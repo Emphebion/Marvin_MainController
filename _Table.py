@@ -132,7 +132,7 @@ class _Button(object):
         self.segments = segments
 
     def getButtonSegment(self, index):
-        if 0 < index < len(self.segments):
+        if index < len(self.segments):
             return self.segments[index]
         else:
             return None
