@@ -1,0 +1,19 @@
+[items]
+names = item1,item2,item3,item4
+folder = items
+
+[item1]
+load = 10
+connected = 1
+
+[item2]
+load = 5
+connected = 0
+
+[item3]
+load = 15
+connected = 1
+
+[item4]
+load = 8
+connected = 1

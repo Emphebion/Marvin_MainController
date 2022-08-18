@@ -1,0 +1,91 @@
+[common]
+devices=GSM,RFID_LED
+menu=main,putgrootte,ontkoppelen,aansluiten,achtergrond
+
+[GSM]
+devid = 1234:5678
+baudrate = 9600
+startByte = \s
+stopByte = \r
+
+[RFID_LED]
+devid = 1a86:7523
+baudrate = 500000
+startByte = \r
+stopByte = \n
+
+[screen]
+size = 480,320
+
+[State1]
+name=reset
+folder=menu
+location=0,0
+
+[State2]
+name=welcome
+folder=menu
+location=0,0
+
+[State3]
+name=ontkoppelen
+folder=menu
+location=0,0
+
+[State4]
+name=putgrootte
+folder=menu
+location=0,0
+
+[State5]
+name=achtergrond
+folder=menu
+location=0,0
+source=100
+
+[State6]
+name=aansluiten
+folder=menu
+location=0,0
+
+[State7]
+name=achtergrond
+folder=menu
+ifolder=items
+location=0,0
+item_location=120,80
+
+[State8]
+name=achtergrond
+folder=menu
+location=0,0
+
+[State9]
+name=IdleGame
+folder=menu
+location=0,0
+successPerLevel=3,6,9
+roundGoalsPerLevel=1,2,3
+
+[State10]
+name=AwaitInput
+folder=menu
+location=0,0
+looptimeout=100
+snakeLength=30
+
+[State11]
+name=ChangeGame
+folder=menu
+location=0,0
+
+[State12]
+name=FinishGame
+folder=items
+location=0,0
+successTimeout=10
+
+[StateX]
+name=Quit
+folder=menu
+location=0,0
