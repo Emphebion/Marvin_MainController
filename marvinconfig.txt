@@ -5,7 +5,7 @@ menu=main,putgrootte,ontkoppelen,aansluiten,achtergrond
 [GSM]
 devid = 1234:5678
 baudrate = 9600
-startByte = \s
+startByte = \n
 stopByte = \r
 
 [RFID_LED]
