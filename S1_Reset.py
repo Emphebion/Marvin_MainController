@@ -9,18 +9,18 @@ class S1_Reset():
     def run(self):
         self.state = self.states.S1
         print("current state is {}".format(self.state))
-        #self.playerDict = self._readPlayerSkills()
+        glbs.display.screenOff()
 
         while(self.state == self.states.S1):
+            
             device_names = [device.name for device in glbs.devices.connectedDevices]
             print("Connected devices: {}".format(device_names))
             self._setState()
-
         return self.state.value
 
     def _setState(self):
         new_state = self.states.S1
-        self._checkInput() 
+        self._checkInput()
 
         if glbs.players.activePlayer:
             new_state = self.states.S2

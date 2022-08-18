@@ -31,5 +31,7 @@ class S5_PutSize(object):
                 else:
                     self.state = self.states.S5
 
-    def display(self):
-        return 1
+        #reset state machine if no input has been provided for 15 minutes
+        if glbs.bedTime():
+            self.state = self.states.S1
+

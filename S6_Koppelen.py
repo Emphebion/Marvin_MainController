@@ -34,3 +34,7 @@ class S6_Koppelen():
                     self.state = self.states.S6
                 else:
                     self.state = self.states.S6
+
+        #reset state machine if no input has been provided for 15 minutes
+        if glbs.bedTime():
+            self.state = self.states.S1

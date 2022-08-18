@@ -33,3 +33,17 @@ currentRoundInputs = []
 gameSuccesses = 0
 snakeCounter = 0
 returnState = None
+
+# Sleep variables
+parser.read(config_file)
+systemTimeout = parser.getint('common', 'systemTimeout')
+systemWakeTime = time.time()
+
+def bedTime():
+    sleep = False
+    timmy = systemTimeout - (time.time() - systemWakeTime)
+    print("Current time before bed = " + str(timmy))
+    if (time.time() - systemWakeTime) > systemTimeout:
+        players.resetActivePlayer()
+        sleep = True
+    return sleep

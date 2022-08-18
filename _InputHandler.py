@@ -1,5 +1,6 @@
 import pygame
 import glbs
+import os
 
 class _InputHandler(object):
     def __init__(self):
@@ -20,6 +21,7 @@ class _InputHandler(object):
             return self.elist.append({"event": "quit"})
 
         elif event.type == pygame.KEYDOWN:
+            glbs.systemWakeTime = glbs.time.time()
             if event.key == pygame.K_LEFT:
                 self.elist.append({"event": "keydown", "data": "left"})
 
@@ -72,7 +74,10 @@ class _InputHandler(object):
 
         elif event.type == self.SERIAL:
             print("SERIAL EVENT DETECTED")
+            glbs.systemWakeTime = glbs.time.time()
             self.elist.append({"event": "serial", "data": event.dict["line"]})
+            if "quit" in event.dict["line"]:
+                os.system("sudo shutdown -h now")
 
         pygame.event.clear()
         return self.elist

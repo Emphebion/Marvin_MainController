@@ -91,20 +91,8 @@ def main():
         prev_state = state
         state = new_state
 
-    '''OLD STUFF'''
-
-    game = Game()
-    game.quit()
 
     '''TODO:
-        - Check if a correct tag is presented
-        - set pages to visible based on tag
-        - show opening page
-        - wait on button and then:
-            - load new page/execute skill
-            - set main menu page as invisible (once)
-        - on execute skill:
-            - start minigame
         - set pages to invisible'''
 
 

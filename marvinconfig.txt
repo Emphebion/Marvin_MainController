@@ -1,6 +1,7 @@
 [common]
 devices=GSM,RFID_LED
 menu=main,putgrootte,ontkoppelen,aansluiten,achtergrond
+systemTimeout=10
 
 [GSM]
 devid = 1234:5678
