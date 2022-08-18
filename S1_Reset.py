@@ -35,7 +35,7 @@ class S1_Reset():
         if input_list:
             new_input = input_list.pop()
             if new_input["event"] == "serial":
-                ID = new_input["data"]
+                ID = int(new_input["data"])
                 if ID in glbs.players.playerDict:
                     glbs.players.setActivePlayer(ID)
 

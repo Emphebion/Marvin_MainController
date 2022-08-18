@@ -8,7 +8,7 @@
 
 class _Players(object):
     def __init__(self, config_file, parser):
-        self.playerDict = {0: []}
+        self.playerDict = {}
         self.parse_config(config_file,parser)
         self.activePlayer = None
         
@@ -17,13 +17,13 @@ class _Players(object):
         playerList = parser.get('common', 'players').split(',')
         for player in playerList:
             try:
-                ID = parser.get('common', player)
+                ID = int(parser.get(player, 'ID'))
             except:
                 ID = 0
             name = parser.get(player, 'name')
             skills = parser.get(player, 'skills').split(',')
             player = _Player(name, ID, skills)
-            self.playerDict[ID].append(player)
+            self.playerDict[ID] = player # TODO append to list if ID=0
 
     def setActivePlayer(self, ID):
         self.activePlayer = self.playerDict[ID]
