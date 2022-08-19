@@ -72,7 +72,7 @@ name=AwaitInput
 folder=menu
 location=0,0
 looptimeout=100
-snakeLength=30
+snakeLength=28
 
 [State11]
 name=ChangeGame

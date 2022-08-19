@@ -66,6 +66,7 @@ class S10_AwaitInput():
                 self.routeDone.pop(0)
 
     def setLEDinSegment(self, segment, oldColor, color):
+        # TODO head and tail of snake can not be in same segment
         if (oldColor in segment.getLEDvalues()):
             LEDValues = segment.getLEDvalues()
             if segment.getFlow() > 0:
