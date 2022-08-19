@@ -1,7 +1,7 @@
 [common]
 devices=GSM,RFID_LED
 menu=main,putgrootte,ontkoppelen,aansluiten,achtergrond
-systemTimeout=10
+systemTimeout=300
 
 [GSM]
 devid = 1234:5678
@@ -10,7 +10,7 @@ startByte = \n
 stopByte = \r
 
 [RFID_LED]
-devid = 1a86:7523
+devid = 2A03:0042
 baudrate = 500000
 startByte = \r
 stopByte = \n
@@ -84,7 +84,7 @@ location=0,0
 name=FinishGame
 folder=items
 location=0,0
-successTimeout=10
+successTimeout=3
 
 [StateX]
 name=Quit
