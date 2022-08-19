@@ -15,7 +15,7 @@ class _Display(object):
         parser.read(config_file)
         self.size = [int(x.strip()) for x in parser.get('screen', 'size').split(',')]
         pygame.init()
-        self.screen = pygame.display.set_mode(self.size)
+        self.screen = pygame.display.set_mode(self.size, pygame.FULLSCREEN)
         self.max_rad = int(min(self.size)/2 - 75)
         
     def display(self, folder, name, location):
