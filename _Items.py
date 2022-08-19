@@ -27,20 +27,26 @@ class _Items(object):
                 self.inactive_items.append(item)
 
     def sel_next_item(self):
-        #add if self.inactive_items:
-        i = self.inactive_index + 1
-        if(i >= len(self.inactive_items)):
-            i = 0
-        self.inactive_index = i
-        return self.inactive_items[self.inactive_index].name
+        if self.inactive_items:
+            #add if self.inactive_items:
+            i = self.inactive_index + 1
+            if(i >= len(self.inactive_items)):
+                i = 0
+            self.inactive_index = i
+            return self.inactive_items[self.inactive_index].name
+        else:
+            return None
 
     def sel_prev_item(self):
-        #add if self.inactive_items:
-        i = self.inactive_index - 1
-        if(self.inactive_index <= 0):
-            i = len(self.inactive_items) - 1
-        self.inactive_index = i
-        return self.inactive_items[self.inactive_index].name
+        if self.inactive_items:
+            #add if self.inactive_items:
+            i = self.inactive_index - 1
+            if(self.inactive_index <= 0):
+                i = len(self.inactive_items) - 1
+            self.inactive_index = i
+            return self.inactive_items[self.inactive_index].name
+        else:
+            return None
 
     def calc_put(self):
         put = 0

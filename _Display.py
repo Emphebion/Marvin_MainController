@@ -19,8 +19,9 @@ class _Display(object):
         self.max_rad = int(min(self.size)/2 - 75)
         
     def display(self, folder, name, location):
-        image = pygame.image.load(folder+"/"+name+".jpg")
-        self.screen.blit(image,location)
+        if name:
+            image = pygame.image.load(folder+"/"+name+".jpg")
+            self.screen.blit(image,location)
         pygame.display.flip()
 
     def set_background(self):
