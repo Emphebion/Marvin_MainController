@@ -80,7 +80,6 @@ class _InputHandler(object):
             # Parse screen buttons
             if (chr(data[0]) == 'B') and (int(data[1]) != 0):
                 bits = [(data[1] >> bit) & 1 for bit in range(8 - 1, -1, -1)]
-                bits = bits[:4]
                 for index, bit in enumerate(bits):
                     if bit:
                         button = glbs.table.screenButtons[index]
@@ -92,6 +91,8 @@ class _InputHandler(object):
                             self.elist.append({"event": "keydown", "data": "down"})
                         if button == "top":
                             self.elist.append({"event": "keydown", "data": "up"})
+                        if button == "shutdown":
+                            pygame.quit()
             elif "quit" in str(data):
                 os.system("sudo shutdown -h now")
             else:
