@@ -55,7 +55,7 @@ class S10_AwaitInput():
                         for index, bit in enumerate(bits):
                             if bit:
                                 result.append(glbs.table.buttonList[index].name)
-                        glbs.currentRoundInputs.append(result)
+                        glbs.currentRoundInputs += result
                 elif input_list:
                     glbs.currentRoundInputs.append(input_list.pop())
 
