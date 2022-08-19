@@ -2,6 +2,7 @@
 names = item1,item2,item3,item4
 folder = items
 source = 100
+item_location=120,80
 
 [item1]
 load = 10

@@ -16,7 +16,7 @@ class _Items(object):
         self.parser.sections()
         self.source = self.parser.getint('items','source')
         self.folder = self.parser.get('items', 'folder').strip()
-        self.location = [int(x.strip()) for x in self.parser.get('State7', 'item_location').split(',')]
+        self.location = [int(x.strip()) for x in self.parser.get('items', 'item_location').split(',')]
         self.itemnames = [x.strip() for x in self.parser.get('items', 'names').split(',')]
         for name in self.itemnames:
             load = self.parser.getint(name, 'load')
