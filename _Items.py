@@ -4,19 +4,23 @@
 # Purpose is to:
 # - What am I doing here?
 #############################################
+import configparser
 
 class _Items(object):
-    def __init__(self, config_file, parser):
+    def __init__(self, config_file):
         self.items = []
         self.inactive_index = 0
-        parser.read(config_file)
-        parser.sections()
-        self.folder = parser.get('items', 'folder').strip()
-        self.location = [int(x.strip()) for x in parser.get('State7', 'item_location').split(',')]
-        self.itemnames = [x.strip() for x in parser.get('items', 'names').split(',')]
+        self.parser = configparser.ConfigParser()
+        self.config_file = config_file
+        self.parser.read(config_file)
+        self.parser.sections()
+        self.source = self.parser.getint('items','source')
+        self.folder = self.parser.get('items', 'folder').strip()
+        self.location = [int(x.strip()) for x in self.parser.get('State7', 'item_location').split(',')]
+        self.itemnames = [x.strip() for x in self.parser.get('items', 'names').split(',')]
         for name in self.itemnames:
-            load = parser.getint(name, 'load')
-            connected = parser.getboolean(name, 'connected')
+            load = self.parser.getint(name, 'load')
+            connected = self.parser.getboolean(name, 'connected')
             self.items.append(Item(name,load,connected))
         self.inactive_items = []
         self.active_items = []
@@ -59,10 +63,10 @@ class _Items(object):
         while self.active_items:
             item = self.active_items.pop()
             item.set_connected(False)
-            parser[item.name]['connected'] = '0'
+            self.parser[item.name]['connected'] = '0'
 
-        with open(config_file,'w') as file:
-            parser.write(file)
+        with open(self.config_file,'w') as file:
+            self.parser.write(file)
 
         self.inactive_index = 0
 
@@ -73,17 +77,26 @@ class _Items(object):
         item = self.inactive_items.pop(self.inactive_index)
         item.set_connected(True)
         self.active_items.append(item)
-        parser[item.name]['connected'] = '1'
+        self.parser[item.name]['connected'] = '1'
 
-        with open(config_file,'w') as file:
-            parser.write(file)
-        
+        with open(self.config_file,'w') as file:
+            self.parser.write(file)
+
+        if self.sumLoad() > self.source:
+            self.disconnect_all()
+
         self.sel_prev_item()
     # add connect function
         #- link back to setState with return to S6
 
     def generate_item(self):
         i = 1
+
+    def sumLoad(self):
+        sum = 0
+        for item in self.active_items:
+            sum += item.load
+        return sum
 
 class Item(object):
     def __init__(self, name, load=1, connected=False):
