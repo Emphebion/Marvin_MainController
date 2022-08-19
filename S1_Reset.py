@@ -11,10 +11,10 @@ class S1_Reset():
         print("current state is {}".format(self.state))
         glbs.display.screenOff()
 
+        device_names = [device.name for device in glbs.devices.connectedDevices]
+        print("Connected devices: {}".format(device_names))
+
         while(self.state == self.states.S1):
-            
-            device_names = [device.name for device in glbs.devices.connectedDevices]
-            print("Connected devices: {}".format(device_names))
             self._setState()
         return self.state.value
 

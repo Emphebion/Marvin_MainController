@@ -43,7 +43,7 @@ systemWakeTime = time.time()
 def bedTime():
     sleep = False
     timmy = systemTimeout - (time.time() - systemWakeTime)
-    print("Current time before bed = " + str(timmy))
+    #print("Current time before bed = " + str(timmy))
     if (time.time() - systemWakeTime) > systemTimeout:
         players.resetActivePlayer()
         sleep = True
