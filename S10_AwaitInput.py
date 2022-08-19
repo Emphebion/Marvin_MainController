@@ -43,13 +43,14 @@ class S10_AwaitInput():
             new_input = input_list.pop()
             if new_input["event"] == "serial":
                 data = new_input["data"]
-                if not (input_list in glbs.table.gameButtons):
-                    bits = [(data >> bit) & 1 for bit in range(8 - 1, -1, -1)]
-                    result = []
-                    for index, bit in enumerate(bits):
-                        if bit:
-                            result.append(glbs.table.buttonList[index].name)
-                    glbs.currentRoundInputs.append(result)
+                if (chr(data[0]) == 'B') and (int(data[2]) != 0):
+                    if not (input_list in glbs.table.gameButtons):
+                        bits = [(data[2] >> bit) & 1 for bit in range(8 - 1, -1, -1)]
+                        result = []
+                        for index, bit in enumerate(bits):
+                            if bit:
+                                result.append(glbs.table.buttonList[index].name)
+                        glbs.currentRoundInputs.append(result)
                 elif input_list:
                     glbs.currentRoundInputs.append(input_list.pop())
 

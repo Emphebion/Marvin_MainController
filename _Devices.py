@@ -141,7 +141,8 @@ class Device(object):
 
             pos += 1
 
-        if calculatedCrc == int(crc):
-            return data[startIndex + 1:endIndex]
-        else:
+        try:
+            if calculatedCrc == ord(crc):
+                return data[startIndex + 1:endIndex]
+        except:
             return []

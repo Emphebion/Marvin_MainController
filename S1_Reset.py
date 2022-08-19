@@ -35,9 +35,11 @@ class S1_Reset():
         if input_list:
             new_input = input_list.pop()
             if new_input["event"] == "serial":
-                ID = int(new_input["data"])
-                if ID in glbs.players.playerDict:
-                    glbs.players.setActivePlayer(ID)
+                data = new_input["data"]
+                if chr(data[0]) == 'T':
+                    ID = int(data[1:])
+                    if ID in glbs.players.playerDict:
+                        glbs.players.setActivePlayer(ID)
 
             # debug statement 
             elif new_input["event"] == "keydown":

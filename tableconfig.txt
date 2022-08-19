@@ -1,7 +1,7 @@
 [common]
 segments=segm0,segm1,segm2,segm3,segm4,segm5,segm6,segm7,segm8,segm9,segm10,segm11,segm12,segm13,segm14,segm15,segm16,segm17,segm18,segm19,segm20,segm21,segm22,segm23,segm24,segm25,segm26,segm27,segm28,segm29,segm30,segm31,segm32,segm33,segm34,segm35,segm36,segm37,segm38,segm39,segm40,segm41,segm42,segm43,segm44,segm45,segm46,segm47,segm48,segm49,segm50,segm51,segm52,segm53,segm54,segm55,segm56,segm57,segm58,segm59,segm60,segm61,segm62,segm63
-gamebuttons=east,northeast,north,northwest,west,southwest,south,southeast
-screenbuttons=right,top,left,bottom
+gamebuttons=southeast,south,southwest,west,northwest,north,northeast,east
+screenbuttons=bottom,right,top,left
 colors=amethist,emerald,purple,turquoise,black
 
 [segm0]
