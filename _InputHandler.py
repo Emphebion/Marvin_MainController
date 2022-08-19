@@ -75,9 +75,27 @@ class _InputHandler(object):
         elif event.type == self.SERIAL:
             print("SERIAL EVENT DETECTED")
             glbs.systemWakeTime = glbs.time.time()
-            self.elist.append({"event": "serial", "data": event.dict["line"]})
-            if "quit" in event.dict["line"]:
+
+            data = event.dict["line"]
+            # Parse screen buttons
+            if (chr(data[0]) == 'B') and (int(data[1]) != 0):
+                bits = [(data[1] >> bit) & 1 for bit in range(8 - 1, -1, -1)]
+                bits = bits[:4]
+                for index, bit in enumerate(bits):
+                    if bit:
+                        button = glbs.table.screenButtons[index]
+                        if button == "left":
+                            self.elist.append({"event": "keydown", "data": "left"})
+                        if button == "right":
+                            self.elist.append({"event": "keydown", "data": "right"})
+                        if button == "bottom":
+                            self.elist.append({"event": "keydown", "data": "down"})
+                        if button == "top":
+                            self.elist.append({"event": "keydown", "data": "up"})
+            elif "quit" in data:
                 os.system("sudo shutdown -h now")
+            else:
+                self.elist.append({"event": "serial", "data": data})
 
         pygame.event.clear()
         return self.elist
