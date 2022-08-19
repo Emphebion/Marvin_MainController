@@ -35,4 +35,8 @@ class S4_Put(object):
                 else:
                     self.state = self.states.S4
 
+        #reset state machine if no input has been provided for 15 minutes
+        if glbs.bedTime():
+            self.state = self.states.S1
+
             

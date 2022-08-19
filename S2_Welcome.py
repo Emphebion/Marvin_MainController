@@ -17,16 +17,18 @@ class S2_Welcome(object):
 
         while(self.state == self.states.S2):
             self._setState()
-
         return self.state.value
 
     def _setState(self):
         new_state = self.states.S2
         input_list = glbs.handler.event_handler()
-
         if input_list:
             new_input = input_list.pop()
             new_state = self.states.S3
 
             if(self.state != new_state):
                 self.state = new_state
+
+        #reset state machine if no input has been provided for 15 minutes
+        if glbs.bedTime():
+            self.state = self.states.S1

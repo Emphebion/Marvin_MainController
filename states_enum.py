@@ -27,12 +27,14 @@ class StatesEnum():
 
     def get_states_s2(self):
         class State2_states(Enum):
+            S1 = self.all_states.S1_Reset.value
             S2 = self.all_states.S2_Welcome.value
             S3 = self.all_states.S3_Ontkoppelen.value
         return State2_states
 
     def get_states_s3(self):
         class State3_states(Enum):
+            S1 = self.all_states.S1_Reset.value
             S3 = self.all_states.S3_Ontkoppelen.value
             S4 = self.all_states.S4_Put.value
             S6 = self.all_states.S6_Koppelen.value
@@ -41,6 +43,7 @@ class StatesEnum():
 
     def get_states_s4(self):
         class State4_states(Enum):
+            S1 = self.all_states.S1_Reset.value
             S3 = self.all_states.S3_Ontkoppelen.value
             S4 = self.all_states.S4_Put.value
             S5 = self.all_states.S5_PutSize.value
@@ -49,12 +52,14 @@ class StatesEnum():
 
     def get_states_s5(self):
         class State5_states(Enum):
+            S1 = self.all_states.S1_Reset.value
             S4 = self.all_states.S4_Put.value
             S5 = self.all_states.S5_PutSize.value
         return State5_states
 
     def get_states_s6(self):
         class State6_states(Enum):
+            S1 = self.all_states.S1_Reset.value
             S3 = self.all_states.S3_Ontkoppelen.value
             S4 = self.all_states.S4_Put.value
             S6 = self.all_states.S6_Koppelen.value
@@ -63,6 +68,7 @@ class StatesEnum():
 
     def get_states_s7(self):
         class State7_states(Enum):
+            S1 = self.all_states.S1_Reset.value
             S6 = self.all_states.S6_Koppelen.value
             S7 = self.all_states.S7_Items.value
             S8 = self.all_states.S8_StartGame.value
@@ -83,6 +89,7 @@ class StatesEnum():
 
     def get_states_s10(self):
         class State10_states(Enum):
+            S1 = self.all_states.S1_Reset.value
             S9 = self.all_states.S9_IdleGame.value
             S10 = self.all_states.S10_AwaitInput.value
             S11 = self.all_states.S11_ChangeGame.value

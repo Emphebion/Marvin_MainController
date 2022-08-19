@@ -38,5 +38,7 @@ class _Display(object):
         pygame.draw.circle(self.screen,(r,g,b,a),(240,160),self.max_rad,width)
         pygame.display.flip()
 
-    def screen_off(self):
-        something = 1
+    def screenOff(self):
+        black = (0,0,0)
+        self.screen.fill(black)
+        pygame.display.flip()

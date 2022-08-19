@@ -36,6 +36,11 @@ class S10_AwaitInput():
                 self.loopStartTime = glbs.time.time()
                 self.state = self.states.S11
 
+        #reset state machine if no input has been provided for 15 minutes
+        if glbs.bedTime():
+            self.state = self.states.S1
+
+
     # State specific functions:
     def _checkInput(self):
         input_list = glbs.handler.event_handler()
