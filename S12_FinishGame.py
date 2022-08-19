@@ -22,9 +22,9 @@ class S12_FinishGame():
             delay = 1
 
         #Handle the consequences of the game
-        if glbs.returnState is self.states.S7:
+        if glbs.returnState.value is self.states.S7.value:
             glbs.items.connect_item()
-        elif glbs.returnState is self.states.S3:
+        elif glbs.returnState.value is self.states.S3.value:
             glbs.items.disconnect_all()
 
         #reset table to off

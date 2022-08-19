@@ -103,8 +103,9 @@ class StatesEnum():
 
     def get_states_s12(self):
         class State12_states(Enum):
-            S2 = self.all_states.S2_Welcome
-            S3 = self.all_states.S3_Ontkoppelen.value
+            S2 = self.all_states.S2_Welcome.value
+            S3 = self.all_states.S3_Ontkoppelen.value # TODO remove this state
             S6 = self.all_states.S6_Koppelen.value
+            S7 = self.all_states.S7_Items.value # TODO remove this state
             S12 = self.all_states.S12_FinishGame.value
         return State12_states
