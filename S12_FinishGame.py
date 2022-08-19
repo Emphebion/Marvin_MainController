@@ -15,7 +15,7 @@ class S12_FinishGame():
         print("current state is {}".format(self.state))
 
         #confirm success to user
-        self._setLEDData(glbs.table.colorsLED("emerald"))
+        self._setLEDData(glbs.table.colorsLED["emerald"])
         self._transmit()
         stopTime = self.successTimeout + glbs.time.time()
         while (stopTime - glbs.time.time() > 0):
@@ -28,7 +28,7 @@ class S12_FinishGame():
             glbs.items.disconnect_all()
 
         #reset table to off
-        self._setLEDData(glbs.table.colorsLED("black"))
+        self._setLEDData(glbs.table.colorsLED["black"])
         self._transmit()
 
         while(self.state == self.states.S12):
@@ -57,4 +57,4 @@ class S12_FinishGame():
     def _setLEDData(self, color):
         for segment in glbs.table.segmentList:
             for i in range(len(segment.LEDvalues)):
-                segment.setLEDValue(color)
+                segment.setLEDValue(i,color)

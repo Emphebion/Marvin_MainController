@@ -27,6 +27,7 @@ class S3_Ontkoppelen(object):
                 if new_input["data"] == "right":
                     self.state = self.states.S4
                 elif new_input["data"] == "down":  # Dummy
+                    glbs.returnState = self.states.S3
                     self.state = self.states.S8
                 elif new_input["data"] == "left":
                     self.state = self.states.S6
