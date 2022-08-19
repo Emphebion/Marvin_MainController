@@ -92,7 +92,7 @@ class _InputHandler(object):
                             self.elist.append({"event": "keydown", "data": "down"})
                         if button == "top":
                             self.elist.append({"event": "keydown", "data": "up"})
-            elif "quit" in data:
+            elif "quit" in str(data):
                 os.system("sudo shutdown -h now")
             else:
                 self.elist.append({"event": "serial", "data": data})
