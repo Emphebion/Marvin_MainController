@@ -37,7 +37,8 @@ class S1_Reset():
             if new_input["event"] == "serial":
                 data = new_input["data"]
                 if chr(data[0]) == 'T':
-                    ID = int(data[1:])
+                    ID = int.from_bytes(data[1:], "big")
+                    print("Received ID: {}".format(ID))
                     if ID in glbs.players.playerDict:
                         glbs.players.setActivePlayer(ID)
 

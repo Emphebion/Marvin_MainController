@@ -11,14 +11,17 @@ ID=12399323
 [SL2]
 name=Irma
 skills=SL
+ID=13420775
 
 [SL3]
 name=Koen
 skills=SL
+ID=13425689
 
 [SL4]
 name=Miranda
 skills=SL
+ID=13421961
 
 [SL5]
 name=Pascal
