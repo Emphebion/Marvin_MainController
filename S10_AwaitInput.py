@@ -78,4 +78,6 @@ class S10_AwaitInput():
                 segment.setLEDValue(LEDValues.index(oldColor), color)
             else:
                 segment.setLEDValue((len(segment.getLEDvalues()) - 1) - list(reversed(LEDValues)).index(oldColor), color)
+            print("Flow of " + str(segment.name) + " = " + str(segment.getFlow()))
+            print(segment.getLEDvalues())
         return not (oldColor in segment.getLEDvalues())

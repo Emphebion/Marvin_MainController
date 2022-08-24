@@ -1,40 +1,77 @@
 [items]
-names = item1,item2,item3,item4,item5,item6,item7
+names = item1,item2,item3,item4,item5,item6,item7,item8,item9
 folder = items
 source = 110
 item_location=120,80
 
 [item1]
-name = Ring
-load = 20
+name = Ketting der Vergetelheid
+function = De persoon die dit draagt vergeet specifieke gebeurtenissen. Als men hem er aan probeerd te herinneren wordt een passende (foutive) herinnering aangemaakt. Als de ketting ooit afgaat zit de persoon met dubbele herinneringen.
+ID = 12345678
+level = 2
+load = 29
 connected = 1
-
+ 
 [item2]
-name = miner
+name = Grondstof Zoeker
+function = Zoekt een gebied af naar grondstoffen. Een keer per dag deel moet de grondstof opgehaal worden. (aangepaste ruling!)
+ID = 23456789
+level = 2
 load = 25
 connected = 1
 
 [item3]
-name = wiggelroede
-load = 10
+name = Inspiratie put Compas
+function = Wijst naar de put waar op dit construct is aangesloten. Als dit wordt gebruikt om te woudlopen verliest de groep items, 1 LP en komt uitgeput aan.
+ID = 34567890
+level = 1
+load = 5
 connected = 1
 
 [item4]
-name = nonmagicpillar
-load = 40
-connected = 1
+name = Magie Grenspost
+function = Zoekt de rand van een plek waar magie niet werkt
+ID = 45678901
+level = 3
+load = 45
+connected = 0
 
 [item5]
-name = musicbox
+name = Speeldoos
+function = Speeld muziek als deze verbonden is
+ID = 56789012
+level = 1
 load = 10
 connected = 0
 
 [item6]
-name = giflepel
+name = Giflepel
+function = Kan in of onder iets gelegd worden om iets warm te houden
+ID = 67890123
+level = 1
 load = 10
-connected = 1
+connected = 0
 
 [item7]
-name = warmteSteen
-load = 8
+name = Warmte Steen
+function = Kan in of onder iets gelegd worden om iets warm te houden
+ID = 78901234
+level = 1
+load = 5
+connected = 0
+
+[item8]
+name = Vitalizer
+function = Na 2 keer draaien van de sleutel gaat het kistje open. Is het kistje leeg neemt het direct 2 LP op als energie. Als er al energie in zit kan dit er uitgehaald worden per LP.
+ID = 89012345
+level = 2
+load = 30
+connected = 0
+
+[item9]
+name = Zegel van Intentie
+function = Tijdens het verzegelen van een brief kan met dit zegel 1 aspect van de brief feilloos worden overgebracht op de persoon die het zegel breekt. Voorbeelden: Emotie tijdens verzegelen, Leest zig zelf voor, Vertaald naar andere taal, etc
+ID = 90123456
+level = 1
+load = 10
 connected = 0

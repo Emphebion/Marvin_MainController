@@ -17,14 +17,8 @@ class S8_StartGame(object):
     def run(self, caller_state):
         self.state = self.states.S8
         print("current state is {}".format(self.state))
-
-        #glbs.display.display()
-        glbs.startTime = glbs.time.time()
-        if glbs.items.inactive_items:
-            glbs.endTime = glbs.time.time() + 60*glbs.items.inactive_items[glbs.items.inactive_index].load
-        else:
-            glbs.endTime = glbs.time.time() + 300
-        print("Game time = {} seconds".format(glbs.endTime - glbs.startTime))
+        
+        #remove state
         while(self.state == self.states.S8):
             self._setState()
         return self.state.value

@@ -22,7 +22,6 @@ class _Table(object):
         colors = parser.get('common', 'colors').split(',')
         for color in colors:
             self.colorsLED[color] = [int(x.strip()) for x in parser.get(color, 'rgb').split(',')]
-        print(self.colorsLED)
         self.segmentNames = parser.get('common', 'segments').split(',')
         for segment in self.segmentNames:
             nrLEDs = parser.getint(segment, 'nrLEDs')
@@ -34,9 +33,8 @@ class _Table(object):
             buttonSegments = parser.get(button, 'segments').split(',')
             self.buttonList.append(_Button(button, buttonSegments))
         self.screenButtons = parser.get('common', 'screenbuttons').split(',')
-        for b in self.buttonList:
-            print(b.name)
-        
+        self.maxRouteLength = parser.getint('common', 'maxRouteLength')
+        self.nrOfStartSegments = parser.getint('common', 'nrOfStartSegments')
 
     def setStartSegment(self, segmentName, flow):
         self.startSegment = segmentName
@@ -77,7 +75,7 @@ class _Table(object):
         #random loop back to start (refactor needed)
         checklist = ["segm0","segm1","segm2","segm3","segm4","segm5","segm6","segm7","segm8","segm9","segm10","segm11","segm12","segm13","segm14","segm15"] #segm in inner ring
         duplicates = 0 #nr of segm in route in inner ring
-        while ((duplicates < 3) & (len(route) < 30)): #exchange hardcoded with settings/vars
+        while ((duplicates < self.nrOfStartSegments) & (len(route) < self.maxRouteLength)): #exchange hardcoded with settings/vars
             if route[-1].flow > 0:
                 route.append(self.getSegment(route[-1].counterSegments[random.randint(0,len(route[-1].counterSegments)-1)]))
             else:
@@ -89,9 +87,6 @@ class _Table(object):
                 route[-1].setSegmentFlow(1)
             else:
                 route[-1].setSegmentFlow(-1)
-
-            #debug
-            print(namelist)
 
         return route
 

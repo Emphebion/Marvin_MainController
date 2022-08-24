@@ -23,9 +23,9 @@ class S12_FinishGame():
 
         #Handle the consequences of the game
         if glbs.returnState.value is self.states.S7.value:
-            glbs.items.connect_item()
+            glbs.items.connectItem()
         elif glbs.returnState.value is self.states.S3.value:
-            glbs.items.disconnect_all()
+            glbs.items.disconnectAll()
 
         #reset table to off
         self._setLEDData(glbs.table.colorsLED["black"])

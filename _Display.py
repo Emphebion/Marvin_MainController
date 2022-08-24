@@ -15,12 +15,13 @@ class _Display(object):
         parser.read(config_file)
         self.size = [int(x.strip()) for x in parser.get('screen', 'size').split(',')]
         pygame.init()
-        self.screen = pygame.display.set_mode(self.size, pygame.FULLSCREEN)
+        #self.screen = pygame.display.set_mode(self.size, pygame.FULLSCREEN)
+        self.screen = pygame.display.set_mode(self.size, pygame.NOFRAME)
         self.max_rad = int(min(self.size)/2 - 75)
         
-    def display(self, folder, name, location):
-        if name:
-            image = pygame.image.load(folder+"/"+name+".jpg")
+    def display(self, folder, fileName, location):
+        if fileName:
+            image = pygame.image.load(folder + "/" + fileName + ".jpg")
             self.screen.blit(image,location)
         pygame.display.flip()
 
@@ -35,7 +36,6 @@ class _Display(object):
         g = random.randrange(0,255,10)
         b = random.randrange(0,255,10)
         a = random.randrange(0,255,10)
-        print('RGBA = '+str(r)+','+str(g)+','+str(b)+','+str(a))
         pygame.draw.circle(self.screen,(r,g,b,a),(240,160),self.max_rad,width)
         pygame.display.flip()
 
