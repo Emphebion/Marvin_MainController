@@ -18,17 +18,23 @@ class _Items(object):
         self.folder = self.parser.get('items', 'folder').strip()
         self.location = [int(x.strip()) for x in self.parser.get('items', 'item_location').split(',')]
         self.itemnames = [x.strip() for x in self.parser.get('items', 'names').split(',')]
+        print("itemnames = " + str(self.itemnames))
         for name in self.itemnames:
             load = self.parser.getint(name, 'load')
-            connected = self.parser.getboolean(name, 'connected')
+            if self.parser.getint(name, 'connected') > 0:
+                connected = True
+            else:
+                connected = False
             self.items.append(Item(name,load,connected))
         self.inactive_items = []
         self.active_items = []
         for item in self.items:
             if item.connected == True:
+                print("connected" +item.name)
                 self.active_items.append(item)
             else:
                 self.inactive_items.append(item)
+                print("not connected" +item.name)
 
     def sel_next_item(self):
         if self.inactive_items:
@@ -63,6 +69,7 @@ class _Items(object):
         while self.active_items:
             item = self.active_items.pop()
             item.set_connected(False)
+            self.inactive_items.append(item)
             self.parser[item.name]['connected'] = '0'
 
         with open(self.config_file,'w') as file:

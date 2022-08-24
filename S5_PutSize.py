@@ -8,14 +8,14 @@ class S5_PutSize(object):
         self.name = str(glbs.parser.get('State5', 'name'))
         self.folder = str(glbs.parser.get('State5', 'folder'))
         self.location = [int(x.strip()) for x in glbs.parser.get('State5', 'location').split(',')]
-        self.source = glbs.parser.getint('State5', 'source')
+        #self.source = glbs.parser.getint('State5', 'source')
 
     def run(self):
         self.state = self.states.S5
         print("current state is {}".format(self.state))
 
         glbs.display.display(self.folder,self.name,self.location)
-        glbs.display.draw_source(self.source,glbs.items.calc_put())
+        glbs.display.draw_source(glbs.items.source,glbs.items.calc_put())
 
         while(self.state == self.states.S5):
             self._setState()

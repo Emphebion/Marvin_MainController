@@ -1,21 +1,40 @@
 [items]
-names = item1,item2,item3,item4
+names = item1,item2,item3,item4,item5,item6,item7
 folder = items
-source = 100
+source = 110
 item_location=120,80
 
 [item1]
-load = 10
+name = Ring
+load = 20
 connected = 1
 
 [item2]
-load = 5
-connected = 0
+name = miner
+load = 25
+connected = 1
 
 [item3]
-load = 15
+name = wiggelroede
+load = 10
 connected = 1
 
 [item4]
-load = 8
+name = nonmagicpillar
+load = 40
 connected = 1
+
+[item5]
+name = musicbox
+load = 10
+connected = 0
+
+[item6]
+name = giflepel
+load = 10
+connected = 1
+
+[item7]
+name = warmteSteen
+load = 8
+connected = 0

@@ -1,44 +1,62 @@
 [common]
-players=SL1,SL2,SL3,SL4,SL5,TT1,TT2,Kiefte
-#<player1>=<tagID>
-#<player1>=<tagID>
+players=SL1,SL2,SL3,SL4,SL5,NPC1,PC1,PC2,PC3,PC4,PC5,PlayerUnknown
 
 [SL1]
 name=Vincent
 skills=SL
-ID=12399323
+ID=13412735
 
 [SL2]
 name=Irma
 skills=SL
-ID=13420775
+ID=13412735
 
 [SL3]
 name=Koen
 skills=SL
-ID=13425689
+ID=13412735
 
 [SL4]
 name=Miranda
 skills=SL
-ID=13421961
+ID=13412735
 
 [SL5]
 name=Pascal
 skills=SL
+ID=13412735
 
-[TT1]
-name=Gerard
-skills=TT
+[NPC1]
+name=Kulgan Kieferfelsen
+ID=13420933
+skills=SL
 
-[TT2]
-name=Vincent
-skills=TT
+[PC1]
+name=Mira
+ID=13420292
+skills=None
 
-[Kiefte]
-name=Kiefte
-skills=TT
+[PC2]                          
+name=Jo Gauss
+ID=14277475
+skills=Ontkoppel,Koppel1,Bron
 
-[player1]
-name=Henk
-skills=Onklaarmaken
+[PC3]
+name=Torg
+ID=13421386
+skills=Ontkoppel,Koppel1,Koppel2,Bron
+
+[PC4]
+name=Harman
+ID=14541168
+skills=None
+
+[PC5]
+name=Isabella Catharina Julia van Zwarteheide
+ID=14522226
+skills=Ontkoppel,Koppel1,Bron
+
+[PlayerUnknown]
+name=Unknown
+ID=0
+skills=None
