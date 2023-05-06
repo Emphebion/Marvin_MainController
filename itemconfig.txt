@@ -1,5 +1,5 @@
 [items]
-names = item1,item2,item3,item4,item5,item6,item7,item8,item9
+names = item2,item4,item7
 folder = items
 source = 110
 item_location=120,80

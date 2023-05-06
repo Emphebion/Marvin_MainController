@@ -1,7 +1,7 @@
 [common]
 devices=GSM,RFID_LED
 menu=main,putgrootte,ontkoppelen,aansluiten,achtergrond
-systemTimeout=300
+systemTimeout=240
 
 [GSM]
 devid = 1234:5678
@@ -65,14 +65,14 @@ location=0,0
 name=IdleGame
 folder=menu
 location=0,0
-successPerLevel=3,6,9
+successPerLevel=6,12,18
 roundGoalsPerLevel=1,2,3
 
 [State10]
 name=AwaitInput
 folder=menu
 location=0,0
-looptimeout=100
+looptimeout=80
 snakeLength=28
 
 [State11]

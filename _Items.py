@@ -32,7 +32,7 @@ class _Items(object):
             self.items[name] = Item(name,function,ID,level,load,connected)
         
 # Menu functions
-    def sel_next_item(self):
+    def selectNextItem(self):
         index = self.itemnames.index(self.currentItemName) + 1
         while index != self.itemnames.index(self.currentItemName):
             if(index >= len(self.itemnames)):
@@ -45,7 +45,7 @@ class _Items(object):
 
         return self.currentItemName
 
-    def sel_prev_item(self):
+    def selectPrevItem(self):
         index = self.itemnames.index(self.currentItemName) - 1
         while index != self.itemnames.index(self.currentItemName):
             if(index < self.getLowestInactiveItem()):

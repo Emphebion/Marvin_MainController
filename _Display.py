@@ -36,6 +36,7 @@ class _Display(object):
         g = random.randrange(0,255,10)
         b = random.randrange(0,255,10)
         a = random.randrange(0,255,10)
+        print('RGBA = '+str(r)+','+str(g)+','+str(b)+','+str(a))
         pygame.draw.circle(self.screen,(r,g,b,a),(240,160),self.max_rad,width)
         pygame.display.flip()
 
@@ -43,3 +44,4 @@ class _Display(object):
         black = (0,0,0)
         self.screen.fill(black)
         pygame.display.flip()
+        

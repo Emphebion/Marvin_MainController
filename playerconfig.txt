@@ -1,5 +1,5 @@
 [common]
-players=SL1,SL2,SL3,SL4,SL5,NPC1,PC1,PC2,PC3,PC4,PC5,PlayerUnknown
+players=SL1,SL2,SL3,SL4,SL5,PlayerUnknown
 
 [SL1]
 name=Vincent
@@ -9,22 +9,22 @@ ID=13412735
 [SL2]
 name=Irma
 skills=SL
-ID=13412735
+ID=13426395
 
 [SL3]
-name=Koen
+name=Deniz
 skills=SL
-ID=13412735
+ID=13420919
 
 [SL4]
 name=Miranda
 skills=SL
-ID=13412735
+ID=13421961
 
 [SL5]
 name=Pascal
 skills=SL
-ID=13412735
+ID=13425689
 
 [NPC1]
 name=Kulgan Kieferfelsen

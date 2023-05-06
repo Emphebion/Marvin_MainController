@@ -18,14 +18,12 @@ class S8_StartGame(object):
         self.state = self.states.S8
         print("current state is {}".format(self.state))
         
-        #remove state
         while(self.state == self.states.S8):
             self._setState()
         return self.state.value
 
     #TODO: expand for multiple rounds
     def _setState(self):
-        #set initial answer
 
         #glbs.currentGameGoals = self.setGameGoals()
         self.state = self.states.S9

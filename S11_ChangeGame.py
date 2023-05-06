@@ -11,7 +11,7 @@ class S11_ChangeGame():     #S11_ChangeLED
 
     def run(self):
         self.state = self.states.S11
-        print("current state is {}".format(self.state))
+        #print("current state is {}".format(self.state))
 
         #glbs.display.display()
         while(self.state == self.states.S11):
@@ -30,7 +30,8 @@ class S11_ChangeGame():     #S11_ChangeLED
         if dev:
             dev.send(self._getLEDData())
         else:
-            print("Failed to transmit led data, device RFID_LED does not exist")
+            #print("Failed to transmit led data, device RFID_LED does not exist")
+            k = 1
 
     def _getLEDData(self):
         LEDData = []

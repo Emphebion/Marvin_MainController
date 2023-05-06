@@ -14,6 +14,7 @@ class S7_Items(object):
         print("current state is {}".format(self.state))
 
         glbs.display.display(self.folder,self.name,self.location)
+        
         if glbs.items.currentItemName:
             glbs.display.display(glbs.items.folder,glbs.items.currentItemName,glbs.items.location)
         while(self.state == self.states.S7):
@@ -26,14 +27,14 @@ class S7_Items(object):
             new_input = input_list.pop()
             if new_input["event"] == "keydown":
                 if new_input["data"] == "right":
-                    glbs.display.display(glbs.items.folder, glbs.items.sel_next_item(), glbs.items.location)
+                    glbs.display.display(glbs.items.folder, glbs.items.selectNextItem(), glbs.items.location)
                     self.state = self.states.S7
                 elif new_input["data"] == "down":
                     glbs.returnState = self.states.S7
                     glbs.activationItem = glbs.items
                     self.state = self.states.S8
                 elif new_input["data"] == "left":
-                    glbs.display.display(glbs.items.folder, glbs.items.sel_prev_item(), glbs.items.location)
+                    glbs.display.display(glbs.items.folder, glbs.items.selectPrevItem(), glbs.items.location)
                     self.state = self.states.S7
                 elif new_input["data"] == "up":
                     self.state = self.states.S6

@@ -247,7 +247,7 @@ flowSegments=segm61,segm62
 counterSegments=segm37,segm38
 
 [segm48]
-nrLEDs=10
+nrLEDs=11
 flowSegments=segm49
 counterSegments=segm40,segm63
 
@@ -257,7 +257,7 @@ flowSegments=segm50,segm41
 counterSegments=segm48
 
 [segm50]
-nrLEDs=11
+nrLEDs=10
 flowSegments=segm51
 counterSegments=segm49,segm41
 
@@ -327,28 +327,36 @@ flowSegments=segm48,segm40
 counterSegments=segm62
 
 [east]
-segments=segm48,segm49
+flowSegments=segm48
+counterSegments=segm49
 
 [northeast]
-segments=segm50,segm51
+flowSegments=segm50
+counterSegments=segm51
 
 [north]
-segments=segm52,segm53
+flowSegments=segm52
+counterSegments=segm53
 
 [northwest]
-segments=segm54,segm55
+flowSegments=segm54
+counterSegments=segm55
 
 [west]
-segments=segm56,segm57
+flowSegments=segm56
+counterSegments=segm57
 
 [southwest]
-segments=segm58,segm59
+flowSegments=segm58
+counterSegments=segm59
 
 [south]
-segments=segm60,segm61
+flowSegments=segm60
+counterSegments=segm61
 
 [southeast]
-segments=segm62,segm63
+flowSegments=segm62
+counterSegments=segm63
 
 [amethist]
 rgb=153,102,204

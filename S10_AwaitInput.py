@@ -15,7 +15,7 @@ class S10_AwaitInput():
 
     def run(self):
         self.state = self.states.S10
-        print("current state is {}".format(self.state))
+        #print("current state is {}".format(self.state))
 
         #TODO: Prepare output (set LED value)
         self._setLEDOutput()
@@ -60,7 +60,7 @@ class S10_AwaitInput():
                     glbs.currentRoundInputs.append(input_list.pop())
 
     #Future: Move to better location and generalise over functions
-    #Furute: Major refactoring needed
+    #Future: Major re-factoring needed
     def _setLEDOutput(self):
         if glbs.currentGameRoute:
             glbs.snakeCounter = glbs.snakeCounter + 1
@@ -68,16 +68,23 @@ class S10_AwaitInput():
                 self.routeDone.append(glbs.currentGameRoute.pop())
         if (glbs.snakeCounter > self.snakeLength) & (len(self.routeDone) > 0):
             if (self.setLEDinSegment(self.routeDone[0], glbs.table.colorsLED["turquoise"], glbs.table.colorsLED["black"])):
-                self.routeDone.pop(0)
+                oldSegment = self.routeDone.pop(0)
+                print(oldSegment.flow)
+                oldSegment.flow.pop()
+                if oldSegment.flow:
+                    print(oldSegment.flow)
+                else:
+                    print("FLOW EMPTY")
 
     def setLEDinSegment(self, segment, oldColor, color):
         # TODO head and tail of snake can not be in same segment
         if (oldColor in segment.getLEDvalues()):
             LEDValues = segment.getLEDvalues()
-            if segment.getFlow() > 0:
+            print("Current Flow of "+ segment.name +" is " + str(segment.getLastSegmentFlow()))
+            if (segment.getLastSegmentFlow()) > 0:
                 segment.setLEDValue(LEDValues.index(oldColor), color)
             else:
                 segment.setLEDValue((len(segment.getLEDvalues()) - 1) - list(reversed(LEDValues)).index(oldColor), color)
-            print("Flow of " + str(segment.name) + " = " + str(segment.getFlow()))
-            print(segment.getLEDvalues())
+            #print("Flow of " + str(segment.name) + " = " + str(segment.getFlow(flowIndex)))
+            #print(segment.getLEDvalues())
         return not (oldColor in segment.getLEDvalues())
