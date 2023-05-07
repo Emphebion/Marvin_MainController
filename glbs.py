@@ -17,7 +17,7 @@ parser = configparser.ConfigParser()
 parser.read(config_file)
 handler = _InputHandler()
 display = _Display(config_file,parser)
-items = _Items(item_file)      #verander naar eigen file config later
+items = _Items(item_file)
 devices = _Devices(config_file,parser)
 table = _Table(table_file,parser)
 players = _Players(player_file,parser) # Add re-read option if obj is empty in state1

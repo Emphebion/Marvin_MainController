@@ -359,16 +359,19 @@ flowSegments=segm62
 counterSegments=segm63
 
 [amethist]
-rgb=153,102,204
+rgb=153,67,140
+OLDrgb=153,102,204
 
 [emerald]
-rgb=80,200,120
+rgb=50,140,80
+OLDrgb=80,200,120
 
 [purple]
 rgb=128,0,128
 
 [turquoise]
-rgb=64,224,208
+rgb=41,150,140
+OLDrgb=64,224,208
 
 [teal]
 rgb=0,128,128

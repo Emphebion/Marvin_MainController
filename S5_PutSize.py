@@ -15,7 +15,7 @@ class S5_PutSize(object):
         print("current state is {}".format(self.state))
 
         glbs.display.display(self.folder,self.name,self.location)
-        glbs.display.draw_source(glbs.items.source,glbs.items.calc_put())
+        glbs.display.draw_source(glbs.items.source,glbs.items.calculateNodeUse())
 
         while(self.state == self.states.S5):
             self._setState()

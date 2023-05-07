@@ -42,35 +42,43 @@ class _InputHandler(object):
 
             elif event.key == pygame.K_h:
                 # pygame.event.post(pygame.event.Event(self.SERIAL,{'line':'north'}))
-                self.elist.append({"event": "keydown", "data": glbs.table.buttonList[0].name})
+                # self.elist.append({"event": "keydown", "data": glbs.table.buttonList[0].name})
+                self.elist.append({"event": "keydown", "data": "east"})
 
             elif event.key == pygame.K_y:
                 # pygame.event.post(pygame.event.Event(self.SERIAL,{'line':'northeast'}))
-                self.elist.append({"event": "keydown", "data": glbs.table.buttonList[1].name})
-
+                # self.elist.append({"event": "keydown", "data": glbs.table.buttonList[1].name})
+                self.elist.append({"event": "keydown", "data": "northeast"})
+                
             elif event.key == pygame.K_t:
                 # pygame.event.post(pygame.event.Event(self.SERIAL,{'line':'east'}))
-                self.elist.append({"event": "keydown", "data": glbs.table.buttonList[2].name})
-
+                # self.elist.append({"event": "keydown", "data": glbs.table.buttonList[2].name})
+                self.elist.append({"event": "keydown", "data": "north"})
+                
             elif event.key == pygame.K_r:
                 # pygame.event.post(pygame.event.Event(self.SERIAL,{'line':'southeast'}))
-                self.elist.append({"event": "keydown", "data": glbs.table.buttonList[3].name})
+                # self.elist.append({"event": "keydown", "data": glbs.table.buttonList[3].name})
+                self.elist.append({"event": "keydown", "data": "northwest"})
 
             elif event.key == pygame.K_f:
                 # pygame.event.post(pygame.event.Event(self.SERIAL,{'line':'south'}))
-                self.elist.append({"event": "keydown", "data": glbs.table.buttonList[4].name})
+                # self.elist.append({"event": "keydown", "data": glbs.table.buttonList[4].name})
+                self.elist.append({"event": "keydown", "data": "west"})
 
             elif event.key == pygame.K_v:
                 # pygame.event.post(pygame.event.Event(self.SERIAL,{'line':'southwest'}))
-                self.elist.append({"event": "keydown", "data": glbs.table.buttonList[5].name})
+                # self.elist.append({"event": "keydown", "data": glbs.table.buttonList[5].name})
+                self.elist.append({"event": "keydown", "data": "southwest"})
 
             elif event.key == pygame.K_b:
                 # pygame.event.post(pygame.event.Event(self.SERIAL,{'line':'west'}))
-                self.elist.append({"event": "keydown", "data": glbs.table.buttonList[6].name})
+                # self.elist.append({"event": "keydown", "data": glbs.table.buttonList[6].name})
+                self.elist.append({"event": "keydown", "data": "south"})
 
             elif event.key == pygame.K_n:
                 # pygame.event.post(pygame.event.Event(self.SERIAL,{'line':'northwest'}))
-                self.elist.append({"event": "keydown", "data": glbs.table.buttonList[7].name})
+                # self.elist.append({"event": "keydown", "data": glbs.table.buttonList[7].name})
+                self.elist.append({"event": "keydown", "data": "southeast"})
 
         elif event.type == self.SERIAL:
             print("SERIAL EVENT DETECTED")
@@ -101,50 +109,6 @@ class _InputHandler(object):
         pygame.event.clear()
         return self.elist
 
-    #def timed_event_handler(self, timeout):
-    #    self.elist = []
-    #    #event = pygame.event.wait(int(timeout*1000))
-    #    event = None
-    #    dev = glbs.devices.get_device("RFID_LED")
-    #    while (event == None):
-    #        if dev:
-    #            ser = glbs.devices.get_device("RFID_LED").usbcom
-    #            try:
-    #                if  ser.is_waiting():
-    #                    data = ser.read_until()
-    #                    pygame.event.port(Event(SERIAL,{'line',data}))
-    #            except:
-    #                ser.open()
-    #            event = pygame.event.peek()
-    #    if event.type == pygame.QUIT:
-    #        return self.elist.append("quit")
-        
-    #    elif event.type == pygame.NOEVENT:
-    #        return elist.append("timeout")
-
-    #    elif event.type == pygame.USEREVENT:
-    #        return elist.append(inputList.pop())
-
-    #    elif event.type == pygame.KEYDOWN:
-    #        if event.key == pygame.K_LEFT:
-    #            elist.append("left")
-
-    #        elif event.key == pygame.K_RIGHT:
-    #            elist.append("right")
-
-    #        elif event.key == pygame.K_DOWN:
-    #            elist.append("down")
-
-    #        elif event.key == pygame.K_UP:
-    #            elist.append("up")
-                 
-    #        elif event.key == pygame.K_ESCAPE:
-    #            pygame.quit()
-
-    #        elif event.key == pygame.K_l:
-    #            pygame.draw.circle()
-    #    pygame.event.clear()
-    #    return elist
 
 
 

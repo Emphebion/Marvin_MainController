@@ -17,9 +17,7 @@ class S9_IdleGame():        #S9_GameMaster
     def run(self):
         self.state = self.states.S9
         print("current state is {}".format(self.state))
-        print("current inputs: ")
         if glbs.currentRoundInputs:
-            print(glbs.currentRoundInputs)
             self.checkForSuccess()
         print("successes: %s" % glbs.gameSuccesses)
         
@@ -30,6 +28,7 @@ class S9_IdleGame():        #S9_GameMaster
         # Create route for current round
         self.setCurrentGoal()
         glbs.currentGameRoute = glbs.table.createCurrentRoute(self.currentGoal)
+        print("current inputs: " + str(self.currentGoal))
         glbs.snakeCounter = 0
         
         # Wait between rounds

@@ -140,13 +140,24 @@ class _Table(object):
             return False
         return True       
 
-    # Could be moved to finish
-    def clearRoute(self, route):
+    def clearTable(self, route):
         while route:
             route.pop().clearSegment(self.colorsLED["black"])
         return route
 
+    def getLEDData(self):
+        LEDData = []
+        for segment in self.segmentList:
+            LEDData += segment.getLEDvalues()
+        return LEDData
+        
+    #Future: Add brightness scale
+    def setAllTableLEDs(self, color):
+        for segment in self.segmentList:
+            for i,prevColor in enumerate(segment.LEDvalues):
+                segment.setLEDValue(i,color)
 
+        
 class _Segment(object):
     def __init__(self, name, nrLEDs, flowSegs, counterSegs, defaultColor):
         self.name = name
@@ -168,8 +179,8 @@ class _Segment(object):
     def clearSegment(self,color):
         self.flow.clear()
         self.timesInRoute = 0
-        for x in self.LEDvalues:
-            self.setLEDValues(x,color)
+        for index,prevColor in enumerate(self.LEDvalues):
+            self.setLEDValue(index,color)
         
     def setLEDValue(self,index,color):
         if index < len(self.LEDvalues):
@@ -180,7 +191,8 @@ class _Segment(object):
 
     def getRouteCount(self):
         return self.timesInRoute
-
+                
+    
 class _Button(object):
     def __init__(self, name, flowSegments, counterSegments):
         self.name = name

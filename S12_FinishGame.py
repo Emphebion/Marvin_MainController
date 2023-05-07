@@ -15,8 +15,10 @@ class S12_FinishGame():
         print("current state is {}".format(self.state))
 
         #confirm success to user
-        self._setLEDData(glbs.table.colorsLED["emerald"])
-        self._transmit()
+        glbs.table.setAllTableLEDs(glbs.table.colorsLED["emerald"])
+        glbs.devices.transmitLED()
+        
+        #start the finish timer
         stopTime = self.successTimeout + glbs.time.time()
         while (stopTime - glbs.time.time() > 0):
             delay = 1
@@ -28,8 +30,8 @@ class S12_FinishGame():
             glbs.items.disconnectAll()
 
         #reset table to off
-        self._setLEDData(glbs.table.colorsLED["black"])
-        self._transmit()
+        glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
+        glbs.devices.transmitLED()
 
         while(self.state == self.states.S12):
             self._setState()
@@ -41,20 +43,3 @@ class S12_FinishGame():
         self.state = self.states.S2
          
 # State specific functions:
-    def _transmit(self):
-        dev = glbs.devices.get_device("RFID_LED")
-        if dev:
-            dev.send(self._getLEDData())
-        else:
-            print("Failed to transmit led data, device RFID_LED does not exist")
-
-    def _getLEDData(self):
-        LEDData = []
-        for segment in glbs.table.segmentList:
-            LEDData += segment.getLEDvalues()
-        return LEDData
-
-    def _setLEDData(self, color):
-        for segment in glbs.table.segmentList:
-            for i in range(len(segment.LEDvalues)):
-                segment.setLEDValue(i,color)

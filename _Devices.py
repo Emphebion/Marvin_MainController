@@ -42,7 +42,6 @@ class _Devices(object):
                 return port.device
         return None
 
-
     def connected_serial_devices(self):
         device_re = re.compile(b'Bus\s+(?P<bus>\d+)\s+Device\s+(?P<device>\d+).+ID\s(?P<id>\w+:\w+)\s(?P<tag>.+)', re.I)
         df = subprocess.check_output("lsusb").decode().strip()
@@ -58,6 +57,13 @@ class _Devices(object):
             print(device)
         return foundDevices
 
+    def transmitLED(self):
+        dev = self.get_device("RFID_LED")
+        if dev:
+            dev.send(glbs.table.getLEDData())
+        else:
+            print("Failed to transmit led data, device RFID_LED does not exist")
+        
     def get_device(self, name):
         for device in self.connectedDevices:
             if device.name == name:

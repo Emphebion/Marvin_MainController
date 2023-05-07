@@ -66,14 +66,14 @@ class _Items(object):
 #Node functions
     def calculateNodeUse(self):
         put = 0
-        for item in self.items:
+        for item in self.items.values():
             if item.connected:
                 put = put + item.load
         return put
 
 # Connection functions
     def disconnectAll(self):
-        for item in self.items:
+        for item in self.items.values():
             item.disconnectItem()
             self.parser[item.name]['connected'] = '0'
 
@@ -93,7 +93,7 @@ class _Items(object):
         if self.calculateNodeUse() > self.source:
             self.disconnectAll()
 
-        if item.name == self.sel_prev_item():
+        if item.name == self.selectPrevItem():
             self.currentItemName = None
 
     # Future: function to add new items during run-time

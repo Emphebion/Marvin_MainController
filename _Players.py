@@ -28,7 +28,6 @@ class _Players(object):
     def setActivePlayer(self, ID):
         self.activePlayer = self.playerDict[ID]
 
-    # TODO: Call from code @sleep (after x min timeout?)
     def resetActivePlayer(self):
         self.activePlayer = None
         
