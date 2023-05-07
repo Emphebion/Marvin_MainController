@@ -12,12 +12,15 @@ class S4_Put(object):
     def run(self):
         self.state = self.states.S4
         print("current state is {}".format(self.state))
-
-        glbs.display.display(self.folder,self.name,self.location)
+        if glbs.players.activePlayer.hasSkill(glbs.skillStateDict[self.state.name]):
+            glbs.display.display(self.folder,self.name,self.location)
+        else:
+            self._skipThisState()
 
         while(self.state == self.states.S4):
             self._setState()
         return self.state.value
+            
 
     def _setState(self):
         input_list = glbs.handler.event_handler()
@@ -25,10 +28,12 @@ class S4_Put(object):
             new_input = input_list.pop()
             if new_input["event"] == "keydown":
                 if new_input["data"] == "right":
+                    glbs.prevStateName = self.state.name
                     self.state = self.states.S6
                 elif new_input["data"] == "down":
                     self.state = self.states.S5
                 elif new_input["data"] == "left":
+                    glbs.prevStateName = self.state.name
                     self.state = self.states.S3
                 elif new_input["data"] == "up":
                     self.state = self.states.S4
@@ -38,5 +43,14 @@ class S4_Put(object):
         #reset state machine if no input has been provided for 15 minutes
         if glbs.bedTime():
             self.state = self.states.S1
-
+            
+    def _skipThisState(self):
+        name = glbs.prevStateName
+        print(glbs.prevStateName)
+        glbs.prevStateName = self.state.name
+        print(glbs.prevStateName)
+        if name == self.states.S6.name:
+            self.state = self.states.S3
+        elif name == self.states.S3.name:
+            self.state = self.states.S6
             

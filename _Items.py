@@ -8,8 +8,10 @@ import configparser
 
 class _Items(object):
     def __init__(self, config_file):
+        #FUTURE: rework Item to make an ID dict similar to player
         self.items = {}
         self.currentItemName = None
+        self.currentItem = None
         self.parser = configparser.ConfigParser()
         self.config_file = config_file
         self.parser.read(config_file)
@@ -62,6 +64,12 @@ class _Items(object):
         for item in self.items.values():
             if not item.connected:
                 return self.itemnames.index(item.name)
+                
+    def findItemByID(self, foundID):
+        for item in self.items.values():
+            if item.ID == foundID:
+                return item
+        return none
 
 #Node functions
     def calculateNodeUse(self):

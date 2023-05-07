@@ -1,5 +1,5 @@
 [common]
-players=SL1,SL2,SL3,SL4,SL5,PlayerUnknown
+players=SL1,SL2,SL3,SL4,SL5,PlayerUnknown,GM
 
 [SL1]
 name=Vincent
@@ -39,12 +39,12 @@ skills=None
 [PC2]                          
 name=Jo Gauss
 ID=14277475
-skills=Ontkoppel,Koppel1,Bron
+skills=Ontkoppelen,Koppel1,Bron
 
 [PC3]
 name=Torg
 ID=13421386
-skills=Ontkoppel,Koppel1,Koppel2,Bron
+skills=Ontkoppelen,Koppel1,Koppel2,Bron
 
 [PC4]
 name=Harman
@@ -54,9 +54,14 @@ skills=None
 [PC5]
 name=Isabella Catharina Julia van Zwarteheide
 ID=14522226
-skills=Ontkoppel,Koppel1,Bron
+skills=Ontkoppelen,Koppel1,Bron
 
 [PlayerUnknown]
 name=Unknown
 ID=0
 skills=None
+
+[GM]
+name=GM
+ID=10
+skills=welcome,ontkoppelen,bronpijlen

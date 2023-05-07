@@ -12,11 +12,12 @@ class S7_Items(object):
     def run(self):
         self.state = self.states.S7
         print("current state is {}".format(self.state))
-
-        glbs.display.display(self.folder,self.name,self.location)
-        
-        if glbs.items.currentItemName:
-            glbs.display.display(glbs.items.folder,glbs.items.currentItemName,glbs.items.location)
+        if glbs.players.activePlayer.hasSkill(self.state.name):
+            # FUTURE: change Item Image setup to Present Item with ID setup
+            glbs.display.display(self.folder,self.name,self.location)
+            
+            if glbs.items.currentItemName:
+                glbs.display.display(glbs.items.folder,glbs.items.currentItemName,glbs.items.location)
         while(self.state == self.states.S7):
             self._setState()
         return self.state.value
@@ -25,18 +26,17 @@ class S7_Items(object):
         input_list = glbs.handler.event_handler()
         if input_list:
             new_input = input_list.pop()
-            if new_input["event"] == "keydown":
-                if new_input["data"] == "right":
-                    glbs.display.display(glbs.items.folder, glbs.items.selectNextItem(), glbs.items.location)
+            if new_input["event"] == "rfid":
+                newItem = glbs.items.findItemByID(new_input["data"])
+                if newItem and (glbs.items.currentItemName != newItem.name):
+                    #FUTURE: show that the Item does not exist
+                    glbs.items.currentItemName = newItem.name
                     self.state = self.states.S7
-                elif new_input["data"] == "down":
-                    glbs.returnState = self.states.S7
-                    glbs.activationItem = glbs.items
+                else:
                     self.state = self.states.S8
-                elif new_input["data"] == "left":
-                    glbs.display.display(glbs.items.folder, glbs.items.selectPrevItem(), glbs.items.location)
-                    self.state = self.states.S7
-                elif new_input["data"] == "up":
+                    
+            elif new_input["event"] == "keydown":
+                if new_input["data"] == "up":
                     self.state = self.states.S6
                 else:
                     self.state = self.states.S7

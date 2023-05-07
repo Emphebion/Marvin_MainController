@@ -101,6 +101,12 @@ class _InputHandler(object):
                             self.elist.append({"event": "keydown", "data": "up"})
                         if button == "shutdown":
                             pygame.quit()
+
+            elif chr(data[0]) == 'T':
+                IDtag = 0
+                for index,IDsnip in enumerate(date):
+                    IDtag = int.from_bytes(data[1:], "big")
+                self.elist.append({"event": "rfid", "data": IDtag})
             elif "quit" in str(data):
                 os.system("sudo shutdown -h now")
             else:

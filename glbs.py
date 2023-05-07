@@ -34,6 +34,9 @@ currentRoundInputs = []
 gameSuccesses = 0
 snakeCounter = 0
 returnState = None
+prevStateName = None
+#FURUTE: Make skill-state dictionary dynamic
+skillStateDict = {"S1": "welcome","S3": "ontkoppelen","S4": "bronpijlen", "S6": "koppelen1"}
 
 # Sleep variables
 parser.read(config_file)

@@ -31,17 +31,14 @@ class S1_Reset():
 # State specific functions:
     def _checkInput(self):
         input_list = glbs.handler.event_handler()
-        #compare to ID list (opvragen op event)
         if input_list:
             new_input = input_list.pop()
-            if new_input["event"] == "serial":
-                data = new_input["data"]
-                if chr(data[0]) == 'T':
-                    ID = int.from_bytes(data[1:], "big")
-                    print("Received ID: {}".format(ID))
-                    if ID in glbs.players.playerDict:
-                        glbs.players.setActivePlayer(ID)
+            #compare to ID list (opvragen op event)
+            if new_input["event"] == "rfid":
+                print("Received ID: {}".format(ID))
+                if ID in glbs.players.playerDict:
+                    glbs.players.setActivePlayer(ID)
 
-            # debug statement 
+                # debug statement 
             elif new_input["event"] == "keydown":
-                glbs.players.setActivePlayer(0)
+                glbs.players.setActivePlayer(10)
