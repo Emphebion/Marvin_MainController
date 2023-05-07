@@ -16,7 +16,7 @@ class S12_FinishGame():
 
         #confirm success to user
         glbs.table.setAllTableLEDs(glbs.table.colorsLED["emerald"])
-        glbs.devices.transmitLED()
+        glbs.devices.transmitLED(glbs.table.getLEDData())
         
         #start the finish timer
         stopTime = self.successTimeout + glbs.time.time()
@@ -31,7 +31,7 @@ class S12_FinishGame():
 
         #reset table to off
         glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
-        glbs.devices.transmitLED()
+        glbs.devices.transmitLED(glbs.table.getLEDData())
 
         while(self.state == self.states.S12):
             self._setState()

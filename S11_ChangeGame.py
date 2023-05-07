@@ -14,7 +14,7 @@ class S11_ChangeGame():     #S11_ChangeLED
         print("current state is {}".format(self.state))
 
         while(self.state == self.states.S11):
-            glbs.devices.transmitLED()
+            glbs.devices.transmitLED(glbs.table.getLEDData())
             self._setState()
         return self.state.value
 

@@ -57,10 +57,10 @@ class _Devices(object):
             print(device)
         return foundDevices
 
-    def transmitLED(self):
+    def transmitLED(self, ledData):
         dev = self.get_device("RFID_LED")
         if dev:
-            dev.send(glbs.table.getLEDData())
+            dev.send(ledData)
         else:
             print("Failed to transmit led data, device RFID_LED does not exist")
         

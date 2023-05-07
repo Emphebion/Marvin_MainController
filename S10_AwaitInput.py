@@ -37,12 +37,14 @@ class S10_AwaitInput():
 
         #reset state machine if no input has been provided for 15 minutes
         if glbs.bedTime():
-            glbs.table.clearTable(glbs.currentGameRoute)
+            glbs.table.clearRoute()
             self.routeDone.clear()
-            glbs.devices.transmitLED()
+            glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
+            glbs.devices.transmitLED(glbs.table.getLEDData())
             self.state = self.states.S1
 
     # State specific functions:
+    # Rework to operate similar to inner buttons (See Input Handler)
     def _checkInput(self):
         input_list = glbs.handler.event_handler()
         if input_list:

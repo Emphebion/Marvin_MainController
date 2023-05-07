@@ -140,10 +140,8 @@ class _Table(object):
             return False
         return True       
 
-    def clearTable(self, route):
-        while route:
-            route.pop().clearSegment(self.colorsLED["black"])
-        return route
+    def clearRoute(self):
+        self.currentRoute.clear()
 
     def getLEDData(self):
         LEDData = []
