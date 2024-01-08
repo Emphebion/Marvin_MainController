@@ -104,7 +104,7 @@ class _InputHandler(object):
 
             elif chr(data[0]) == 'T':
                 IDtag = 0
-                for index,IDsnip in enumerate(date):
+                for index,IDsnip in enumerate(data):
                     IDtag = int.from_bytes(data[1:], "big")
                 self.elist.append({"event": "rfid", "data": IDtag})
             elif "quit" in str(data):

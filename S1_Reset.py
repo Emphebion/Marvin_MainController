@@ -28,6 +28,7 @@ class S1_Reset():
         if(self.state != new_state):
             self.state = new_state
 
+
 # State specific functions:
     def _checkInput(self):
         input_list = glbs.handler.event_handler()
@@ -35,6 +36,7 @@ class S1_Reset():
             new_input = input_list.pop()
             #compare to ID list (opvragen op event)
             if new_input["event"] == "rfid":
+                ID = new_input["data"]
                 print("Received ID: {}".format(ID))
                 if ID in glbs.players.playerDict:
                     glbs.players.setActivePlayer(ID)
