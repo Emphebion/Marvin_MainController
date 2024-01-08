@@ -10,16 +10,17 @@ from tkinter.ttk import Frame, Button, Style
 from states_enum import StatesEnum
 import S1_Reset
 import S2_Welcome
-import S3_Ontkoppelen
-import S4_Put
-import S5_PutSize
-import S6_Koppelen
-import S7_Items
-import S8_StartGame
-import S9_IdleGame
-import S10_AwaitInput
-import S11_ChangeGame
-import S12_FinishGame
+import S3_Disconnect_All
+import S4_Disconnect_Item
+import S5_Well
+import S6_Well_Size
+import S7_Connect_Item
+import S8_Items
+import S9_StartGame
+import S10_IdleGame
+import S11_AwaitInput
+import S12_ChangeGame
+import S13_FinishGame
 import glbs
 
 SERIAL_BAUD_RATE = 57600
@@ -45,16 +46,17 @@ def main():
 
     S1_State = S1_Reset.S1_Reset()
     S2_State = S2_Welcome.S2_Welcome()
-    S3_State = S3_Ontkoppelen.S3_Ontkoppelen()
-    S4_State = S4_Put.S4_Put()
-    S5_State = S5_PutSize.S5_PutSize()
-    S6_State = S6_Koppelen.S6_Koppelen()
-    S7_State = S7_Items.S7_Items()
-    S8_State = S8_StartGame.S8_StartGame()
-    S9_State = S9_IdleGame.S9_IdleGame()
-    S10_State = S10_AwaitInput.S10_AwaitInput()
-    S11_State = S11_ChangeGame.S11_ChangeGame()
-    S12_State = S12_FinishGame.S12_FinishGame()
+    S3_State = S3_Disconnect_All.S3_Disconnect_All()
+    S4_State = S4_Disconnect_Item.S4_Disconnect_Item()
+    S5_State = S5_Well.S5_Well()
+    S6_State = S6_Well_Size.S6_Well_Size()
+    S7_State = S7_Connect_Item.S7_Connect_Item()
+    S8_State = S8_Items.S8_Items()
+    S9_State = S9_StartGame.S9_StartGame()
+    S10_State = S10_IdleGame.S10_IdleGame()
+    S11_State = S11_AwaitInput.S11_AwaitInput()
+    S12_State = S12_ChangeGame.S12_ChangeGame()
+    S13_State = S13_FinishGame.S13_FinishGame()
 
     state = all_states.S1_Reset.value
     new_state = all_states.S1_Reset.value
@@ -66,26 +68,28 @@ def main():
             new_state = S1_State.run()
         if(state == all_states.S2_Welcome.value):
             new_state = S2_State.run()
-        if(state== all_states.S3_Ontkoppelen.value):
+        if(state== all_states.S3_Disconnect_All.value):
             new_state = S3_State.run()
-        if(state == all_states.S4_Put.value):
+        if(state == all_states.S4_Disconnect_Item.value):
             new_state = S4_State.run()
-        if(state == all_states.S5_PutSize.value):
+        if(state == all_states.S5_Well.value):
             new_state = S5_State.run()
-        if(state == all_states.S6_Koppelen.value):
+        if(state == all_states.S6_Well_Size.value):
             new_state = S6_State.run()
-        if(state == all_states.S7_Items.value):
+        if(state == all_states.S7_Connect_Item.value):
             new_state = S7_State.run()
-        if(state == all_states.S8_StartGame.value):
+        if(state == all_states.S8_Items.value):
             new_state = S8_State.run(prev_state)
-        if(state == all_states.S9_IdleGame.value):
+        if(state == all_states.S9_StartGame.value):
             new_state = S9_State.run()
-        if(state == all_states.S10_AwaitInput.value):
+        if(state == all_states.S10_IdleGame.value):
             new_state = S10_State.run()
-        if(state == all_states.S11_ChangeGame.value):
+        if(state == all_states.S11_AwaitInput.value):
             new_state = S11_State.run()
-        if(state == all_states.S12_FinishGame.value):
+        if(state == all_states.S12_ChangeGame.value):
             new_state = S12_State.run()
+        if(state == all_states.S13_FinishGame.value):
+            new_state = S13_State.run()
         if(state == all_states.Sx_Quit.value):
             quit()
         prev_state = state

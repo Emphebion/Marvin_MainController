@@ -1,7 +1,7 @@
 from states_enum import StatesEnum
 import glbs
 
-class S4_Put(object):
+class S4_Disconnect_Item(object):
     def __init__(self):
         states_enum = StatesEnum()
         self.states = states_enum.get_states_s4()
@@ -25,9 +25,10 @@ class S4_Put(object):
             new_input = input_list.pop()
             if new_input["event"] == "keydown":
                 if new_input["data"] == "right":
-                    self.state = self.states.S6
-                elif new_input["data"] == "down":
                     self.state = self.states.S5
+                elif new_input["data"] == "down":  # Dummy
+                    glbs.returnState = self.states.S4
+                    self.state = self.states.S8
                 elif new_input["data"] == "left":
                     self.state = self.states.S3
                 elif new_input["data"] == "up":
@@ -38,5 +39,3 @@ class S4_Put(object):
         #reset state machine if no input has been provided for 15 minutes
         if glbs.bedTime():
             self.state = self.states.S1
-
-            

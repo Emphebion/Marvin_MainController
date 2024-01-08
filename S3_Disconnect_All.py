@@ -1,7 +1,7 @@
 from states_enum import StatesEnum
 import glbs
 
-class S3_Ontkoppelen(object):
+class S3_Disconnect_All(object):
     def __init__(self):
         states_enum = StatesEnum()
         self.states = states_enum.get_states_s3()
@@ -28,9 +28,9 @@ class S3_Ontkoppelen(object):
                     self.state = self.states.S4
                 elif new_input["data"] == "down":  # Dummy
                     glbs.returnState = self.states.S3
-                    self.state = self.states.S8
+                    self.state = self.states.S9
                 elif new_input["data"] == "left":
-                    self.state = self.states.S6
+                    self.state = self.states.S7
                 elif new_input["data"] == "up":
                     self.state = self.states.S3
                 else:

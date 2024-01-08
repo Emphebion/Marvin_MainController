@@ -1,39 +1,39 @@
 from states_enum import StatesEnum
 import glbs
 
-class S10_AwaitInput():
+class S11_AwaitInput():
     def __init__(self):
         states_enum = StatesEnum()
-        self.states = states_enum.get_states_s10()
-        self.name = glbs.parser.get('State10', 'name')
-        self.folder = glbs.parser.get('State10', 'folder')
-        self.location = [int(x.strip()) for x in glbs.parser.get('State10', 'location').split(',')]
-        self.loopTimeout = float(glbs.parser.getint('State10', 'looptimeout'))/1000
-        self.snakeLength = glbs.parser.getint('State10', 'snakeLength')
+        self.states = states_enum.get_states_s11()
+        self.name = glbs.parser.get('State11', 'name')
+        self.folder = glbs.parser.get('State11', 'folder')
+        self.location = [int(x.strip()) for x in glbs.parser.get('State11', 'location').split(',')]
+        self.loopTimeout = float(glbs.parser.getint('State11', 'looptimeout'))/1000
+        self.snakeLength = glbs.parser.getint('State11', 'snakeLength')
         self.loopStartTime = 0
         self.routeDone = []
 
     def run(self):
-        self.state = self.states.S10
+        self.state = self.states.S11
         print("current state is {}".format(self.state))
 
         self._setLEDOutput()
 
-        while(self.state == self.states.S10):
+        while(self.state == self.states.S11):
             self._checkInput()
             self._setState()
         return self.state.value
 
     def _setState(self):
         if (self.loopTimeout > (glbs.time.time()-self.loopStartTime)):
-            #print("Remaining time S10 = {} seconds".format(self.loopTimeout - (glbs.time.time()-self.loopStartTime)))
-            self.state = self.states.S10
+            #print("Remaining time S11 = {} seconds".format(self.loopTimeout - (glbs.time.time()-self.loopStartTime)))
+            self.state = self.states.S11
         else:
             if(not self.routeDone) & (not glbs.currentGameRoute):
-                self.state = self.states.S9
+                self.state = self.states.S10
             else:
                 self.loopStartTime = glbs.time.time()
-                self.state = self.states.S11
+                self.state = self.states.S12
 
         #reset state machine if no input has been provided for 15 minutes
         if glbs.bedTime():
