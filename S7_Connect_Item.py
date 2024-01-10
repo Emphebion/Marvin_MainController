@@ -1,26 +1,27 @@
 from states_enum import StatesEnum
 import glbs
 
-class S4_Put(object):
+class S7_Connect_Item():
     def __init__(self):
         states_enum = StatesEnum()
-        self.states = states_enum.get_states_s4()
-        self.name = str(glbs.parser.get('State4', 'name'))
-        self.folder = str(glbs.parser.get('State4', 'folder'))
-        self.location = [int(x.strip()) for x in glbs.parser.get('State4', 'location').split(',')]
+        self.states = states_enum.get_states_s7()
+        self.name = str(glbs.parser.get('State7', 'name'))
+        self.folder = str(glbs.parser.get('State7', 'folder'))
+        self.location = [int(x.strip()) for x in glbs.parser.get('State7', 'location').split(',')]
 
     def run(self):
-        self.state = self.states.S4
+        self.state = self.states.S7
         print("current state is {}".format(self.state))
         if glbs.players.activePlayer.hasSkill(glbs.skillStateDict[self.state.name]):
             glbs.display.display(self.folder,self.name,self.location)
         else:
             self._skipThisState()
 
-        while(self.state == self.states.S4):
+        glbs.display.display(self.folder,self.name,self.location)
+
+        while(self.state == self.states.S7):
             self._setState()
         return self.state.value
-            
 
     def _setState(self):
         input_list = glbs.handler.event_handler()
@@ -28,29 +29,27 @@ class S4_Put(object):
             new_input = input_list.pop()
             if new_input["event"] == "keydown":
                 if new_input["data"] == "right":
-                    glbs.prevStateName = self.state.name
-                    self.state = self.states.S6
-                elif new_input["data"] == "down":
-                    self.state = self.states.S5
-                elif new_input["data"] == "left":
-                    glbs.prevStateName = self.state.name
                     self.state = self.states.S3
+                elif new_input["data"] == "down":
+                    glbs.returnState = self.states.S7
+                    self.state = self.states.S8
+                elif new_input["data"] == "left":
+                    self.state = self.states.S5
                 elif new_input["data"] == "up":
-                    self.state = self.states.S4
+                    self.state = self.states.S7
                 else:
-                    self.state = self.states.S4
+                    self.state = self.states.S7
 
         #reset state machine if no input has been provided for 15 minutes
         if glbs.bedTime():
             self.state = self.states.S1
-            
+
     def _skipThisState(self):
         name = glbs.prevStateName
         print(glbs.prevStateName)
         glbs.prevStateName = self.state.name
         print(glbs.prevStateName)
-        if name == self.states.S6.name:
+        if name == self.states.S5.name:
             self.state = self.states.S3
         elif name == self.states.S3.name:
-            self.state = self.states.S6
-            
+            self.state = self.states.S5
