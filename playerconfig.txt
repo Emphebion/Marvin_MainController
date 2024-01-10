@@ -39,12 +39,12 @@ skills=None
 [PC2]                          
 name=Jo Gauss
 ID=14277475
-skills=Ontkoppelen,Koppel1,Bron
+skills=ontkoppelen,aansluiten,Bron
 
 [PC3]
 name=Torg
 ID=13421386
-skills=Ontkoppelen,Koppel1,Koppel2,Bron
+skills=ontkoppelen,aansluiten,Koppel2,Bron
 
 [PC4]
 name=Harman
@@ -64,4 +64,4 @@ skills=None
 [GM]
 name=GM
 ID=10
-skills=welcome,ontkoppelen,bronpijlen
+skills=welcome,ontkoppelen,aansluiten,putgrootte,ontkoppel_item

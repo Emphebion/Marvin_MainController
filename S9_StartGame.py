@@ -14,7 +14,7 @@ class S9_StartGame(object):
         self.folder = glbs.parser.get('State9', 'folder')
         self.location = [int(x.strip()) for x in glbs.parser.get('State9', 'location').split(',')]
 
-    def run(self, caller_state):
+    def run(self):
         self.state = self.states.S9
         print("current state is {}".format(self.state))
         

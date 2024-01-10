@@ -12,8 +12,10 @@ class S5_Well(object):
     def run(self):
         self.state = self.states.S5
         print("current state is {}".format(self.state))
-
-        glbs.display.display(self.folder,self.name,self.location)
+        if glbs.players.activePlayer.hasSkill(glbs.skillStateDict[self.state.name]):
+            glbs.display.display(self.folder,self.name,self.location)
+        else:
+            self._skipThisState()
 
         while(self.state == self.states.S5):
             self._setState()
@@ -38,5 +40,15 @@ class S5_Well(object):
         #reset state machine if no input has been provided for 15 minutes
         if glbs.bedTime():
             self.state = self.states.S1
+
+    def _skipThisState(self):
+        name = glbs.prevStateName
+        print(glbs.prevStateName)
+        glbs.prevStateName = self.state.name
+        print(glbs.prevStateName)
+        if name == self.states.S7.name:
+            self.state = self.states.S4
+        elif name == self.states.S4.name:
+            self.state = self.states.S7
 
             
