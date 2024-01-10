@@ -26,6 +26,8 @@ class S13_FinishGame():
         #Handle the consequences of the game
         if glbs.returnState.value is self.states.S8.value:  #TODO: change to S7 and add S4 when disconnecting 1 item
             glbs.items.connectItem()
+        elif glbs.returnState.value is self.states.S4.value:
+            glbs.items.disconnectItem()
         elif glbs.returnState.value is self.states.S3.value:
             glbs.items.disconnectAll()
 

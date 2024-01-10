@@ -91,6 +91,7 @@ class StatesEnum():
     def get_states_s8(self):
         class State8_states(Enum):
             S1 = self.all_states.S1_Reset.value
+            S4 = self.all_states.S4_Disconnect_Item.value
             S7 = self.all_states.S7_Connect_Item.value
             S8 = self.all_states.S8_Items.value
             S9 = self.all_states.S9_StartGame.value
@@ -132,6 +133,7 @@ class StatesEnum():
         class State13_states(Enum):
             S2 = self.all_states.S2_Welcome.value
             S3 = self.all_states.S3_Disconnect_All.value # TODO remove this state
+            S4 = self.all_states.S4_Disconnect_Item.value # TODO remove this state
             S7 = self.all_states.S7_Connect_Item.value
             S8 = self.all_states.S8_Items.value # TODO remove this state
             S13 = self.all_states.S13_FinishGame.value

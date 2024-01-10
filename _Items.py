@@ -28,40 +28,68 @@ class _Items(object):
                 connected = True
             else:
                 connected = False
-                self.currentItemName = name
+            self.currentItemName = name
             self.items[name] = Item(name,function,ID,level,load,connected)
         
 # Menu functions
-    def selectNextItem(self):
+    def selectNextItem(self,stateNr):
         index = self.itemnames.index(self.currentItemName) + 1
         while index != self.itemnames.index(self.currentItemName):
             if(index >= len(self.itemnames)):
                 index = 0
-            if not self.items[self.itemnames[index]].connected:
-                self.currentItemName = self.itemnames[index]
-                return self.currentItemName
+            if stateNr >5:
+                if not self.items[self.itemnames[index]].connected:
+                    self.currentItemName = self.itemnames[index]
+                    return self.currentItemName
+            else:
+                if self.items[self.itemnames[index]].connected:
+                    self.currentItemName = self.itemnames[index]
+                    return self.currentItemName
             
             index = index + 1
 
         return self.currentItemName
 
-    def selectPrevItem(self):
+    def selectPrevItem(self,stateNr):
         index = self.itemnames.index(self.currentItemName) - 1
         while index != self.itemnames.index(self.currentItemName):
-            if(index < self.getLowestInactiveItem()):
-                index = len(self.itemnames) - 1
-            if not self.items[self.itemnames[index]].connected:
-                self.currentItemName = self.itemnames[index]
-                return self.currentItemName
             
-            index = index + 1
+            if stateNr >5:
+                if(index < self.getLowestInactiveItemIndex()):
+                    index = len(self.itemnames) - 1
+                if not self.items[self.itemnames[index]].connected:
+                    self.currentItemName = self.itemnames[index]
+                    return self.currentItemName
+            else:
+                if(index < self.getLowestActiveItemIndex()):
+                    index = len(self.itemnames) - 1
+                if self.items[self.itemnames[index]].connected:
+                    self.currentItemName = self.itemnames[index]
+                    return self.currentItemName
+            
+            index = index - 1
 
         return self.currentItemName
 
-    def getLowestInactiveItem(self):
+    def getLowestInactiveItemIndex(self):
         for item in self.items.values():
             if not item.connected:
                 return self.itemnames.index(item.name)
+            
+    def getLowestActiveItemIndex(self):
+        for item in self.items.values():
+            if item.connected:
+                return self.itemnames.index(item.name)
+    
+    def setCurrentItemToLowestInactiveItem(self):
+        for item in self.items.values():
+            if not item.connected:
+                self.currentItemName = item.name
+            
+    def setCurrentItemToLowestActiveItem(self):
+        for item in self.items.values():
+            if item.connected:
+                self.currentItemName = item.name
 
 #Node functions
     def calculateNodeUse(self):
@@ -92,6 +120,17 @@ class _Items(object):
 
         if self.calculateNodeUse() > self.source:
             self.disconnectAll()
+
+        if item.name == self.selectPrevItem():
+            self.currentItemName = None
+
+    def disconnectItem(self):
+        item = self.items[self.currentItemName]
+        item.disconnectItem()
+        self.parser[item.name]['connected'] = '0'
+
+        with open(self.config_file,'w') as file:
+            self.parser.write(file)
 
         if item.name == self.selectPrevItem():
             self.currentItemName = None

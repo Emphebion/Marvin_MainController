@@ -16,6 +16,11 @@ class S8_Items(object):
         glbs.display.display(self.folder,self.name,self.location)
         
         #TODO: Add distiction between connected and disconnectable items
+        if glbs.returnState.value == self.states.S4.value:
+            glbs.items.setCurrentItemToLowestActiveItem()
+        elif glbs.returnState.value == self.states.S7.value:
+            glbs.items.setCurrentItemToLowestInactiveItem()
+
         if glbs.items.currentItemName:
             glbs.display.display(glbs.items.folder,glbs.items.currentItemName,glbs.items.location)
         while(self.state == self.states.S8):
@@ -28,17 +33,15 @@ class S8_Items(object):
             new_input = input_list.pop()
             if new_input["event"] == "keydown":
                 if new_input["data"] == "right":
-                    glbs.display.display(glbs.items.folder, glbs.items.selectNextItem(), glbs.items.location)
+                    glbs.display.display(glbs.items.folder, glbs.items.selectNextItem(glbs.returnState.value), glbs.items.location)
                     self.state = self.states.S8
                 elif new_input["data"] == "down":
-                    glbs.returnState = self.states.S8
-                    glbs.activationItem = glbs.items    #TODO: add Disconnect
                     self.state = self.states.S9
                 elif new_input["data"] == "left":
-                    glbs.display.display(glbs.items.folder, glbs.items.selectPrevItem(), glbs.items.location)
+                    glbs.display.display(glbs.items.folder, glbs.items.selectPrevItem(glbs.returnState.value), glbs.items.location)
                     self.state = self.states.S8
                 elif new_input["data"] == "up":
-                    self.state = self.states.S7     #TODO: Add return to correct state
+                    self.state = glbs.returnState
                 else:
                     self.state = self.states.S8
         

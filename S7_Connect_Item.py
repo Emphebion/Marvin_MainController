@@ -27,6 +27,7 @@ class S7_Connect_Item():
                 if new_input["data"] == "right":
                     self.state = self.states.S3
                 elif new_input["data"] == "down":
+                    glbs.returnState = self.states.S7
                     self.state = self.states.S8
                 elif new_input["data"] == "left":
                     self.state = self.states.S5

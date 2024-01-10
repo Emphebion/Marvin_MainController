@@ -79,7 +79,7 @@ def main():
         if(state == all_states.S7_Connect_Item.value):
             new_state = S7_State.run()
         if(state == all_states.S8_Items.value):
-            new_state = S8_State.run(prev_state)
+            new_state = S8_State.run()
         if(state == all_states.S9_StartGame.value):
             new_state = S9_State.run()
         if(state == all_states.S10_IdleGame.value):

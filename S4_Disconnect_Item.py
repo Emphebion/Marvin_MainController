@@ -26,7 +26,7 @@ class S4_Disconnect_Item(object):
             if new_input["event"] == "keydown":
                 if new_input["data"] == "right":
                     self.state = self.states.S5
-                elif new_input["data"] == "down":  # Dummy
+                elif new_input["data"] == "down":
                     glbs.returnState = self.states.S4
                     self.state = self.states.S8
                 elif new_input["data"] == "left":
