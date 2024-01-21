@@ -1,3 +1,4 @@
+import pygame
 from _Display import _Display
 from _InputHandler import _InputHandler
 from _Items import _Items
@@ -13,6 +14,7 @@ config_file = 'marvinconfig.txt'
 item_file = 'itemconfig.txt'
 table_file = 'tableconfig.txt'
 player_file = 'playerconfig.txt'
+pygame.init()
 parser = configparser.ConfigParser()
 parser.read(config_file)
 handler = _InputHandler()
@@ -42,6 +44,7 @@ skillStateDict = {"S1": "welcome","S3": "ontkoppelen","S4": "ontkoppel_item", "S
 parser.read(config_file)
 systemTimeout = parser.getint('common', 'systemTimeout')
 systemWakeTime = time.time()
+handlerTime = time.time()
 
 def bedTime():
     sleep = False
