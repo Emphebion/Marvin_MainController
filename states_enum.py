@@ -138,3 +138,10 @@ class StatesEnum():
             S8 = self.all_states.S8_Items.value # TODO remove this state
             S13 = self.all_states.S13_FinishGame.value
         return State13_states
+    
+    #Sx Quit
+    def get_states_sx(self):
+        class Statex_states(Enum):
+            Sx = self.all_states.Sx_Quit.value
+        return Statex_states
+    

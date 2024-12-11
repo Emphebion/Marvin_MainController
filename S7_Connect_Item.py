@@ -1,6 +1,9 @@
 from states_enum import StatesEnum
 import glbs
 
+#*********************************************************#
+# Dummy state that only sets the purpose used in S8_Items #
+#*********************************************************#
 class S7_Connect_Item():
     def __init__(self):
         states_enum = StatesEnum()
@@ -17,7 +20,10 @@ class S7_Connect_Item():
         else:
             self._skipThisState()
 
-        glbs.display.display(self.folder,self.name,self.location)
+        'TODO: get item ID and set current item in globals'
+
+        'Why is this here?'
+        #glbs.display.display(self.folder,self.name,self.location)
 
         while(self.state == self.states.S7):
             self._setState()

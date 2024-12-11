@@ -13,7 +13,6 @@ class S8_Items(object):
         self.state = self.states.S8
         print("current state is {}".format(self.state))
         if glbs.players.activePlayer.hasSkill(self.state.name):
-            # FUTURE: change Item Image setup to Present Item with ID setup
             glbs.display.display(self.folder,self.name,self.location)
             
             if glbs.returnState.value == self.states.S4.value:
@@ -21,6 +20,7 @@ class S8_Items(object):
             elif glbs.returnState.value == self.states.S7.value:
                 glbs.items.setCurrentItemToLowestInactiveItem()
 
+            # FUTURE: change Item Image setup to Present Item with ID setup
             #TODO: move to RFID part
             if glbs.items.currentItemName:
                 glbs.display.display(glbs.items.folder,glbs.items.currentItemName,glbs.items.location)
@@ -29,23 +29,38 @@ class S8_Items(object):
             self._setState()
         return self.state.value
 
+    # Function definition
+    # Keep Checking input until:
+    #   1. An ID has been presented (or an item has been selected by the buttons)
+    #   2. The return (up) key was pressed
+    #   3. 30 seconds have passed
+    # If no Item is present, return to returnState
+    # If an ID is found, attempt to find the item attached to the ID
+    # If found, save ID and start game
+    # if not check if Player ID
+    # If player, ignore and keep trying (or Message that the ID is incorrect)
+    # If Unknown go to S99_Add_New_Item (up down to set level, up down to set intensity, save to file as UNNAMEDx and include player ID)
+
     def _setState(self):
         input_list = glbs.handler.event_handler()
         if input_list:
             new_input = input_list.pop()
             if new_input["event"] == "rfid":
-                newItem = glbs.items.findItemByID(new_input["data"])
+                newItem = glbs.items.getItemByID(new_input["data"])
                 if newItem and (glbs.items.currentItemName != newItem.name):
                     #FUTURE: Add "Register Item menu, if the item does not exist"
                     glbs.items.currentItemName = newItem.name
-                    self.state = self.states.S8
-                else:
                     self.state = self.states.S9
-                    
+                else:
+                    self.state = self.states.S8
+
+            #FUTURE: Remove        
+            #elif new_input["event"] == "keydown":
+            #    if new_input["data"] == "up":
+            #        self.state = self.states.S7
+            #--------------        
+
             elif new_input["event"] == "keydown":
-                if new_input["data"] == "up":
-                    self.state = self.states.S7
-            if new_input["event"] == "keydown":
                 if new_input["data"] == "right":
                     glbs.display.display(glbs.items.folder, glbs.items.selectNextItem(glbs.returnState.value), glbs.items.location)
                     self.state = self.states.S8
@@ -59,9 +74,9 @@ class S8_Items(object):
                 else:
                     self.state = self.states.S8
         
-        #return to S7 if no items can be (dis)connected
+        #return to returnState if no items can be (dis)connected
         if not glbs.items.currentItemName:
-            self.state = self.states.S7
+            self.state = glbs.returnState
 
         #reset state machine if no input has been provided for 15 minutes
         if glbs.bedTime():

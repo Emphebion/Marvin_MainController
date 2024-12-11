@@ -27,7 +27,7 @@ class S10_IdleGame():        #S10_GameMaster
         #Check successes
         # Create route for current round
         self.setCurrentGoal()
-        glbs.currentGameRoute = glbs.table.createCurrentRoute(self.currentGoal)
+        glbs.currentGameRoute = glbs.table.createCurrentSnake(self.currentGoal)
         print("current inputs: " + str(self.currentGoal))
         glbs.snakeCounter = 0
         

@@ -91,6 +91,18 @@ folder=items
 location=0,0
 successTimeout=3
 
+[StateT1]
+name=TableOff
+
+[StateT2]
+name=TableActive
+
+[StateT3]
+name=TableBroken
+
+[StateT4]
+name=TableOverload
+
 [StateX]
 name=Quit
 folder=menu

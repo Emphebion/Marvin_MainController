@@ -7,7 +7,6 @@
 
 import math
 import random
-import time
 import glbs
 
 class _Display(object):
@@ -15,7 +14,7 @@ class _Display(object):
         parser.read(config_file)
         self.size = [int(x.strip()) for x in parser.get('screen', 'size').split(',')]
         glbs.pygame.init()
-        #self.screen = pygame.display.set_mode(self.size, pygame.FULLSCREEN)
+        #self.screen = glbs.pygame.display.set_mode(self.size, glbs.pygame.FULLSCREEN)
         self.screen = glbs.pygame.display.set_mode(self.size, glbs.pygame.NOFRAME)
         self.max_rad = int(min(self.size)/2 - 75)
         

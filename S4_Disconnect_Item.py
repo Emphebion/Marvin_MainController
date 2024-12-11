@@ -1,6 +1,9 @@
 from states_enum import StatesEnum
 import glbs
 
+#*********************************************************#
+# Dummy state that only sets the purpose used in S8_Items #
+#*********************************************************#
 class S4_Disconnect_Item(object):
     def __init__(self):
         states_enum = StatesEnum()
@@ -16,7 +19,7 @@ class S4_Disconnect_Item(object):
             glbs.display.display(self.folder,self.name,self.location)
         else:
             self._skipThisState()
-
+        
         while(self.state == self.states.S4):
             self._setState()
         return self.state.value

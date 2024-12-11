@@ -10,6 +10,7 @@ class _Items(object):
     def __init__(self, config_file):
         #FUTURE: rework Item to make an ID dict similar to player
         self.items = {}
+        self.itemsIDs = {}
         self.currentItemName = None
         self.currentItem = None
         self.parser = configparser.ConfigParser()
@@ -31,7 +32,9 @@ class _Items(object):
             else:
                 connected = False
             self.currentItemName = name
+            # Improve statement below when we switch to full item ID opperation
             self.items[name] = Item(name,function,ID,level,load,connected)
+            self.itemsIDs[ID] = Item(name,function,ID,level,load,connected)
         
 # Menu functions
     def selectNextItem(self,stateNr):
@@ -72,17 +75,19 @@ class _Items(object):
             index = index - 1
 
         return self.currentItemName
+    
+    def getItemByID(self, foundID):
+        try:
+            return self.itemsIDs[foundID]
+        except IndexError:
+            print('ERROR: Item ID index out of range/not found')
+        except:
+            print('ERROR: Unknown error while finding Item by ID')
 
     def getLowestInactiveItemIndex(self):
         for item in self.items.values():
             if not item.connected:
                 return self.itemnames.index(item.name)
-                
-    def findItemByID(self, foundID):
-        for item in self.items.values():
-            if item.ID == foundID:
-                return item
-        return None
             
     def getLowestActiveItemIndex(self):
         for item in self.items.values():
@@ -99,7 +104,7 @@ class _Items(object):
             if item.connected:
                 self.currentItemName = item.name
 
-#Node functions
+# Node functions
     def calculateNodeUse(self):
         put = 0
         for item in self.items.values():

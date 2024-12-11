@@ -22,13 +22,20 @@ class _InputHandler(object):
             self.keyboard_event_handler()
 
         glbs.pygame.event.clear()
-        glbs.pygame.time.wait(1)
+        glbs.pygame.time.wait(1)    #serves to slowdown the reading loop, improving input responce
         #overallTime = glbs.time.time() - glbs.handlerTime
         #glbs.handlerTime = glbs.time.time() - tempTime
         #print("Elapsed handler time: {}".format(glbs.handlerTime))
         #print("Elapsed total time: {}".format(overallTime))
         return self.elist
             
+    #***************************************************#
+    # Function handeling serial data form Arduino Mega  #
+    # Types of data:                                    #
+    # * B - Button data for inner and outer ring        #
+    # * T - Item tag data                               #
+    # * quit - Shutdown button was pressed              #
+    #***************************************************#
     def serial_event_handler(self):
         event = glbs.pygame.event.peek()
         data = event.dict["line"]
@@ -59,7 +66,9 @@ class _InputHandler(object):
         else:
             self.elist.append({"event": "serial", "data": data})
 
-    
+    #***************************************************#
+    # Function handeling keyboard data (backup)         #
+    #***************************************************#
     def keyboard_event_handler(self):
         event = glbs.pygame.event.peek()
         if event.type == glbs.pygame.KEYDOWN:

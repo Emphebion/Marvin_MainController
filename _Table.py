@@ -16,6 +16,7 @@ class _Table(object):
         self.parse_config(config_file,parser)
         self.startSegment = ''
         self.currentRoute = []
+        self.lightmode = None
         
     def parse_config(self, config_file, parser):
         parser.read(config_file)
@@ -55,12 +56,12 @@ class _Table(object):
             if button.name == name:
                 return button
 
-    def createCurrentRoute(self, goal):
-        # - two route options:
-        #       1. Snake with length <=30 LEDs to prevent overlap; route is random until X inner ring segm are in list; route < 30 segm
-        #       2. Solid route with list of possible options. remove options while planning to prevent crossings (TODO)
-        #       3. Runes that slowly form.
 
+    # - three route options:
+    #       1. Snake with length <=30 LEDs to prevent overlap; route is random until X inner ring segm are in list; route < 30 segm
+    #       2. Solid route with list of possible options. remove options while planning to prevent crossings (TODO)
+    #       3. Runes that slowly form.
+    def createCurrentSnake(self, goal):
         route = []
         namelist = []
         flowlist = []
@@ -78,7 +79,7 @@ class _Table(object):
         namelist.append(route[-1].name)
 
         #random loop back to starting segment (refactor needed)
-        checklist = ["segm0","segm1","segm2","segm3","segm4","segm5","segm6","segm7","segm8","segm9","segm10","segm11","segm12","segm13","segm14","segm15"] #segm in inner ring
+        finishlist = ["segm0","segm1","segm2","segm3","segm4","segm5","segm6","segm7","segm8","segm9","segm10","segm11","segm12","segm13","segm14","segm15"] #segm in inner ring
         duplicates = 0 #nr of segm in route in inner ring
     
         while ((duplicates < self.nrOfStartSegments) & (len(route) < self.maxRouteLength)):
@@ -87,7 +88,7 @@ class _Table(object):
             else:
                 route.append(self.getSegment(route[-1].flowSegments[random.randint(0,len(route[-1].flowSegments)-1)]))
             namelist.append(route[-1].name)
-            duplicates += checklist.count(namelist[-1])
+            duplicates += finishlist.count(namelist[-1])
 
         i = 0
         while i < len(route)-1:
@@ -100,6 +101,7 @@ class _Table(object):
         print(len(flowlist))
         return route
 
+    # Ensures the LEDs in one segment are run in the correct order/direction
     def setRouteSegmentFlow(self,currentSegment,previousSegment):
         if currentSegment.name in previousSegment.flowSegments:
             previousSegment.addSegmentFlow(1)
@@ -117,6 +119,7 @@ class _Table(object):
             print("ERROR: Segments not linked! re-run route")
             return 0
 
+    # Ensures the LEDs in the final segment are run in the correct order/direction
     def setDestinationSegmentFlow(self,destination,segment):
         if segment.name in destination.flowSegments:
             segment.addSegmentFlow(1)
@@ -128,6 +131,7 @@ class _Table(object):
             print("ERROR: Destination and segment not linked! re-run route")
             return 0
 
+    # check if the route is set correctly
     def checkRoute(self, route):
         check = []
         c = 0
@@ -140,6 +144,7 @@ class _Table(object):
             return False
         return True       
 
+    # Remove the reacted route list
     def clearRoute(self):
         self.currentRoute.clear()
 

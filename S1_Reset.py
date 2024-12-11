@@ -28,7 +28,6 @@ class S1_Reset():
         if(self.state != new_state):
             self.state = new_state
 
-
 # State specific functions:
     def _checkInput(self):
         input_list = glbs.handler.event_handler()

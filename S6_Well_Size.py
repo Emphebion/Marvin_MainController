@@ -20,6 +20,8 @@ class S6_Well_Size(object):
         while(self.state == self.states.S6):
             self._setState()
         return self.state.value
+    
+        'TODO: Display well size in LED of the table'
 
     def _setState(self):
         input_list = glbs.handler.event_handler()

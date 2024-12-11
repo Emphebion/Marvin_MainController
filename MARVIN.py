@@ -95,11 +95,5 @@ def main():
         prev_state = state
         state = new_state
 
-
-    '''TODO:
-        - set pages to invisible'''
-
-
-
 if __name__ == '__main__':
     main()
