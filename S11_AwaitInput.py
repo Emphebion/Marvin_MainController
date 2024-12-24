@@ -25,6 +25,7 @@ class S11_AwaitInput():
         return self.state.value
 
     def _setState(self):
+        # Statement used to determine game speed:
         if (self.loopTimeout > (glbs.time.time()-self.loopStartTime)):
             #print("Remaining time S11 = {} seconds".format(self.loopTimeout - (glbs.time.time()-self.loopStartTime)))
             self.state = self.states.S11

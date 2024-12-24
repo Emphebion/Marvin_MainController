@@ -22,6 +22,8 @@ size = 480,320
 name=reset
 folder=menu
 location=0,0
+idletimeout=10
+sparktimeout=80
 
 [State2]
 name=welcome

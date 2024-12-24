@@ -9,14 +9,14 @@ import time
 
 class _Table(object):
     def __init__(self, config_file, parser):
-        self.LEDsArray = []                     #3x500 byte matrix or 1x1500
+        self.LEDsArray = []                     #unused?
         self.segmentList = []
         self.buttonList = []
         self.colorsLED = {}
         self.parse_config(config_file,parser)
         self.startSegment = ''
         self.currentRoute = []
-        self.lightmode = None
+        self.status
         
     def parse_config(self, config_file, parser):
         parser.read(config_file)
@@ -41,6 +41,7 @@ class _Table(object):
         self.screenButtons = parser.get('common', 'screenbuttons').split(',')
         self.maxRouteLength = parser.getint('common', 'maxRouteLength')
         self.nrOfStartSegments = parser.getint('common', 'nrOfStartSegments')
+        self.status = parser.get('common', 'status')
         
         #debug
         for b in self.buttonList:
@@ -55,12 +56,17 @@ class _Table(object):
         for button in self.buttonList:
             if button.name == name:
                 return button
-
+            
+    def getRandomSegment(self):
+        return random.choice(self.segmentList)
 
     # - three route options:
     #       1. Snake with length <=30 LEDs to prevent overlap; route is random until X inner ring segm are in list; route < 30 segm
     #       2. Solid route with list of possible options. remove options while planning to prevent crossings (TODO)
     #       3. Runes that slowly form.
+
+    # SNAKE FUNCTIONS
+    'TODO: Create Snake Class'
     def createCurrentSnake(self, goal):
         route = []
         namelist = []
@@ -102,6 +108,14 @@ class _Table(object):
         return route
 
     # Ensures the LEDs in one segment are run in the correct order/direction
+    def setRouteFlow(self,route):
+        directionlist = []
+        i = 0
+        while i < len(route)-1:
+            directionlist.append(self.setRouteSegmentFlow(route[i],route[i+1]))
+            i = i+1
+        print('Segment flow = ', directionlist)
+    
     def setRouteSegmentFlow(self,currentSegment,previousSegment):
         if currentSegment.name in previousSegment.flowSegments:
             previousSegment.addSegmentFlow(1)
@@ -130,7 +144,7 @@ class _Table(object):
         else:
             print("ERROR: Destination and segment not linked! re-run route")
             return 0
-
+ 
     # check if the route is set correctly
     def checkRoute(self, route):
         check = []
@@ -160,7 +174,43 @@ class _Table(object):
             for i,prevColor in enumerate(segment.LEDvalues):
                 segment.setLEDValue(i,color)
 
-        
+# OTHER TABLE FUNCTIONS
+
+    # Ensures the LEDs in the final segment are run in the correct order/direction
+    def setSegmentFlowRandom(self,segment):
+        rnd = 0
+        while rnd == 0:
+            rnd = random.randint(-1,1)
+        segment.addSegmentFlow(rnd)
+        return rnd
+    
+    def createRandomSpark(self, name):
+        route = []
+        routeLength = random.randint(1,5)
+        namelist = []
+
+        route.append(self.getRandomSegment())
+        namelist.append(route[0].name)
+        randomStartDirection = random.randint(1,2)
+
+        if (len(route) < routeLength):
+            if (randomStartDirection > 1):
+                route.append(self.getSegment(route[0].flowSegments[random.randint(0,len(route[0].flowSegments)-1)]))
+            else:
+                route.append(self.getSegment(route[0].counterSegments[random.randint(0,len(route[0].counterSegments)-1)]))
+            namelist.append(route[-1].name)
+
+            while(len(route) < routeLength):
+                if (route[-2].name in route[-1].flowSegments):
+                    route.append(self.getSegment(route[-1].counterSegments[random.randint(0,len(route[-1].counterSegments)-1)]))
+                else:
+                    route.append(self.getSegment(route[-1].flowSegments[random.randint(0,len(route[-1].flowSegments)-1)]))
+                namelist.append(route[-1].name)
+
+        spark = Spark(name, route)
+        return spark
+    
+
 class _Segment(object):
     def __init__(self, name, nrLEDs, flowSegs, counterSegs, defaultColor):
         self.name = name
@@ -168,13 +218,19 @@ class _Segment(object):
         self.flowSegments = flowSegs
         self.counterSegments = counterSegs
         self.flow = []
-        self.LEDvalues = []
+        self.LEDvalues = [] 
+        self.LEDUsers = []
         self.timesInRoute = 0
         for x in range(nrLEDs):
             self.LEDvalues.append(defaultColor)
+        for LED in range(nrLEDs):
+            self.LEDUsers.append("Unused")
 
     def addSegmentFlow(self, flow):
         self.flow.append(flow)
+
+    def removeSegmentFlow(self):
+        self.flow.remove()
 
     def getLastSegmentFlow(self):
         return self.flow[-1]
@@ -189,8 +245,15 @@ class _Segment(object):
         if index < len(self.LEDvalues):
             self.LEDvalues[index] = color
 
+    def setUser(self,index,name):
+        if index < len(self.LEDvalues):
+            self.LEDUsers[index] = name
+
     def getLEDvalues(self):
         return self.LEDvalues
+    
+    def getLEDUsers(self):
+        return self.LEDUsers
 
     def getRouteCount(self):
         return self.timesInRoute
@@ -206,3 +269,65 @@ class _Button(object):
         list = self.flowSegments + self.counterSegments
         index = random.randint(0,len(list)-1)
         return list[index]
+
+
+class Spark(object):
+    def __init__(self, name, segments):
+        self.name = name
+        self.segments = segments
+        self.segmentDirection = self._setSegmentDirection()
+        self.segmentsActive = []
+        self.segmentActiveDirection = []
+        self.segmentsDone = []
+        self.segmentDoneDirection = []
+        self.startLEDIndex = random.randint(0,self.segments[0].nrLEDs-1)
+        self.endLEDIndex = random.randint(0,self.segments[-1].nrLEDs-1)
+        self.lengthCounter = 0
+        self._setSparkLength()
+        self._resetUsers()
+
+    # Set the length of the spark between 5 LEDs and the minimum of 20 vs maxLEDs in the spark
+    def _setSparkLength(self):
+        maxLength = 0
+        for seg in self.segments:
+            maxLength = maxLength + seg.nrLEDs
+        self.length = random.randint(5,min(maxLength,20))
+
+    def _setSegmentDirection(self):
+        sparkDirection = []
+        if len(self.segments) > 1:
+            for index, segment in enumerate(self.segments):
+                if index < len(self.segments)-1:
+                    nextSegment = self.segments[index + 1]
+                    if segment.name in nextSegment.flowSegments:
+                        sparkDirection.append(1)
+                    elif segment.name in nextSegment.counterSegments:
+                        sparkDirection.append(-1)
+                else:
+                    prevSegment = self.segments[index - 1]
+                    if segment.name in prevSegment.flowSegments:
+                        sparkDirection.append(-1)
+                    elif segment.name in prevSegment.counterSegments:
+                        sparkDirection.append(1)
+        elif len(self.segments) == 1:
+            sparkDirection.append(1)
+        else:
+            print("ERROR: No segment in spark!")
+        if not(len(sparkDirection) == len(self.segments)):
+            print("ERROR: Segments length NOT equal to Directions Length!")
+        return sparkDirection
+
+    def _resetUsers(self):
+        for segment in self.segments:
+            for index, user in enumerate(segment.LEDUsers):
+                segment.setUser(index,"Unused")
+
+    def resetSpark(self):
+        if self.segments:
+            self.segmentsActive = self.segments.copy()
+            self.segmentActiveDirection = self.segmentDirection.copy()
+            self.lengthCounter = 0
+        else:
+            while True:
+                temp = 1
+    
