@@ -23,8 +23,8 @@ ID=13421961
 
 [SL5]
 name=Pascal
-skills=SL
 ID=13425689
+skills=SL
 
 [NPC1]
 name=Kulgan Kieferfelsen
@@ -39,12 +39,12 @@ skills=None
 [PC2]                          
 name=Jo Gauss
 ID=14277475
-skills=ontkoppelen,aansluiten,Bron
+skills=disconnectall,connect1,wellsize
 
 [PC3]
 name=Torg
 ID=13421386
-skills=ontkoppelen,aansluiten,Koppel2,Bron
+skills=disconnectall,isconnect1item,connect1,connect2,wellsize
 
 [PC4]
 name=Harman
@@ -54,7 +54,7 @@ skills=None
 [PC5]
 name=Isabella Catharina Julia van Zwarteheide
 ID=14522226
-skills=Ontkoppelen,Koppel1,Bron
+skills=disconnectall,connect1,wellsize
 
 [PlayerUnknown]
 name=Unknown
@@ -64,4 +64,4 @@ skills=None
 [GM]
 name=GM
 ID=10
-skills=welcome,ontkoppelen,aansluiten,putgrootte,ontkoppel_item
+skills=disconnectall,disconnect1item,connect1,connect2,connect3,wellsize

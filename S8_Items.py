@@ -15,12 +15,13 @@ class S8_Items(object):
         if glbs.players.activePlayer.hasSkill(self.state.name):
             glbs.display.display(self.folder,self.name,self.location)
             
+            # FUTURE: This can be removed if the Item ID setup is working
             if glbs.returnState.value == self.states.S4.value:
                 glbs.items.setCurrentItemToLowestActiveItem()
             elif glbs.returnState.value == self.states.S7.value:
                 glbs.items.setCurrentItemToLowestInactiveItem()
 
-            # FUTURE: change Item Image setup to Present Item with ID setup
+            # FUTURE: change the function below to show "ITEM DETECTED" for this Item ID setup
             #TODO: move to RFID part
             if glbs.items.currentItemName:
                 glbs.display.display(glbs.items.folder,glbs.items.currentItemName,glbs.items.location)
@@ -45,26 +46,13 @@ class S8_Items(object):
         input_list = glbs.handler.event_handler()
         if input_list:
             new_input = input_list.pop()
-            if new_input["event"] == "rfid":
-                newItem = glbs.items.getItemByID(new_input["data"])
-                if newItem and (glbs.items.currentItemName != newItem.name):
-                    #FUTURE: Add "Register Item menu, if the item does not exist"
-                    glbs.items.currentItemName = newItem.name
-                    self.state = self.states.S9
-                else:
-                    self.state = self.states.S8
-
-            #FUTURE: Remove        
-            #elif new_input["event"] == "keydown":
-            #    if new_input["data"] == "up":
-            #        self.state = self.states.S7
-            #--------------        
-
-            elif new_input["event"] == "keydown":
+            # Handle the (sub)menu input buttons for this state
+            if new_input["event"] == "keydown":
                 if new_input["data"] == "right":
                     glbs.display.display(glbs.items.folder, glbs.items.selectNextItem(glbs.returnState.value), glbs.items.location)
                     self.state = self.states.S8
                 elif new_input["data"] == "down":
+                    glbs.returnState = self.states.S8
                     self.state = self.states.S9
                 elif new_input["data"] == "left":
                     glbs.display.display(glbs.items.folder, glbs.items.selectPrevItem(glbs.returnState.value), glbs.items.location)

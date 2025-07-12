@@ -11,11 +11,12 @@ class S4_Disconnect_Item(object):
         self.name = str(glbs.parser.get('State4', 'name'))
         self.folder = str(glbs.parser.get('State4', 'folder'))
         self.location = [int(x.strip()) for x in glbs.parser.get('State4', 'location').split(',')]
+        self.skills = glbs.parser.get('State4', 'skills').split(',')
 
     def run(self):
         self.state = self.states.S4
         print("current state is {}".format(self.state))
-        if glbs.players.activePlayer.hasSkill(glbs.skillStateDict[self.state.name]):
+        if glbs.players.activePlayer.hasSkill(self.skills): #TODO change name to match skill
             glbs.display.display(self.folder,self.name,self.location)
         else:
             self._skipThisState()
@@ -28,12 +29,32 @@ class S4_Disconnect_Item(object):
         input_list = glbs.handler.event_handler()
         if input_list:
             new_input = input_list.pop()
-            if new_input["event"] == "keydown":
+
+            # CHECK if an RFID tag has been presented
+            if new_input["event"] == "rfid":
+                newItem = glbs.items.getItemByID(new_input["data"])
+                playerIsGM = glbs.players.activePlayer.isGM
+                # TODO: check if item was scanned & valid & is connected!
+                if playerIsGM and newItem.connected:
+                    glbs.items.disconnectItem(newItem)
+                    glbs.items.currentItemName = ""
+                    # TODO: change to S2 in the future
+                    self.state = self.states.S1
+                elif glbs.items.currentItemName != newItem.name and newItem.connected:
+                    glbs.items.currentItemName = newItem.name
+                    glbs.gameTimeout = 300  # Set game timeout to 5 minutes
+                    glbs.returnState = self.states.S4
+                    self.state = self.states.S9
+                else:
+                    self.state = self.states.S4
+            
+            # Handle the menu input buttons for this state
+            elif new_input["event"] == "keydown":
                 if new_input["data"] == "right":
                     self.state = self.states.S5
                 elif new_input["data"] == "down":
                     glbs.returnState = self.states.S4
-                    self.state = self.states.S8
+                    self.state = self.states.S9
                 elif new_input["data"] == "left":
                     glbs.prevStateName = self.state.name
                     self.state = self.states.S3

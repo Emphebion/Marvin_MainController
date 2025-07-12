@@ -16,7 +16,7 @@ class _Table(object):
         self.parse_config(config_file,parser)
         self.startSegment = ''
         self.currentRoute = []
-        self.status
+        self.status = "Off"                # Off, Active, Broken, Overload
         
     def parse_config(self, config_file, parser):
         parser.read(config_file)

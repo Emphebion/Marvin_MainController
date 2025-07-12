@@ -8,6 +8,7 @@ class S10_IdleGame():        #S10_GameMaster
         self.name = glbs.parser.get('State10', 'name')
         self.folder = glbs.parser.get('State10', 'folder')
         self.location = [int(x.strip()) for x in glbs.parser.get('State10', 'location').split(',')]
+        self.failuresPerLevel = [int(x.strip()) for x in glbs.parser.get('State10', 'failuresPerLevel').split(',')]
         self.successPerLevel = [int(x.strip()) for x in glbs.parser.get('State10', 'successPerLevel').split(',')]    #self.successPercentage = round(parser.getint(current, 'successPercentage'),0)
         self.nrRoundGoalsPerLevel = [int(x.strip()) for x in glbs.parser.get('State10', 'roundGoalsPerLevel').split(',')]
         self.currentGoal = ''
@@ -18,17 +19,19 @@ class S10_IdleGame():        #S10_GameMaster
         self.state = self.states.S10
         print("current state is {}".format(self.state))
         if glbs.currentRoundInputs:
-            self.checkForSuccess()
-        print("successes: %s" % glbs.gameSuccesses)
+            self.checkForFailures()
+        print("failures: %s" % glbs.gameFailures)
         
+        # Reset game variables
         glbs.currentGameRoute.clear()
         glbs.currentRoundInputs.clear()
 
-        #Check successes
+        # TODO:CHANGE SUCCESSES FOR TIME + Max Failures
+
         # Create route for current round
         self.setCurrentGoal()
         glbs.currentGameRoute = glbs.table.createCurrentSnake(self.currentGoal)
-        print("current inputs: " + str(self.currentGoal))
+        print("current input required: " + str(self.currentGoal))
         glbs.snakeCounter = 0
         
         # Wait between rounds
@@ -41,19 +44,31 @@ class S10_IdleGame():        #S10_GameMaster
 
 
     def _setState(self):
-        # 1. check if # successes required is achieved (level option for future)
-        # 2. calculate new round 
+        # 1. check if the player did not exceed the maximum number of failures
+        # 2. Check if game time is exceeded
+        # 3. calculate new round 
         # 3. wait for X time between rounds
-        if (self.successPerLevel[0] > glbs.gameSuccesses):
-            if ((self.idleTime - glbs.time.time() > 0) | (glbs.currentGameRoute == [])):
-                #print("Remaining time S9 = {} seconds".format(self.idleTime - glbs.time.time()))
+        if (self.failuresPerLevel[0] >= glbs.gameFailures):
+            print("Currently " + str(glbs.gameFailures) + " of " + str(self.failuresPerLevel[0]) + " failures")
+            # Check if game time is exceeded
+            # If game time is exceeded, the game is finished
+            if self.checkGameTime():
+                print("Game time exceeded, game is finished")
+                glbs.gameSuccess = True
+                self.state = self.states.S13
+            # If the game is not finished, check if the idle time is exceeded
+            # or if the current game route is empty (no inputs received) (removed due to potential locked state)
+            elif ((self.idleTime - glbs.time.time() > 0)):
                 self.state = self.states.S10
+            # Start new round
             else:
                 self.state = self.states.S11
-        else:
+        # Game failed
+        else:   
+            print("Game failed, maximum number of failures exceeded")
+            glbs.gameSuccess = False
             self.state = self.states.S13
-            print("Currently " + str(glbs.gameSuccesses) + " of " + str(self.successPerLevel[0]) + " successes achieved")
-        
+        #reset state machine if no input has been provided for 15 minutes
 
 # State specific functions:
     def setCurrentGoal(self):
@@ -62,7 +77,16 @@ class S10_IdleGame():        #S10_GameMaster
         print(goal) #debug
         self.currentGoal = goal
 
-    def checkForSuccess(self):
+    def checkForFailures(self):
         inputs = list(set(glbs.currentRoundInputs))
-        if (self.currentGoal in inputs) and (len(inputs) is 1):
-            glbs.gameSuccesses = glbs.gameSuccesses + 1
+        if (self.currentGoal not in inputs) or (len(inputs) > 1):
+            glbs.gameFailures = glbs.gameFailures + 1
+
+    def checkGameTime(self):
+        gameComplete = False
+        timmy = glbs.gameTimeout - (glbs.time.time() - glbs.gameStartTime)
+        print("Current time before finished = " + str(timmy))
+        if (glbs.time.time() - glbs.gameStartTime) > glbs.gameTimeout:
+            gameComplete = True
+            # game is finished
+        return gameComplete

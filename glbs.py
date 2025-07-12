@@ -24,6 +24,8 @@ devices = _Devices(config_file,parser)
 table = _Table(table_file,parser)
 players = _Players(player_file,parser) # Add re-read option if obj is empty in state1
 
+gameStartTime = 0
+gameTimeout = 0
 startTime = 0
 endTime = 0
 success = 0
@@ -33,12 +35,13 @@ currentInput = ""
 #Round variables
 currentGameRoute = []
 currentRoundInputs = []
-gameSuccesses = 0
+gameSuccess = False
+gameFailures = 0
 snakeCounter = 0
 returnState = None
 prevStateName = None
-#FURUTE: Make skill-state dictionary dynamic
-skillStateDict = {"S1": "welcome","S3": "ontkoppelen","S4": "ontkoppel_item", "S5": "putgrootte", "S7": "aansluiten"}
+#TODO: Make skill-state dictionary dynamic
+skillStateDict = {"S1": "welcome","S3": "disconnectall","S4": "disconnect1item", "S5": "wellsize", "S7": "connect"}
 
 # Sleep variables
 parser.read(config_file)
@@ -54,3 +57,4 @@ def bedTime():
         players.resetActivePlayer()
         sleep = True
     return sleep
+

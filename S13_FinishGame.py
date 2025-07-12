@@ -24,12 +24,22 @@ class S13_FinishGame():
             delay = 1
 
         #Handle the consequences of the game
-        if glbs.returnState.value is self.states.S8.value:  #TODO: change to S7 and add S4 when disconnecting 1 item
-            glbs.items.connectItem()
-        elif glbs.returnState.value is self.states.S4.value:
-            glbs.items.disconnectItem()
-        elif glbs.returnState.value is self.states.S3.value:
-            glbs.items.disconnectAll()
+        if glbs.gameSuccess:
+            print("Game finished successfully")
+            glbs.table.setAllTableLEDs(glbs.table.colorsLED["emerald"])
+            glbs.devices.transmitLED(glbs.table.getLEDData())
+            if glbs.returnState.value is self.states.S8.value or glbs.returnState.value is self.states.S7.value:  #TODO: change to S7 and add S4 when disconnecting 1 item
+                glbs.items.connectItem()
+            elif glbs.returnState.value is self.states.S4.value:
+                glbs.items.disconnectItem()
+            elif glbs.returnState.value is self.states.S3.value:
+                glbs.items.disconnectAll()
+        else:
+            print("Game failed")
+            glbs.table.setAllTableLEDs(glbs.table.colorsLED["red"])
+            glbs.devices.transmitLED(glbs.table.getLEDData())
+
+        
 
         #reset table to off
         glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])

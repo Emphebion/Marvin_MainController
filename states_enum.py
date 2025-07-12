@@ -55,6 +55,7 @@ class StatesEnum():
             S5 = self.all_states.S5_Well.value
             S7 = self.all_states.S7_Connect_Item.value
             S8 = self.all_states.S8_Items.value
+            S9 = self.all_states.S9_StartGame.value
         return State4_states
 
     #S5 Well
@@ -85,6 +86,7 @@ class StatesEnum():
             S5 = self.all_states.S5_Well.value
             S7 = self.all_states.S7_Connect_Item.value
             S8 = self.all_states.S8_Items.value
+            S9 = self.all_states.S9_StartGame.value
         return State7_states
 
     #S8 Items

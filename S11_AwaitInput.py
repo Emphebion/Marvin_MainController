@@ -30,13 +30,16 @@ class S11_AwaitInput():
             #print("Remaining time S11 = {} seconds".format(self.loopTimeout - (glbs.time.time()-self.loopStartTime)))
             self.state = self.states.S11
         else:
+            # Check if the snake is done
             if(not self.routeDone) & (not glbs.currentGameRoute):
                 self.state = self.states.S10
+            # Check if the game is finished
             else:
                 self.loopStartTime = glbs.time.time()
                 self.state = self.states.S12
 
-        #reset state machine if no input has been provided for 15 minutes
+        #reset state machine if no input has been provided for 15 minutes   CAN BE MOVED TO OTHER STATES NOW THAT FAILURES ARE HANDLED
+        # This is a safety net to prevent the game from being stuck in an infinite loop
         if glbs.bedTime():
             glbs.table.clearRoute()
             self.routeDone.clear()

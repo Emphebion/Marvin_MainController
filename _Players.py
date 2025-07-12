@@ -26,7 +26,11 @@ class _Players(object):
             self.playerDict[ID] = player # TODO append to list if ID=0
 
     def setActivePlayer(self, ID):
-        self.activePlayer = self.playerDict[ID]
+        if ID in self.playerDict:
+            self.activePlayer = self.playerDict[ID]
+        else:
+            self.activePlayer = None
+        
 
     def resetActivePlayer(self):
         self.activePlayer = None
@@ -36,10 +40,19 @@ class _Player(object):
         self.name = name
         self.ID = ID
         self.skillList = skills
+        self.isGM = self.hasSkill("SL")
         
     def getSkills(self):
         return self.skillList
         
     def hasSkill(self, skill):
-        return skill in self.skillList
+        print("Checking if player {} has skill {}".format(self.name, skill))
+        print("Player skills: {}".format(self.skillList))
+        if isinstance(skill, list):
+            for s in skill:
+                if s in self.skillList:
+                    return True
+            return False
+        else:
+            return skill in self.skillList
   

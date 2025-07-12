@@ -22,8 +22,6 @@ class S9_StartGame(object):
             self._setState()
         return self.state.value
 
-    #TODO: expand for multiple rounds
     def _setState(self):
-
-        #glbs.currentGameGoals = self.setGameGoals()
+        glbs.gameStartTime = glbs.time.time()
         self.state = self.states.S10

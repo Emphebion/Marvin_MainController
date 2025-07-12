@@ -26,6 +26,7 @@ class _Items(object):
             function = self.parser.get(name, 'function')
             ID = self.parser.getint(name, 'ID')
             level = self.parser.getint(name, 'level')
+            activationSkill = f"connect{level}"
             load = self.parser.getint(name, 'load')
             if self.parser.getint(name, 'connected') > 0:
                 connected = True

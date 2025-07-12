@@ -8,11 +8,12 @@ class S5_Well(object):
         self.name = str(glbs.parser.get('State5', 'name'))
         self.folder = str(glbs.parser.get('State5', 'folder'))
         self.location = [int(x.strip()) for x in glbs.parser.get('State5', 'location').split(',')]
+        self.skills = glbs.parser.get('State5', 'skills').split(',')
 
     def run(self):
         self.state = self.states.S5
         print("current state is {}".format(self.state))
-        if glbs.players.activePlayer.hasSkill(glbs.skillStateDict[self.state.name]):
+        if glbs.players.activePlayer.hasSkill(self.skills):
             glbs.display.display(self.folder,self.name,self.location)
         else:
             self._skipThisState()

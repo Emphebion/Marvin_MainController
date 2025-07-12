@@ -8,11 +8,13 @@ class S3_Disconnect_All(object):
         self.name = str(glbs.parser.get('State3', 'name'))
         self.folder = str(glbs.parser.get('State3', 'folder'))
         self.location = [int(x.strip()) for x in glbs.parser.get('State3', 'location').split(',')]
+        self.skills = glbs.parser.get('State3', 'skills').split(',')
 
     def run(self):
         self.state = self.states.S3
         print("current state is {}".format(self.state))
-        if glbs.players.activePlayer.hasSkill(glbs.skillStateDict[self.state.name]):
+        print("current state name is {}".format(self.state.name))
+        if glbs.players.activePlayer.hasSkill(self.skills):
             glbs.display.display(self.folder,self.name,self.location)
         else:
             self._skipThisState()
@@ -22,6 +24,7 @@ class S3_Disconnect_All(object):
         return self.state.value
 
     def _setState(self):
+        # Handle the menu input buttons for this state
         input_list = glbs.handler.event_handler()
         if input_list:
             new_input = input_list.pop()
@@ -30,7 +33,13 @@ class S3_Disconnect_All(object):
                     glbs.prevStateName = self.state.name
                     self.state = self.states.S4
                 elif new_input["data"] == "down":  # Dummy
-                    glbs.returnState = self.states.S3
+                    if glbs.players.activePlayer.isGM:
+                        glbs.items.disconnectAllItems()
+                        # improve return state (to S2?) Maybe this is the best return state for all except sleep
+                        self.state = self.states.S3
+                    else:
+                        glbs.gameTimeout = 600  # Set game timeout to 10 minutes
+                        glbs.returnState = self.states.S3
                     self.state = self.states.S9
                 elif new_input["data"] == "left":
                     self.state = self.states.S7

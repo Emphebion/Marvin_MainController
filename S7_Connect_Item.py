@@ -11,11 +11,12 @@ class S7_Connect_Item():
         self.name = str(glbs.parser.get('State7', 'name'))
         self.folder = str(glbs.parser.get('State7', 'folder'))
         self.location = [int(x.strip()) for x in glbs.parser.get('State7', 'location').split(',')]
+        self.skills = glbs.parser.get('State7', 'skills').split(',')
 
     def run(self):
         self.state = self.states.S7
         print("current state is {}".format(self.state))
-        if glbs.players.activePlayer.hasSkill(glbs.skillStateDict[self.state.name]):
+        if glbs.players.activePlayer.hasSkill(self.skills):
             glbs.display.display(self.folder,self.name,self.location)
         else:
             self._skipThisState()
@@ -33,7 +34,26 @@ class S7_Connect_Item():
         input_list = glbs.handler.event_handler()
         if input_list:
             new_input = input_list.pop()
-            if new_input["event"] == "keydown":
+            # CHECK if an RFID tag has been presented
+            if new_input["event"] == "rfid":
+                newItem = glbs.items.getItemByID(new_input["data"])
+                playerIsGM = glbs.players.activePlayer.isGM
+                playerCanActivate = glbs.players.activePlayer.hasSkill(newItem.activationSkill)
+                # TODO: check if item was scanned & valid!
+                if playerIsGM and not(newItem.connected):
+                    glbs.items.connectItem(newItem)
+                    glbs.items.currentItemName = ""
+                    self.state = self.states.S1
+                elif playerCanActivate and (glbs.items.currentItemName != newItem.name) and not(newItem.connected):
+                    glbs.items.currentItemName = newItem.name
+                    glbs.gameTimeout = 300  # Set game timeout to 5 minutes
+                    glbs.returnState = self.states.S7
+                    self.state = self.states.S9
+                else:
+                    self.state = self.states.S7
+            
+            # Handle the menu input buttons for this state
+            elif new_input["event"] == "keydown":
                 if new_input["data"] == "right":
                     self.state = self.states.S3
                 elif new_input["data"] == "down":

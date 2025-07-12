@@ -19,6 +19,8 @@ class S1_Reset():
         device_names = [device.name for device in glbs.devices.connectedDevices]
         print("Connected devices: {}".format(device_names))
 
+        glbs.players.setActivePlayer(None)  # Reset active player
+
         #generate random sparks
         self._setIdleLightBehaviour()
 
@@ -59,7 +61,10 @@ class S1_Reset():
                 glbs.players.setActivePlayer(10)
 
     # Prepare the behaviour of the Table LEDs while idling.
+    # This will set the sparklist to an empty list
+    # and will create a list of sparks that can be used
     def _setIdleLightBehaviour(self):
+        print("Table status is: {}".format(glbs.table.status))
         if glbs.table.status == "Off":
             glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
             glbs.devices.transmitLED(glbs.table.getLEDData())
@@ -89,6 +94,14 @@ class S1_Reset():
             pass
             'An Error occured. Create a handling function'
 
+    # Sub function to run the idle light behaviour
+    # This is called when the table is idle but active
+    # or when the table is broken
+    # or when the table is overloaded
+    # or when the table is off
+    # This function will run the sparks over the surface
+    # and will update the LEDs accordingly
+    # This function will also reset the sparks when they are done
     def _runIdleLightBehaviour(self):
         if glbs.table.status == "Active":
             pass
