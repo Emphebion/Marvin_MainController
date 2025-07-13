@@ -54,7 +54,7 @@ skills=None
 [PC5]
 name=Isabella Catharina Julia van Zwarteheide
 ID=14522226
-skills=disconnectall,connect1,wellsize
+skills=disconnectall,connect1,connect3,wellsize
 
 [PlayerUnknown]
 name=Unknown
@@ -64,4 +64,4 @@ skills=None
 [GM]
 name=GM
 ID=10
-skills=disconnectall,disconnect1item,connect1,connect2,connect3,wellsize
+skills=disconnectall,disconnect1item,connect1,connect2

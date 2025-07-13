@@ -34,8 +34,8 @@ class _Items(object):
                 connected = False
             self.currentItemName = name
             # Improve statement below when we switch to full item ID opperation
-            self.items[name] = Item(name,function,ID,level,load,connected)
-            self.itemsIDs[ID] = Item(name,function,ID,level,load,connected)
+            self.items[name] = Item(name,function,ID,level,activationSkill,load,connected)
+            self.itemsIDs[ID] = Item(name,function,ID,level,activationSkill,load,connected)
         
 # Menu functions
     def selectNextItem(self,stateNr):
@@ -155,13 +155,15 @@ class _Items(object):
 
 
 class Item(object):
-    def __init__(self, name, function, ID, level, load=1, connected=False):
+    def __init__(self, name, function, ID, level, activationSkill, load=1, connected=False):
         self.name = name
         self.function = function
         self.ID = ID
         self.level = level
+        self.activationSkill = activationSkill
         self.load = load
         self.connected = connected
+        print(f"Item created: {self.name}, ID: {self.ID}, connected: {self.connected}, activationSkill: {self.activationSkill}")
 
     def toggle_connected(self):
         self.connected != self.connected

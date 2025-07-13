@@ -18,8 +18,7 @@ class S10_IdleGame():        #S10_GameMaster
     def run(self):
         self.state = self.states.S10
         print("current state is {}".format(self.state))
-        if glbs.currentRoundInputs:
-            self.checkForFailures()
+        self.checkForFailures()
         print("failures: %s" % glbs.gameFailures)
         
         # Reset game variables
@@ -79,7 +78,7 @@ class S10_IdleGame():        #S10_GameMaster
 
     def checkForFailures(self):
         inputs = list(set(glbs.currentRoundInputs))
-        if (self.currentGoal not in inputs) or (len(inputs) > 1):
+        if not((self.currentGoal in inputs) and (len(inputs) == 1)):
             glbs.gameFailures = glbs.gameFailures + 1
 
     def checkGameTime(self):

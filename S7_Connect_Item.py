@@ -12,10 +12,12 @@ class S7_Connect_Item():
         self.folder = str(glbs.parser.get('State7', 'folder'))
         self.location = [int(x.strip()) for x in glbs.parser.get('State7', 'location').split(',')]
         self.skills = glbs.parser.get('State7', 'skills').split(',')
+        self.gameTime = glbs.parser.getint('State7', 'gameTime')
 
     def run(self):
         self.state = self.states.S7
         print("current state is {}".format(self.state))
+        print("current state name is {}".format(self.state.name))
         if glbs.players.activePlayer.hasSkill(self.skills):
             glbs.display.display(self.folder,self.name,self.location)
         else:
@@ -37,29 +39,32 @@ class S7_Connect_Item():
             # CHECK if an RFID tag has been presented
             if new_input["event"] == "rfid":
                 newItem = glbs.items.getItemByID(new_input["data"])
-                playerIsGM = glbs.players.activePlayer.isGM
-                playerCanActivate = glbs.players.activePlayer.hasSkill(newItem.activationSkill)
-                # TODO: check if item was scanned & valid!
-                if playerIsGM and not(newItem.connected):
-                    glbs.items.connectItem(newItem)
-                    glbs.items.currentItemName = ""
-                    self.state = self.states.S1
-                elif playerCanActivate and (glbs.items.currentItemName != newItem.name) and not(newItem.connected):
-                    glbs.items.currentItemName = newItem.name
-                    glbs.gameTimeout = 300  # Set game timeout to 5 minutes
-                    glbs.returnState = self.states.S7
-                    self.state = self.states.S9
-                else:
-                    self.state = self.states.S7
+                if newItem:
+                    playerIsGM = glbs.players.activePlayer.isGM
+                    playerCanActivate = glbs.players.activePlayer.hasSkill(newItem.activationSkill)
+                    # TODO: give feedback if item was invalid, already connected or level is insufficient!
+                    if playerIsGM and not(newItem.connected):
+                        glbs.items.connectItem(newItem)
+                        glbs.items.currentItemName = ""
+                        self.state = self.states.S1
+                    elif playerCanActivate and (glbs.items.currentItemName != newItem.name) and not(newItem.connected):
+                        glbs.items.currentItemName = newItem.name
+                        glbs.gameTimeout = self.gameTime  # Set game timeout (in seconds) to the value in the config
+                        glbs.returnState = self.states.S7
+                        self.state = self.states.S9
+                    else:
+                        self.state = self.states.S7
             
             # Handle the menu input buttons for this state
             elif new_input["event"] == "keydown":
                 if new_input["data"] == "right":
+                    glbs.prevStateName = self.state.name
                     self.state = self.states.S3
                 elif new_input["data"] == "down":
                     glbs.returnState = self.states.S7
                     self.state = self.states.S8
                 elif new_input["data"] == "left":
+                    glbs.prevStateName = self.state.name
                     self.state = self.states.S5
                 elif new_input["data"] == "up":
                     self.state = self.states.S7

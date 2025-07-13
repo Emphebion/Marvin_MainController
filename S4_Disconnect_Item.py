@@ -12,10 +12,12 @@ class S4_Disconnect_Item(object):
         self.folder = str(glbs.parser.get('State4', 'folder'))
         self.location = [int(x.strip()) for x in glbs.parser.get('State4', 'location').split(',')]
         self.skills = glbs.parser.get('State4', 'skills').split(',')
+        self.gameTime = glbs.parser.getint('State4', 'gameTime')
 
     def run(self):
         self.state = self.states.S4
         print("current state is {}".format(self.state))
+        print("current state name is {}".format(self.state.name))
         if glbs.players.activePlayer.hasSkill(self.skills): #TODO change name to match skill
             glbs.display.display(self.folder,self.name,self.location)
         else:
@@ -42,7 +44,7 @@ class S4_Disconnect_Item(object):
                     self.state = self.states.S1
                 elif glbs.items.currentItemName != newItem.name and newItem.connected:
                     glbs.items.currentItemName = newItem.name
-                    glbs.gameTimeout = 300  # Set game timeout to 5 minutes
+                    glbs.gameTimeout = self.gameTime  #Set game timeout (in seconds) to the value in the config
                     glbs.returnState = self.states.S4
                     self.state = self.states.S9
                 else:
@@ -51,6 +53,7 @@ class S4_Disconnect_Item(object):
             # Handle the menu input buttons for this state
             elif new_input["event"] == "keydown":
                 if new_input["data"] == "right":
+                    glbs.prevStateName = self.state.name
                     self.state = self.states.S5
                 elif new_input["data"] == "down":
                     glbs.returnState = self.states.S4

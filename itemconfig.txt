@@ -18,7 +18,7 @@ function = Zoekt een gebied af naar grondstoffen. Een keer per dag deel moet de 
 id = 23456789
 level = 2
 load = 25
-connected = 1
+connected = 0
 
 [item3]
 name = Inspiratie put Compas
@@ -34,7 +34,7 @@ function = Zoekt de rand van een plek waar magie niet werkt
 id = 45678901
 level = 3
 load = 45
-connected = 1
+connected = 0
 
 [item5]
 name = Speeldoos

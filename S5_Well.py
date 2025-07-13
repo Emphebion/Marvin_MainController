@@ -13,6 +13,7 @@ class S5_Well(object):
     def run(self):
         self.state = self.states.S5
         print("current state is {}".format(self.state))
+        print("current state name is {}".format(self.state.name))
         if glbs.players.activePlayer.hasSkill(self.skills):
             glbs.display.display(self.folder,self.name,self.location)
         else:
@@ -28,10 +29,12 @@ class S5_Well(object):
             new_input = input_list.pop()
             if new_input["event"] == "keydown":
                 if new_input["data"] == "right":
+                    glbs.prevStateName = self.state.name
                     self.state = self.states.S7
                 elif new_input["data"] == "down":
                     self.state = self.states.S6
                 elif new_input["data"] == "left":
+                    glbs.prevStateName = self.state.name
                     self.state = self.states.S4
                 elif new_input["data"] == "up":
                     self.state = self.states.S5

@@ -9,7 +9,7 @@ class S1_Reset():
         self.idleStartTime = 0
         self.sparkTimeout = float(glbs.parser.getint('State1','sparktimeout'))
         self.sparkStartTime = 0
-        self.idleTimeout = glbs.random.randint(1,self.idleMaxTimeout)
+        self.idleTimeout = glbs.random.uniform(1,self.idleMaxTimeout)
 
     def run(self):
         self.state = self.states.S1
@@ -28,7 +28,7 @@ class S1_Reset():
             if (self.idleTimeout < (glbs.time.time()-self.idleStartTime)):
                 self._runIdleLightBehaviour()
                 self.idleStartTime = glbs.time.time()
-                self.idleTimeout = glbs.random.randint(1,self.idleMaxTimeout)
+                self.idleTimeout = glbs.random.uniform(1,self.idleMaxTimeout)
             else:
                 self._setState()
         return self.state.value

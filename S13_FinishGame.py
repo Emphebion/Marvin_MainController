@@ -39,7 +39,12 @@ class S13_FinishGame():
             glbs.table.setAllTableLEDs(glbs.table.colorsLED["red"])
             glbs.devices.transmitLED(glbs.table.getLEDData())
 
-        
+        glbs.gameSuccess = False # Reset game success to False for next game
+        glbs.gameFailures = -1  # Reset game failures to -1 to compensate for the first failure at snake 0
+        glbs.gameStartTime = 0  # Reset game start time
+        glbs.gameTimeout = 0  # Reset game timeout
+        glbs.returnState = None # Reset return state
+        glbs.prevStateName = None # Reset previous state name
 
         #reset table to off
         glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
@@ -50,8 +55,6 @@ class S13_FinishGame():
         return self.state.value
 
     def _setState(self):
-        glbs.gameSuccesses = 0
-        glbs.returnState = None
-        self.state = self.states.S2 #TODO: Add succes state
+        self.state = self.states.S2
          
 # State specific functions:

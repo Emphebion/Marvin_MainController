@@ -9,6 +9,7 @@ class S3_Disconnect_All(object):
         self.folder = str(glbs.parser.get('State3', 'folder'))
         self.location = [int(x.strip()) for x in glbs.parser.get('State3', 'location').split(',')]
         self.skills = glbs.parser.get('State3', 'skills').split(',')
+        self.gameTime = glbs.parser.getint('State3', 'gameTime')
 
     def run(self):
         self.state = self.states.S3
@@ -18,6 +19,7 @@ class S3_Disconnect_All(object):
             glbs.display.display(self.folder,self.name,self.location)
         else:
             self._skipThisState()
+            return self.state.value
             
         while(self.state == self.states.S3):
             self._setState()
@@ -38,10 +40,11 @@ class S3_Disconnect_All(object):
                         # improve return state (to S2?) Maybe this is the best return state for all except sleep
                         self.state = self.states.S3
                     else:
-                        glbs.gameTimeout = 600  # Set game timeout to 10 minutes
+                        glbs.gameTimeout = self.gameTime  #Set game timeout (in seconds) to the value in the config
                         glbs.returnState = self.states.S3
                     self.state = self.states.S9
                 elif new_input["data"] == "left":
+                    glbs.prevStateName = self.state.name
                     self.state = self.states.S7
                 elif new_input["data"] == "up":
                     self.state = self.states.S3

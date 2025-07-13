@@ -24,19 +24,14 @@ devices = _Devices(config_file,parser)
 table = _Table(table_file,parser)
 players = _Players(player_file,parser) # Add re-read option if obj is empty in state1
 
+#Round variables
 gameStartTime = 0
 gameTimeout = 0
-startTime = 0
-endTime = 0
-success = 0
-failure = 0
 currentInput = ""
-
-#Round variables
 currentGameRoute = []
 currentRoundInputs = []
 gameSuccess = False
-gameFailures = 0
+gameFailures = -1   # Start at -1 to compensate first failure at snake 0
 snakeCounter = 0
 returnState = None
 prevStateName = None
