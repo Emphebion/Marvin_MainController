@@ -1,60 +1,70 @@
 [common]
-players=SL1,SL2,SL3,SL4,SL5,PlayerUnknown,GM
+players=SL1,SL2,SL3,SL4,SL5,NPC1,NPC2,PC1,PC2,PC3,PC4,PC5,PC6,PlayerUnknown,GM
 
 [SL1]
-name=Vincent
-skills=SL
+name=SL1
 ID=13412735
+skills=disconnectall,disconnect1item,connect1,connect2,connect3,wellsize
 
 [SL2]
 name=Irma
-skills=SL
 ID=13426395
+skills=disconnectall,disconnect1item,connect1,connect2,connect3,wellsize
 
 [SL3]
 name=Deniz
-skills=SL
-ID=13420919
+ID=13420914
+skills=disconnectall,disconnect1item,connect1,connect2,connect3,wellsize
 
 [SL4]
-name=Miranda
-skills=SL
-ID=13421961
+name=Vincent
+ID=14277475
+skills=disconnectall,disconnect1item,connect1,connect2,connect3,wellsize
 
 [SL5]
 name=Pascal
-ID=13425689
-skills=SL
+ID=13420919
+skills=disconnectall,disconnect1item,connect1,connect2,connect3,wellsize
 
 [NPC1]
-name=Kulgan Kieferfelsen
-ID=13420933
-skills=SL
+name=NPC1
+ID=14519050
+skills=disconnectall,disconnect1item,connect1,connect2,connect3,wellsize
+
+[NPC2]
+name=NPC2
+ID=14480986
+skills=disconnectall,disconnect1item,connect1,connect2,connect3,wellsize
 
 [PC1]
 name=Mira
-ID=13420292
-skills=None
+ID=14529775
+skills=wellsize,connect1
 
 [PC2]                          
-name=Jo Gauss
-ID=14277475
-skills=disconnectall,connect1,wellsize
+name=Kyra
+ID=13423538
+skills=connect1,disconnectall
 
 [PC3]
 name=Torg
-ID=13421386
-skills=disconnectall,isconnect1item,connect1,connect2,wellsize
+ID=13423487
+skills=disconnectall,disconnect1item,connect1,connect2,connect3,wellsize
 
 [PC4]
 name=Harman
-ID=14541168
-skills=None
+ID=13423111
+skills=wellsize
 
 [PC5]
-name=Isabella Catharina Julia van Zwarteheide
-ID=14522226
-skills=disconnectall,connect1,connect3,wellsize
+name=Arandriel
+ID=13421100
+skills=disconnectall
+
+[PC6]
+name=Sebastiaan
+ID=13420908
+skills=connect1
 
 [PlayerUnknown]
 name=Unknown
@@ -64,4 +74,4 @@ skills=None
 [GM]
 name=GM
 ID=10
-skills=disconnectall,disconnect1item,connect1,connect2
+skills=disconnectall,disconnect1item,connect1,connect2,connect3,wellsize

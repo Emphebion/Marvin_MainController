@@ -13,9 +13,15 @@ class S10_IdleGame():        #S10_GameMaster
         self.nrRoundGoalsPerLevel = [int(x.strip()) for x in glbs.parser.get('State10', 'roundGoalsPerLevel').split(',')]
         self.currentGoal = ''
         self.idleTime = 0
+        self.state = None
+
 
 
     def run(self):
+        # Wait between rounds
+        if self.state == self.states.S10:
+            self.idleTime = glbs.random.randint(3,5) + glbs.time.time()
+        #print("Idle time = {} seconds".format(self.idleTime - glbs.time.time()))
         self.state = self.states.S10
         print("current state is {}".format(self.state))
         self.checkForFailures()
@@ -32,10 +38,6 @@ class S10_IdleGame():        #S10_GameMaster
         glbs.currentGameRoute = glbs.table.createCurrentSnake(self.currentGoal)
         print("current input required: " + str(self.currentGoal))
         glbs.snakeCounter = 0
-        
-        # Wait between rounds
-        self.idleTime = glbs.random.randint(3,5) + glbs.time.time()
-        #print("Idle time = {} seconds".format(self.idleTime - glbs.time.time()))
 
         while(self.state == self.states.S10):
             self._setState()
@@ -78,6 +80,8 @@ class S10_IdleGame():        #S10_GameMaster
 
     def checkForFailures(self):
         inputs = list(set(glbs.currentRoundInputs))
+        if inputs:
+            glbs.systemWakeTime = glbs.time.time()
         if not((self.currentGoal in inputs) and (len(inputs) == 1)):
             glbs.gameFailures = glbs.gameFailures + 1
 

@@ -364,7 +364,7 @@ rgb=153,67,140
 OLDrgb=153,102,204
 
 [emerald]
-rgb=50,140,80
+rgb=50,200,75
 OLDrgb=80,200,120
 
 [red]
@@ -374,11 +374,13 @@ rgb=200,0,0
 rgb=128,0,128
 
 [turquoise]
-rgb=41,150,140
-OLDrgb=64,224,208
+rgb=64,224,208
 
 [teal]
 rgb=0,128,128
+
+[orange]
+rgb=150,150,0
 
 [black]
 rgb=0,0,0

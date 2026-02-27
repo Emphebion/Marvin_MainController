@@ -16,14 +16,15 @@ class _Table(object):
         self.parse_config(config_file,parser)
         self.startSegment = ''
         self.currentRoute = []
-        self.status = "Off"                # Off, Active, Broken, Overload
-        
+
     def parse_config(self, config_file, parser):
         parser.read(config_file)
         colors = parser.get('common', 'colors').split(',')
         for color in colors:
             self.colorsLED[color] = [int(x.strip()) for x in parser.get(color, 'rgb').split(',')]
 
+        self.status = parser.get('common', 'status')                # Off, Active, Broken, Overload
+        
         #debug
         print(self.colorsLED)
         

@@ -35,6 +35,7 @@ class S7_Connect_Item():
     def _setState(self):
         input_list = glbs.handler.event_handler()
         if input_list:
+            glbs.systemWakeTime = glbs.time.time()
             new_input = input_list.pop()
             # CHECK if an RFID tag has been presented
             if new_input["event"] == "rfid":
@@ -52,6 +53,11 @@ class S7_Connect_Item():
                         glbs.gameTimeout = self.gameTime  # Set game timeout (in seconds) to the value in the config
                         glbs.returnState = self.states.S7
                         self.state = self.states.S9
+                    elif not playerCanActivate:
+                        glbs.table.setAllTableLEDs(glbs.table.colorsLED["orange"])
+                        time.sleep(3)
+                        glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
+                        self.state = self.states.S7
                     else:
                         self.state = self.states.S7
             
@@ -61,8 +67,7 @@ class S7_Connect_Item():
                     glbs.prevStateName = self.state.name
                     self.state = self.states.S3
                 elif new_input["data"] == "down":
-                    glbs.returnState = self.states.S7
-                    self.state = self.states.S8
+                    self.state = self.states.S7
                 elif new_input["data"] == "left":
                     glbs.prevStateName = self.state.name
                     self.state = self.states.S5

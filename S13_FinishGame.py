@@ -14,15 +14,6 @@ class S13_FinishGame():
         self.state = self.states.S13
         print("current state is {}".format(self.state))
 
-        #confirm success to user
-        glbs.table.setAllTableLEDs(glbs.table.colorsLED["emerald"])
-        glbs.devices.transmitLED(glbs.table.getLEDData())
-        
-        #start the finish timer
-        stopTime = self.successTimeout + glbs.time.time()
-        while (stopTime - glbs.time.time() > 0):
-            delay = 1
-
         #Handle the consequences of the game
         if glbs.gameSuccess:
             print("Game finished successfully")
@@ -39,6 +30,11 @@ class S13_FinishGame():
             glbs.table.setAllTableLEDs(glbs.table.colorsLED["red"])
             glbs.devices.transmitLED(glbs.table.getLEDData())
 
+        #start the finish timer
+        stopTime = self.successTimeout + glbs.time.time()
+        while (stopTime - glbs.time.time() > 0):
+            delay = 1
+
         glbs.gameSuccess = False # Reset game success to False for next game
         glbs.gameFailures = -1  # Reset game failures to -1 to compensate for the first failure at snake 0
         glbs.gameStartTime = 0  # Reset game start time
@@ -49,6 +45,11 @@ class S13_FinishGame():
         #reset table to off
         glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
         glbs.devices.transmitLED(glbs.table.getLEDData())
+        
+        #start the finish timer again
+        stopTime = self.successTimeout + glbs.time.time()
+        while (stopTime - glbs.time.time() > 0):
+            delay = 1
 
         while(self.state == self.states.S13):
             self._setState()

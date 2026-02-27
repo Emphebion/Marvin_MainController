@@ -14,6 +14,9 @@ class S2_Welcome(object):
         print("current state is {}".format(self.state))
         print("Welcome to the game, {}!".format(glbs.players.activePlayer.name))
         glbs.display.display(self.folder, self.name, self.location)
+        glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
+        glbs.devices.transmitLED(glbs.table.getLEDData())
+        glbs.systemWakeTime = glbs.time.time()  # Reset system wake time
 
         while(self.state == self.states.S2):
             self._setState()
@@ -23,6 +26,7 @@ class S2_Welcome(object):
         new_state = self.states.S2
         input_list = glbs.handler.event_handler()
         if input_list:
+            glbs.systemWakeTime = glbs.time.time()  # Reset system wake time
             new_input = input_list.pop()
             new_state = self.states.S3
 

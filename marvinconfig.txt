@@ -35,7 +35,7 @@ name=disconnectall
 folder=menu
 location=0,0
 skills=disconnectall
-gameTime=60
+gameTime=600
 
 [State4]
 name=disconnect1item
@@ -69,6 +69,7 @@ folder=menu
 ifolder=items
 location=0,0
 item_location=120,80
+gameTime=300
 
 [State9]
 name=achtergrond

@@ -26,6 +26,7 @@ class S6_Well_Size(object):
     def _setState(self):
         input_list = glbs.handler.event_handler()
         if input_list:
+            glbs.systemWakeTime = glbs.time.time()
             new_input = input_list.pop()
             if new_input["event"] == "keydown":
                 if new_input["data"] == "up":

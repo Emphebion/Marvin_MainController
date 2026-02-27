@@ -8,23 +8,23 @@ class S8_Items(object):
         self.name = str(glbs.parser.get('State8', 'name'))                  #TODO: Make "StateX" a variable per state
         self.folder = glbs.parser.get('State8', 'folder').strip()
         self.location = [int(x.strip()) for x in glbs.parser.get('State8', 'location').split(',')]
+        self.gameTime = glbs.parser.getint('State8', 'gameTime')
                 
     def run(self):
         self.state = self.states.S8
         print("current state is {}".format(self.state))
-        if glbs.players.activePlayer.hasSkill(self.state.name):
-            glbs.display.display(self.folder,self.name,self.location)
-            
-            # FUTURE: This can be removed if the Item ID setup is working
-            if glbs.returnState.value == self.states.S4.value:
-                glbs.items.setCurrentItemToLowestActiveItem()
-            elif glbs.returnState.value == self.states.S7.value:
-                glbs.items.setCurrentItemToLowestInactiveItem()
+        glbs.display.display(self.folder,self.name,self.location)
+        
+        # FUTURE: This can be removed if the Item ID setup is working
+        if glbs.returnState.value == self.states.S4.value:
+            glbs.items.setCurrentItemToLowestActiveItem()
+        elif glbs.returnState.value == self.states.S7.value:
+            glbs.items.setCurrentItemToLowestInactiveItem()
 
-            # FUTURE: change the function below to show "ITEM DETECTED" for this Item ID setup
-            #TODO: move to RFID part
-            if glbs.items.currentItemName:
-                glbs.display.display(glbs.items.folder,glbs.items.currentItemName,glbs.items.location)
+        # FUTURE: change the function below to show "ITEM DETECTED" for this Item ID setup
+        #TODO: move to RFID part
+        if glbs.items.currentItemName:
+            glbs.display.display(glbs.items.folder,glbs.items.currentItemName,glbs.items.location)
 
         while(self.state == self.states.S8):
             self._setState()
@@ -53,6 +53,7 @@ class S8_Items(object):
                     self.state = self.states.S8
                 elif new_input["data"] == "down":
                     glbs.returnState = self.states.S8
+                    glbs.gameTimeout = self.gameTime 
                     self.state = self.states.S9
                 elif new_input["data"] == "left":
                     glbs.display.display(glbs.items.folder, glbs.items.selectPrevItem(glbs.returnState.value), glbs.items.location)

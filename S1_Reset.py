@@ -58,7 +58,8 @@ class S1_Reset():
 
                 # debug statement 
             elif new_input["event"] == "keydown":
-                glbs.players.setActivePlayer(10)
+                if new_input["data"] == "down":
+                    glbs.players.setActivePlayer(10)
 
     # Prepare the behaviour of the Table LEDs while idling.
     # This will set the sparklist to an empty list

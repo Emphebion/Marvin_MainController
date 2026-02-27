@@ -30,6 +30,7 @@ class S4_Disconnect_Item(object):
     def _setState(self):
         input_list = glbs.handler.event_handler()
         if input_list:
+            glbs.systemWakeTime = glbs.time.time()  # Reset system wake time
             new_input = input_list.pop()
 
             # CHECK if an RFID tag has been presented
@@ -37,18 +38,19 @@ class S4_Disconnect_Item(object):
                 newItem = glbs.items.getItemByID(new_input["data"])
                 playerIsGM = glbs.players.activePlayer.isGM
                 # TODO: check if item was scanned & valid & is connected!
-                if playerIsGM and newItem.connected:
-                    glbs.items.disconnectItem(newItem)
-                    glbs.items.currentItemName = ""
-                    # TODO: change to S2 in the future
-                    self.state = self.states.S1
-                elif glbs.items.currentItemName != newItem.name and newItem.connected:
-                    glbs.items.currentItemName = newItem.name
-                    glbs.gameTimeout = self.gameTime  #Set game timeout (in seconds) to the value in the config
-                    glbs.returnState = self.states.S4
-                    self.state = self.states.S9
-                else:
-                    self.state = self.states.S4
+                if newItem:
+                    if playerIsGM and newItem.connected:
+                        glbs.items.disconnectItem(newItem)
+                        glbs.items.currentItemName = ""
+                        # TODO: change to S2 in the future
+                        self.state = self.states.S1
+                    elif glbs.items.currentItemName != newItem.name and newItem.connected:
+                        glbs.items.currentItemName = newItem.name
+                        glbs.gameTimeout = self.gameTime  #Set game timeout (in seconds) to the value in the config
+                        glbs.returnState = self.states.S4
+                        self.state = self.states.S9
+                    else:
+                        self.state = self.states.S4
             
             # Handle the menu input buttons for this state
             elif new_input["event"] == "keydown":

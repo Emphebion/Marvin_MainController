@@ -43,7 +43,8 @@ class _Items(object):
         while index != self.itemnames.index(self.currentItemName):
             if(index >= len(self.itemnames)):
                 index = 0
-            if stateNr >5:
+            if stateNr >5:  # S7_Connect_Item
+
                 if not self.items[self.itemnames[index]].connected:
                     self.currentItemName = self.itemnames[index]
                     return self.currentItemName
@@ -60,17 +61,29 @@ class _Items(object):
         index = self.itemnames.index(self.currentItemName) - 1
         while index != self.itemnames.index(self.currentItemName):
             
+  
             if stateNr >5:
-                if(index < self.getLowestInactiveItemIndex()):
-                    index = len(self.itemnames) - 1
-                if not self.items[self.itemnames[index]].connected:
-                    self.currentItemName = self.itemnames[index]
+                indexLow = self.getLowestInactiveItemIndex()
+                if indexLow != None:
+                    if(index < indexLow):
+                        index = len(self.itemnames) - 1
+                    if not self.items[self.itemnames[index]].connected:
+                        self.currentItemName = self.itemnames[index]
+                        return self.currentItemName
+                else:
+                    self.currentItemName = None
                     return self.currentItemName
+                
             else:
-                if(index < self.getLowestActiveItemIndex()):
-                    index = len(self.itemnames) - 1
-                if self.items[self.itemnames[index]].connected:
-                    self.currentItemName = self.itemnames[index]
+                indexLow = self.getLowestActiveItemIndex()
+                if indexLow != None:
+                    if(index < indexLow):
+                        index = len(self.itemnames) - 1
+                    if self.items[self.itemnames[index]].connected:
+                        self.currentItemName = self.itemnames[index]
+                        return self.currentItemName
+                else:
+                    self.currentItemName = None
                     return self.currentItemName
             
             index = index - 1
@@ -99,11 +112,15 @@ class _Items(object):
         for item in self.items.values():
             if not item.connected:
                 self.currentItemName = item.name
+                return None
+        self.currentItemName = None
             
     def setCurrentItemToLowestActiveItem(self):
         for item in self.items.values():
             if item.connected:
                 self.currentItemName = item.name
+                return None
+        self.currentItemName = None
 
 # Node functions
     def calculateNodeUse(self):
@@ -135,8 +152,9 @@ class _Items(object):
         if self.calculateNodeUse() > self.source:
             self.disconnectAll()
 
-        if item.name == self.selectPrevItem():
-            self.currentItemName = None
+        self.setCurrentItemToLowestInactiveItem()
+
+
 
     def disconnectItem(self):
         item = self.items[self.currentItemName]
@@ -146,8 +164,7 @@ class _Items(object):
         with open(self.config_file,'w') as file:
             self.parser.write(file)
 
-        if item.name == self.selectPrevItem():
-            self.currentItemName = None
+        self.setCurrentItemToLowestActiveItem()
 
     # Future: function to add new items during run-time
     def generate_item(self):

@@ -1,94 +1,109 @@
 [items]
-names = item2,item4,item7
+names = item1,item2,item3,item4,item5,item6,item7,item8,item9,item10,item11,item12
 folder = items
-source = 110
+source = 70
 item_location = 120,80
 
 [item1]
-name = Ketting der Vergetelheid
-function = De persoon die dit draagt vergeet specifieke gebeurtenissen. Als men hem er aan probeerd te herinneren wordt een passende (foutive) herinnering aangemaakt. Als de ketting ooit afgaat zit de persoon met dubbele herinneringen.
-id = 12345678
+name = Zuiver geweten
+function = Onbekend in de pilaar
+id = 14531606
 level = 2
-load = 29
-connected = 1
+load = 30
+connected = 0
 
 [item2]
-name = Grondstof Zoeker
+name = Mini Verzamel Golem
 function = Zoekt een gebied af naar grondstoffen. Een keer per dag deel moet de grondstof opgehaal worden. (aangepaste ruling!)
-id = 23456789
+id = 14494164
 level = 2
 load = 25
 connected = 0
 
 [item3]
-name = Inspiratie put Compas
+name = Inspiratie Amulet
 function = Wijst naar de put waar op dit construct is aangesloten. Als dit wordt gebruikt om te woudlopen verliest de groep items, 1 LP en komt uitgeput aan.
-id = 34567890
+id = 14500535
 level = 1
 load = 5
-connected = 1
+connected = 0
 
 [item4]
-name = Magie Grenspost
-function = Zoekt de rand van een plek waar magie niet werkt
-id = 45678901
-level = 3
-load = 45
+name = Zelfreparerend Pantser
+function = Repareert met X punten per Y tijd
+id = 14525725
+level = 2
+load = 21
 connected = 0
 
 [item5]
-name = Speeldoos
-function = Speeld muziek als deze verbonden is
-id = 56789012
+name = Zegel van Intentie
+function = Tijdens het verzegelen van een brief kan met dit zegel 1 aspect van de brief feilloos worden overgebracht op de persoon die het zegel breekt. Voorbeelden: Emotie tijdens verzegelen, Leest zig zelf voor, Vertaald naar andere taal, etc
+id = 14495391
 level = 1
-load = 10
+load = 7
 connected = 0
 
 [item6]
-name = Giflepel
-function = Kan in of onder iets gelegd worden om iets warm te houden
-id = 67890123
+name = Vitalizer
+function = Na 2 keer draaien van de sleutel gaat het kistje open. Is het kistje leeg neemt het direct 2 LP op als energie. Als er al energie in zit kan dit er uitgehaald worden per LP.
+id = 14560095
 level = 1
 load = 10
 connected = 0
 
 [item7]
-name = Warmte Steen
-function = Kan in of onder iets gelegd worden om iets warm te houden
-id = 78901234
+name = Kristallen feest glas met licht
+function = Onbekend in pilaar
+id = 14502092
 level = 1
 load = 5
 connected = 0
 
 [item8]
-name = Vitalizer
-function = Na 2 keer draaien van de sleutel gaat het kistje open. Is het kistje leeg neemt het direct 2 LP op als energie. Als er al energie in zit kan dit er uitgehaald worden per LP.
-id = 89012345
+name = Dryade diadeem
+function = Onbekend in pilaar
+id = 14537768
 level = 2
 load = 30
 connected = 0
 
 [item9]
-name = Zegel van Intentie
-function = Tijdens het verzegelen van een brief kan met dit zegel 1 aspect van de brief feilloos worden overgebracht op de persoon die het zegel breekt. Voorbeelden: Emotie tijdens verzegelen, Leest zig zelf voor, Vertaald naar andere taal, etc
-id = 90123456
+name = Vloeislag de 1ste
+function = Onbekend in pilaar
+id = 14303860
 level = 1
 load = 10
 connected = 0
 
 [item10]
-name = Communicatie Steen
-function = Tijdens het verzegelen van een brief kan met dit zegel 1 aspect van de brief feilloos worden overgebracht op de persoon die het zegel breekt. Voorbeelden: Emotie tijdens verzegelen, Leest zig zelf voor, Vertaald naar andere taal, etc
-id = 90123434
+name = Drakenklauw ketting
+function = Kan met de schaduwen van de drakenklauw communiceren
+id = 14294007
 level = 1
 load = 8
 connected = 0
 
 [item11]
-name = Zwaard van Zelfreflectie
-function = Onbalans op jezelf als je iemand slaat die jij als vriend ziet.
-id = 90128294
+name = Landkaart
+function = Laat op een landkaart zien waar iets van belang gebeurd voor de kijker
+id = 14540039
 level = 1
 load = 10
 connected = 1
 
+[item12]
+name = Herhaal paal
+function = Communiceerd tot 2x met zijn tegenpool
+id = 14553988
+level = 1
+load = 12
+connected = 1
+
+[item13]
+name = Spintol Vonne TEMP
+function = Spintol Vonne TEMP function tbd
+id = 14466855
+level = 0
+load = 0
+connected = 0

@@ -29,6 +29,7 @@ class S3_Disconnect_All(object):
         # Handle the menu input buttons for this state
         input_list = glbs.handler.event_handler()
         if input_list:
+            glbs.systemWakeTime = glbs.time.time()  # Reset system wake time
             new_input = input_list.pop()
             if new_input["event"] == "keydown":
                 if new_input["data"] == "right":
@@ -64,3 +65,5 @@ class S3_Disconnect_All(object):
             self.state = self.states.S4
         elif name == self.states.S4.name:
             self.state = self.states.S7
+        else:
+            self.state = self.states.S4
