@@ -28,6 +28,7 @@ Snake routing (createCurrentSnake):
 
 import random
 import time
+import math
 
 class _Table(object):
     """LED segment graph: loads topology from config, owns all routing and animation helpers."""
@@ -407,4 +408,92 @@ class Spark(object):
         else:
             while True:
                 temp = 1
-    
+
+
+class EnergyFlow(object):
+    """A softly glowing energy flow that drifts continuously along the segment graph.
+
+    Used during the Active idle state (S1_Reset). Multiple flows run simultaneously,
+    each moving independently through the ring topology. Brightness follows a cosine
+    gradient from full at the head to zero at the tail, giving a smooth pulsing look.
+
+    Usage per animation frame:
+        table.setAllTableLEDs(black)   # clear previous state
+        for flow in flows:
+            flow.step(table)           # advance head by one LED
+            flow.apply()               # write gradient colours to segments
+        devices.transmitLED(table.getLEDData())
+
+    Attributes:
+        name        -- unique identifier string
+        base_color  -- [R, G, B] at full brightness
+        length      -- gradient length in LEDs (head to tail)
+        body        -- list of (segment, led_index) from head (index 0) to tail
+    """
+
+    def __init__(self, name, base_color, length, start_segment, direction=None):
+        """Create an EnergyFlow starting at a random LED in start_segment.
+
+        Args:
+            name          -- unique name string
+            base_color    -- [R, G, B] colour at full brightness
+            length        -- number of LEDs in the gradient trail
+            start_segment -- _Segment object where the flow begins
+            direction     -- +1 (flow direction) or -1 (counter direction).
+                             Randomly chosen if None.
+        """
+        self.name = name
+        self.base_color = base_color
+        self.length = length
+        self.body = []
+        self._current_segment = start_segment
+        self._current_led = random.randint(0, max(0, start_segment.nrLEDs - 1))
+        self._direction = direction if direction is not None else random.choice([1, -1])
+
+    def _scale_color(self, color, factor):
+        """Return color scaled by factor (0.0–1.0), clamped to 0–255."""
+        return [max(0, min(255, int(c * factor))) for c in color]
+
+    def step(self, table):
+        """Advance the flow head by one LED, extending the body trail.
+
+        When the head reaches the end of a segment, a random neighbouring
+        segment is chosen and the flow continues from the appropriate end.
+
+        Args:
+            table -- _Table instance (used for getSegment() lookups)
+        """
+        # Record current head position in the body trail
+        self.body.insert(0, (self._current_segment, self._current_led))
+        if len(self.body) > self.length:
+            self.body.pop()
+
+        # Advance head by one LED in travel direction
+        next_led = self._current_led + self._direction
+        if 0 <= next_led < self._current_segment.nrLEDs:
+            self._current_led = next_led
+        else:
+            # Cross to a neighbouring segment
+            candidates = (
+                self._current_segment.flowSegments
+                if self._direction > 0
+                else self._current_segment.counterSegments
+            )
+            next_seg = table.getSegment(random.choice(candidates))
+            if next_seg is None:
+                return  # safety: unknown segment name in config
+            # Enter the new segment from the appropriate end
+            self._current_led = 0 if self._direction > 0 else next_seg.nrLEDs - 1
+            self._current_segment = next_seg
+
+    def apply(self):
+        """Write the cosine brightness gradient to segment LEDvalues.
+
+        Call table.setAllTableLEDs(black) before applying all flows each
+        frame so that LED positions no longer in any flow are cleared.
+        """
+        for i, (seg, led_idx) in enumerate(self.body):
+            # Cosine fade: 1.0 at head (i=0), smoothly to 0.0 at tail
+            t = i / max(1, self.length - 1)
+            factor = 0.5 * (1.0 + math.cos(math.pi * t))
+            seg.setLEDValue(led_idx, self._scale_color(self.base_color, factor))

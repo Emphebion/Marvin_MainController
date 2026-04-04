@@ -1,16 +1,42 @@
+"""S1_Reset — Idle/reset state with table-status-dependent LED animations."""
+
 from states_enum import StatesEnum
+from _Table import EnergyFlow
 import glbs
 
 class S1_Reset():
+    """Idle state. Wakes on RFID scan. Drives table animations based on table status:
+
+    Active  -- soft glowing EnergyFlow drifts (new)
+    Broken  -- sharp random Spark flashes
+    Off     -- all LEDs black
+    Overload-- (placeholder)
+    """
+
     def __init__(self):
         states_enum = StatesEnum()
         self.states = states_enum.get_states_s1()
-        self.idleMaxTimeout = float(glbs.parser.getint('State1','idletimeout'))
-        self.idleStartTime = 0
-        self.sparkTimeout = float(glbs.parser.getint('State1','sparktimeout'))
-        self.sparkStartTime = 0
-        self.idleTimeout = glbs.random.uniform(1,self.idleMaxTimeout)
 
+        # Spark / idle timing (used by Broken status)
+        self.idleMaxTimeout = float(glbs.parser.getint('State1', 'idletimeout'))
+        self.idleStartTime = 0
+        self.sparkTimeout = float(glbs.parser.getint('State1', 'sparktimeout')) / 1000.0
+        self.sparkStartTime = 0
+        self.idleTimeout = glbs.random.uniform(1, self.idleMaxTimeout)
+
+        # Energy flow config (used by Active status)
+        self._flowCount  = glbs.parser.getint('State1', 'energyFlowCount')
+        self._flowSpeed  = glbs.parser.getint('State1', 'energyFlowSpeed') / 1000.0  # ms → s
+        self._flowLength = glbs.parser.getint('State1', 'energyFlowLength')
+        self._flowColorName = glbs.parser.get('State1', 'energyFlowColor').strip()
+        self._flowStepTime = 0.0   # timestamp of last animation step
+
+        self.sparklist = []
+        self._flows = []
+
+    # ------------------------------------------------------------------ #
+    # Main entry point                                                     #
+    # ------------------------------------------------------------------ #
     def run(self):
         self.state = self.states.S1
         print("current state is {}".format(self.state))
@@ -19,212 +45,179 @@ class S1_Reset():
         device_names = [device.name for device in glbs.devices.connectedDevices]
         print("Connected devices: {}".format(device_names))
 
-        glbs.players.setActivePlayer(None)  # Reset active player
+        glbs.players.setActivePlayer(None)
 
-        #generate random sparks
         self._setIdleLightBehaviour()
+        self.idleStartTime = glbs.time.time()
+        self._flowStepTime = glbs.time.time()
 
-        while(self.state == self.states.S1):
-            if (self.idleTimeout < (glbs.time.time()-self.idleStartTime)):
-                self._runIdleLightBehaviour()
-                self.idleStartTime = glbs.time.time()
-                self.idleTimeout = glbs.random.uniform(1,self.idleMaxTimeout)
-            else:
-                self._setState()
+        while self.state == self.states.S1:
+            now = glbs.time.time()
+
+            if glbs.table.status == "Active":
+                if (now - self._flowStepTime) >= self._flowSpeed:
+                    self._stepEnergyFlows()
+                    self._flowStepTime = now
+
+            elif glbs.table.status == "Broken":
+                if (now - self.idleStartTime) >= self.idleTimeout:
+                    self._runSparkBehaviour()
+                    self.idleStartTime = now
+                    self.idleTimeout = glbs.random.uniform(1, self.idleMaxTimeout)
+
+            self._setState()
+
         return self.state.value
 
+    # ------------------------------------------------------------------ #
+    # Input handling                                                       #
+    # ------------------------------------------------------------------ #
     def _setState(self):
-        new_state = self.states.S1
         self._checkInput()
-
         if glbs.table.status != 'Broken':
             if glbs.players.activePlayer:
-                new_state = self.states.S2
+                self.state = self.states.S2
 
-        if(self.state != new_state):
-            self.state = new_state
-
-# State specific functions:
     def _checkInput(self):
         input_list = glbs.handler.event_handler()
         if input_list:
             new_input = input_list.pop()
-            #compare to ID list (opvragen op event)
             if new_input["event"] == "rfid":
                 ID = new_input["data"]
                 print("Received ID: {}".format(ID))
                 if ID in glbs.players.playerDict:
                     glbs.players.setActivePlayer(ID)
-
-                # debug statement 
             elif new_input["event"] == "keydown":
                 if new_input["data"] == "down":
-                    glbs.players.setActivePlayer(10)
+                    glbs.players.setActivePlayer(10)  # GM override key
 
-    # Prepare the behaviour of the Table LEDs while idling.
-    # This will set the sparklist to an empty list
-    # and will create a list of sparks that can be used
+    # ------------------------------------------------------------------ #
+    # Animation setup                                                      #
+    # ------------------------------------------------------------------ #
     def _setIdleLightBehaviour(self):
+        """Initialise animation objects based on current table status."""
         print("Table status is: {}".format(glbs.table.status))
+
         if glbs.table.status == "Off":
             glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
             glbs.devices.transmitLED(glbs.table.getLEDData())
 
         elif glbs.table.status == "Active":
-            pass
-            'TODO: create electric paths running from center to edge in a "random" straight path when idle but active'
+            self._flows = []
+            base_color = glbs.table.colorsLED.get(self._flowColorName, [153, 67, 140])
+            # Spread flows across evenly spaced segments for a balanced start
+            step = max(1, len(glbs.table.segmentList) // self._flowCount)
+            for i in range(self._flowCount):
+                seg = glbs.table.segmentList[(i * step) % len(glbs.table.segmentList)]
+                # Alternate direction so flows move in both directions
+                direction = 1 if i % 2 == 0 else -1
+                self._flows.append(
+                    EnergyFlow(
+                        name=f"flow{i}",
+                        base_color=base_color,
+                        length=self._flowLength,
+                        start_segment=seg,
+                        direction=direction,
+                    )
+                )
 
         elif glbs.table.status == "Broken":
             self.sparklist = []
             while len(self.sparklist) < 666:
                 name = "spark" + str(len(self.sparklist))
-                print(name)
                 self.sparklist.append(glbs.table.createRandomSpark(name))
 
-            'TODO: create random electric sparks 3-10 Leds long in 1-3 segments'
-            # Create start point => reuse from Snake
-            # Determine length
-            # Create a trace => reuse from Snake
-            # * Expand to create several traces "in parallel" meerdere lines => merge traces
-        
         elif glbs.table.status == "Overload":
-            pass
-            'TODO: heavy flickering'
+            pass  # placeholder: heavy flickering (Phase 2)
 
-        else:
-            pass
-            'An Error occured. Create a handling function'
+    # ------------------------------------------------------------------ #
+    # Energy flow animation (Active)                                       #
+    # ------------------------------------------------------------------ #
+    def _stepEnergyFlows(self):
+        """Advance all energy flows by one LED step and transmit the result."""
+        glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
+        for flow in self._flows:
+            flow.step(glbs.table)
+            flow.apply()
+        glbs.devices.transmitLED(glbs.table.getLEDData())
 
-    # Sub function to run the idle light behaviour
-    # This is called when the table is idle but active
-    # or when the table is broken
-    # or when the table is overloaded
-    # or when the table is off
-    # This function will run the sparks over the surface
-    # and will update the LEDs accordingly
-    # This function will also reset the sparks when they are done
-    def _runIdleLightBehaviour(self):
-        if glbs.table.status == "Active":
-            pass
-            'TODO: create electric paths running from center to edge in a "random" straight path when idle but active'
+    # ------------------------------------------------------------------ #
+    # Spark animation (Broken)                                             #
+    # ------------------------------------------------------------------ #
+    def _runSparkBehaviour(self):
+        """Run one batch of spark animations across the table."""
+        numberOfSparks = 1
+        sparks = []
+        for _ in range(numberOfSparks):
+            chosen = glbs.random.choice(self.sparklist)
+            chosen.resetSpark()
+            sparks.append(chosen)
 
-        # TODO: Find a way to reset the spark route once done
-        # CURRENTLY EVERY SPARK CAN BE USED ONCE (then the segments list is empty)
-        # Sub function to run sparks over the surface
-        if glbs.table.status == "Broken":
-            # Select sparks from generated list and create flow per spark
-            numberOfSparks = 1#glbs.random.randint(1,10)
-            sparks = []
-            while len(sparks) < numberOfSparks:
-                sparks.append(glbs.random.choice(self.sparklist))
-                sparks[-1].resetSpark()
-            
-            # Test param
-            print(sparks)
-            for spark in sparks:
-                print(spark.name)
-                for segment in spark.segmentsActive:
-                    print(segment.name)
-            while sparks:
-                #if (self.sparkTimeout < (glbs.time.time()-self.sparkStartTime)):
-                    self.runSparkRoutes(sparks)
-                    glbs.devices.transmitLED(glbs.table.getLEDData())
-                    #print('Time = ', (glbs.time.time()-self.sparkStartTime))
-                    #self.sparkStartTime = glbs.time.time()
+        while sparks:
+            self._runSparkRoutes(sparks)
+            glbs.devices.transmitLED(glbs.table.getLEDData())
 
-            'TODO: finalize the run function'
-            # Run through the created list
-            # Method to brighten and reduce
-        
-        if glbs.table.status == "Overload":
-            pass
-            'TODO: heavy flickering'
-    
-    # NOT COMPLEET !!!1
-    # MOVE TO SPARK CLASS LATER
-    def runSparkRoutes(self, sparks):
-        # HOWTO track flow in segment per spark
-        # SOLVED: flow is now tracked in Spark object (also implement this in Snake)
-        'TODO: Run through the LEDs (see Snake)'
+    def _runSparkRoutes(self, sparks):
+        """Advance each spark by one LED and clear the tail once the length is reached."""
         for spark in sparks:
-            print(spark.name)
             if spark.segmentsActive:
-                spark.lengthCounter = spark.lengthCounter + 1
-                if(self._setIdleLEDs(spark.name,spark.segmentsActive[-1],spark.segmentActiveDirection[-1],glbs.table.colorsLED["turquoise"])):
+                spark.lengthCounter += 1
+                done = self._setSparkLED(
+                    spark.name,
+                    spark.segmentsActive[-1],
+                    spark.segmentActiveDirection[-1],
+                    glbs.table.colorsLED["turquoise"],
+                )
+                if done:
                     spark.segmentsDone.append(spark.segmentsActive.pop())
                     spark.segmentDoneDirection.append(spark.segmentActiveDirection.pop())
-                    #NOTE: The color based index will not work. IDEA: Set initial index based on flow. 1=0 and -1=nrLEDs-1. then run through list with index = index + flow
-                if spark.segmentsActive:
-                    print("Segments")
-                    print(spark.segmentsActive[-1].LEDUsers)
-            elif not(spark.segmentsDone):
-                sparks.pop(sparks.index(spark))
-            if spark.lengthCounter >= spark.length:
-                if spark.segmentsDone:
-                    # DIRECTION -1 NOT CORRECTLY SET
-                    if(self._setIdleLEDs(spark.name,spark.segmentsDone[0],spark.segmentDoneDirection[0],glbs.table.colorsLED["black"])):
-                        finishedSegment = spark.segmentsDone.pop(0)
-                        finishedDirection = spark.segmentDoneDirection.pop(0)
-                    if spark.segmentsDone:
-                        print("Reset segments")
-                        print(spark.segmentsDone[0].LEDUsers)
-                        # TODO: Set finished segments that have the spark's name to UNUSED
-                        # TODO: Resolve error!
-            #print("SEGMENTS")
-            #print(spark.segments)
-            #print("SEGMENTS DONE")
-            #print(spark.segmentsDone)
+            elif not spark.segmentsDone:
+                sparks.remove(spark)
 
+            if spark.lengthCounter >= spark.length and spark.segmentsDone:
+                done = self._setSparkLED(
+                    spark.name,
+                    spark.segmentsDone[0],
+                    spark.segmentDoneDirection[0],
+                    glbs.table.colorsLED["black"],
+                )
+                if done:
+                    spark.segmentsDone.pop(0)
+                    spark.segmentDoneDirection.pop(0)
 
-    # rewrite to remove spark and use name (to enable reset to "unused")
-    def _setIdleLEDs(self, name, segment, direction, color):
+    def _setSparkLED(self, name, segment, direction, color):
+        """Set the next LED in segment for spark name. Returns 1 when segment is done."""
         users = segment.getLEDUsers()
-        if(name in users):
+        if name in users:
             if direction > 0:
                 if color == glbs.table.colorsLED["black"]:
-                    #NOT WORKING WHEN RESETTING TO UNUSED
-                    userIndex = users.index(name) #lowest index
-                    segment.setLEDValue(userIndex,color)
-                    segment.setUser(userIndex,"Done")
-                    #print(segment.getLEDvalues())
-                    #print(segment.getLEDUsers())
-                    if(userIndex >= len(users) or users.count("Done") == len(users)):
-                        return 1
+                    idx = users.index(name)
+                    segment.setLEDValue(idx, color)
+                    segment.setUser(idx, "Done")
+                    return 1 if (idx >= len(users) - 1 or users.count("Done") == len(users)) else 0
                 else:
-                    userIndex = len(users) - 1 - users[::-1].index(name) #highest index
-                    segment.setLEDValue(userIndex+1,color)
-                    segment.setUser(userIndex+1,name)
-                    #print(segment.getLEDvalues())
-                    #print(segment.getLEDUsers())
-                    if(userIndex+1 >= len(users)):
-                        return 1
+                    idx = len(users) - 1 - users[::-1].index(name)
+                    if idx + 1 < len(users):
+                        segment.setLEDValue(idx + 1, color)
+                        segment.setUser(idx + 1, name)
+                    return 1 if idx + 1 >= len(users) - 1 else 0
             else:
                 if color == glbs.table.colorsLED["black"]:
-                    #NOT WORKING WHEN RESETTING TO UNUSED
-                    userIndex = len(users) - 1 - users[::-1].index(name) #highest index
-                    segment.setLEDValue(userIndex,color)
-                    segment.setUser(userIndex,"Done")
-                    #print(segment.getLEDvalues())
-                    #print(segment.getLEDUsers())#NOT WORKING WHEN RESETTING TO UNUSED
-                    if(userIndex <= 0):
-                        return 1
+                    idx = len(users) - 1 - users[::-1].index(name)
+                    segment.setLEDValue(idx, color)
+                    segment.setUser(idx, "Done")
+                    return 1 if idx <= 0 else 0
                 else:
-                    userIndex = users.index(name) #lowest index
-                    segment.setLEDValue(userIndex-1,color)
-                    segment.setUser(userIndex-1,name)
-                    #print(segment.getLEDvalues())
-                    #print(segment.getLEDUsers())
-                    if(userIndex-1 <= 0):
-                        return 1
+                    idx = users.index(name)
+                    if idx - 1 >= 0:
+                        segment.setLEDValue(idx - 1, color)
+                        segment.setUser(idx - 1, name)
+                    return 1 if idx - 1 <= 0 else 0
         else:
             if direction > 0:
-                segment.setLEDValue(0,color)
-                segment.setUser(0,name)
-                #print(segment.getLEDvalues())
-                #print(segment.getLEDUsers())
+                segment.setLEDValue(0, color)
+                segment.setUser(0, name)
             else:
-                segment.setLEDValue(len(users)-1,color)
-                segment.setUser(len(users)-1,name)
-                #print(segment.getLEDvalues())
-                #print(segment.getLEDUsers())
+                segment.setLEDValue(len(users) - 1, color)
+                segment.setUser(len(users) - 1, name)
         return 0

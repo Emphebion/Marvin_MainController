@@ -40,8 +40,12 @@ One section per device listed in `[common] devices`.
 | `name` | string | `reset` | Menu image filename (without `.jpg`). |
 | `folder` | string | `menu` | Folder containing the menu image. |
 | `location` | int,int | `0,0` | Screen coordinates for the image. |
-| `idletimeout` | int (seconds) | `10` | Time with no input before the spark effect restarts. |
-| `sparktimeout` | int (ms) | `80` | Delay between spark animation steps (milliseconds). |
+| `idletimeout` | int (seconds) | `10` | Time with no input before the spark effect restarts (Broken status). |
+| `sparktimeout` | int (ms) | `80` | Delay between spark animation steps (Broken status). |
+| `energyFlowCount` | int | `3` | Number of simultaneous energy flows (Active status). |
+| `energyFlowSpeed` | int (ms) | `80` | Milliseconds between each LED step of the energy flows. Lower = faster. |
+| `energyFlowLength` | int | `30` | Gradient trail length in LEDs. Longer = more visible tail. |
+| `energyFlowColor` | string | `amethist` | Named colour from `tableconfig.txt` used for the energy flows. |
 
 ### [State2] — S2_Welcome
 
