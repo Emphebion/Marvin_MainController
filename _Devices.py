@@ -6,13 +6,29 @@ import threading
 import subprocess
 from sys import platform
 
-#############################################
-# Interconnect function
-# ===========================================
-# Purpose is to:
-# - Setup connections to the periferals
-#############################################
+"""
+_Devices.py — Serial device manager for MARVIN.
+
+Detects USB serial devices by VID:PID at startup and opens connections.
+Currently manages:
+    RFID_LED  -- Arduino Micro (2A03:0042) at 500000 baud
+                 Handles RFID tag reading, button input, and NeoPixel output.
+    GSM       -- Placeholder (1234:5678) -- not yet in use.
+
+The primary runtime interface is:
+    transmitLED(ledData)  -- send the full LED frame to RFID_LED
+    get_device(name)      -- retrieve a Device object by name for direct read/write
+
+Message frame format (transmit):
+    [\\r] [R G B] [R G B] ... [\\n] [CRC]
+    CRC = XOR of all R, G, B bytes
+
+Message frame format (receive, via Device.read/parse_status_response):
+    [startByte] [payload bytes] [stopByte] [CRC]
+"""
+
 class _Devices(object):
+    """Container for all configured serial devices. Detects and connects devices at init."""
     def __init__(self, config_file, parser):
         self.connectedDevices = []
         self.parse_config(config_file, parser)
@@ -58,6 +74,12 @@ class _Devices(object):
         return foundDevices
 
     def transmitLED(self, ledData):
+        """Send a full LED frame to the RFID_LED device.
+
+        Args:
+            ledData -- list of [R, G, B] triples, one per LED, in segment order
+                       (segm0 index 0 → segm63 last index)
+        """
         dev = self.get_device("RFID_LED")
         if dev:
             dev.send(ledData)
@@ -70,13 +92,8 @@ class _Devices(object):
                 return device
 
 
-#############################################
-# Peripheral function
-# ===========================================
-# Purpose is to:
-# - Setup connections to the periferals
-#############################################
 class Device(object):
+    """A single serial device with framed message protocol and CRC validation."""
     def __init__(self, name, port, devID, baudrate, startByte, stopByte):
         self.name = name
         self.ser = serial.Serial()
@@ -105,6 +122,14 @@ class Device(object):
             self.ser.write(msg)
 
     def format_msg(self, data):
+        """Build a framed serial message with XOR CRC.
+
+        Args:
+            data -- list of [R, G, B] triples
+
+        Returns:
+            list of ints ready to pass to ser.write()
+        """
         crc = 0
         msg = [ord(self.startByte)]
         for d in data:
@@ -113,9 +138,14 @@ class Device(object):
         msg += [ord(self.stopByte), crc]
         return msg
 
-# Not used in state10 ?!
     def read(self):
-        time.sleep(.000001)  # TODO remove this delay
+        """Read one framed message from the serial port if data is available.
+
+        Returns the validated payload bytes, or None if no data is waiting.
+        Note: this method is not called during active game states (S10/S11).
+        Input during the game is handled directly by _InputHandler.event_handler()
+        via pygame serial events.
+        """
         self.open()
         if self.ser.in_waiting:
             data = self.ser.read_until()
@@ -124,6 +154,11 @@ class Device(object):
             return result
 
     def parse_status_response(self, data, crc):
+        """Validate CRC and extract the payload from a received message.
+
+        Returns:
+            bytes between startByte and stopByte if CRC matches, else [].
+        """
         calculatedCrc = 0
         startFound = False
         endFound = False

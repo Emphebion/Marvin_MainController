@@ -1,3 +1,28 @@
+"""
+glbs.py — Global initialisation and shared state for MARVIN.
+
+This module is executed once at import time (before main() runs).
+It creates all subsystem objects and holds mutable game-round variables
+that are shared across state modules.
+
+Subsystem objects (read-only after init):
+    display   -- pygame screen renderer
+    handler   -- input handler (buttons / RFID / keyboard)
+    items     -- item inventory and power-node manager
+    devices   -- serial device connections
+    table     -- LED segment graph and animation engine
+    players   -- player registry and active-player tracker
+
+Round variables (mutated by state modules):
+    gameStartTime, gameTimeout, currentInput, currentGameRoute,
+    currentRoundInputs, gameSuccess, gameFailures, snakeCounter,
+    returnState, prevStateName
+
+Sleep variables:
+    systemTimeout   -- seconds of idle before auto-reset (from config)
+    systemWakeTime  -- timestamp of last user interaction
+"""
+
 import pygame
 from _Display import _Display
 from _InputHandler import _InputHandler
@@ -45,6 +70,11 @@ systemWakeTime = time.time()
 handlerTime = time.time()
 
 def bedTime():
+    """Return True if the system has been idle longer than systemTimeout.
+
+    Resets the active player when the timeout is reached so the next
+    RFID scan starts a fresh session.
+    """
     sleep = False
     timmy = systemTimeout - (time.time() - systemWakeTime)
     #print("Current time before bed = " + str(timmy))

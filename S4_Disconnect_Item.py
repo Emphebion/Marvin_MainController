@@ -18,7 +18,7 @@ class S4_Disconnect_Item(object):
         self.state = self.states.S4
         print("current state is {}".format(self.state))
         print("current state name is {}".format(self.state.name))
-        if glbs.players.activePlayer.hasSkill(self.skills): #TODO change name to match skill
+        if glbs.players.activePlayer.hasSkill(self.skills):
             glbs.display.display(self.folder,self.name,self.location)
         else:
             self._skipThisState()
@@ -37,12 +37,10 @@ class S4_Disconnect_Item(object):
             if new_input["event"] == "rfid":
                 newItem = glbs.items.getItemByID(new_input["data"])
                 playerIsGM = glbs.players.activePlayer.isGM
-                # TODO: check if item was scanned & valid & is connected!
                 if newItem:
                     if playerIsGM and newItem.connected:
                         glbs.items.disconnectItem(newItem)
                         glbs.items.currentItemName = ""
-                        # TODO: change to S2 in the future
                         self.state = self.states.S1
                     elif glbs.items.currentItemName != newItem.name and newItem.connected:
                         glbs.items.currentItemName = newItem.name

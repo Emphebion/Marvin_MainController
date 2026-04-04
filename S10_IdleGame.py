@@ -31,8 +31,6 @@ class S10_IdleGame():        #S10_GameMaster
         glbs.currentGameRoute.clear()
         glbs.currentRoundInputs.clear()
 
-        # TODO:CHANGE SUCCESSES FOR TIME + Max Failures
-
         # Create route for current round
         self.setCurrentGoal()
         glbs.currentGameRoute = glbs.table.createCurrentSnake(self.currentGoal)

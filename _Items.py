@@ -1,12 +1,22 @@
-#############################################
-# Items
-# ===========================================
-# Purpose is to:
-# - Keeps track of the status of all the items during play
-#############################################
+"""
+_Items.py — Item inventory and power-node manager for MARVIN.
+
+Loads item definitions from itemconfig.txt and tracks connection state
+at runtime. Writes connection changes back to itemconfig.txt so state
+persists across restarts.
+
+The "well" (power node) has a fixed capacity. Connecting an item adds its
+load to the total. If the total exceeds the source capacity an overload
+occurs and all items are disconnected.
+
+Two parallel dicts are maintained:
+    items    -- name  → Item  (for menu navigation by name)
+    itemsIDs -- int ID → Item (for RFID lookup by tag ID)
+"""
 import configparser
 
 class _Items(object):
+    """Item inventory: menu navigation, connection state, and overload protection."""
     def __init__(self, config_file):
         #FUTURE: rework Item to make an ID dict similar to player
         self.items = {}
@@ -38,7 +48,18 @@ class _Items(object):
             self.itemsIDs[ID] = Item(name,function,ID,level,activationSkill,load,connected)
         
 # Menu functions
-    def selectNextItem(self,stateNr):
+    def selectNextItem(self, stateNr):
+        """Advance currentItemName to the next valid item for the given state.
+
+        For states > 5 (S7 Connect): cycles through disconnected items.
+        For states ≤ 5 (S4 Disconnect): cycles through connected items.
+
+        Args:
+            stateNr -- current state number (int)
+
+        Returns:
+            name of the newly selected item (str)
+        """
         index = self.itemnames.index(self.currentItemName) + 1
         while index != self.itemnames.index(self.currentItemName):
             if(index >= len(self.itemnames)):
@@ -57,7 +78,11 @@ class _Items(object):
 
         return self.currentItemName
 
-    def selectPrevItem(self,stateNr):
+    def selectPrevItem(self, stateNr):
+        """Move currentItemName to the previous valid item for the given state.
+
+        Same filtering logic as selectNextItem but iterates backward.
+        """
         index = self.itemnames.index(self.currentItemName) - 1
         while index != self.itemnames.index(self.currentItemName):
             
@@ -91,6 +116,11 @@ class _Items(object):
         return self.currentItemName
     
     def getItemByID(self, foundID):
+        """Look up an Item by its integer RFID tag ID.
+
+        Returns:
+            Item object, or None if not found.
+        """
         try:
             return self.itemsIDs[foundID]
         except IndexError:
@@ -124,6 +154,7 @@ class _Items(object):
 
 # Node functions
     def calculateNodeUse(self):
+        """Return the total power load of all currently connected items (int)."""
         put = 0
         for item in self.items.values():
             if item.connected:
@@ -132,6 +163,7 @@ class _Items(object):
 
 # Connection functions
     def disconnectAll(self):
+        """Disconnect all items and persist the change to itemconfig.txt."""
         for item in self.items.values():
             item.disconnectItem()
             self.parser[item.name]['connected'] = '0'
@@ -142,6 +174,7 @@ class _Items(object):
         self.currentItemName = self.itemnames[0]
 
     def connectItem(self):
+        """Connect currentItem and persist. Triggers disconnectAll() on overload."""
         item = self.items[self.currentItemName]
         item.connectItem()
         self.parser[item.name]['connected'] = '1'
@@ -157,6 +190,7 @@ class _Items(object):
 
 
     def disconnectItem(self):
+        """Disconnect currentItem and persist to itemconfig.txt."""
         item = self.items[self.currentItemName]
         item.disconnectItem()
         self.parser[item.name]['connected'] = '0'
@@ -183,7 +217,7 @@ class Item(object):
         print(f"Item created: {self.name}, ID: {self.ID}, connected: {self.connected}, activationSkill: {self.activationSkill}")
 
     def toggle_connected(self):
-        self.connected != self.connected
+        self.connected = not self.connected
         
     def setConnected(self, value):
         self.connected = value

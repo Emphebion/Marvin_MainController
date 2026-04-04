@@ -37,7 +37,7 @@ class S3_Disconnect_All(object):
                     self.state = self.states.S4
                 elif new_input["data"] == "down":  # Dummy
                     if glbs.players.activePlayer.isGM:
-                        glbs.items.disconnectAllItems()
+                        glbs.items.disconnectAll()
                         # improve return state (to S2?) Maybe this is the best return state for all except sleep
                         self.state = self.states.S3
                     else:

@@ -1,13 +1,36 @@
-#############################################
-# Table
-# ===========================================
-# Purpose is to:
-# - Translate the physical table to LED array
-#############################################
+"""
+_Table.py — LED segment graph, snake routing, and spark animation engine.
+
+The physical table has 64 LED segments across three concentric octagonal
+rings connected by radial bridges. This module provides:
+
+  _Table       -- the segment graph (loaded from tableconfig.txt) and
+                  all operations on it: snake route creation, LED colour
+                  management, and spark effect generation.
+
+  _Segment     -- one physical LED strip segment (5–11 LEDs). Tracks LED
+                  colours, the users of each LED, and the traversal direction
+                  (flow) when part of a route.
+
+  _Button      -- one of the 8 outer game buttons. Holds the two associated
+                  outer-ring segment names.
+
+  Spark        -- a short animated LED effect used during idle/broken states.
+                  Travels along a random 1–5 segment path.
+
+Snake routing (createCurrentSnake):
+  Starts at a random segment near the goal button and walks inward through
+  the segment graph until at least nrOfStartSegments inner-ring segments
+  have been visited, or maxRouteLength is reached. Each segment records
+  its traversal direction (+1 / -1) so the animation in S11 knows which
+  LED index to advance.
+"""
+
 import random
 import time
 
 class _Table(object):
+    """LED segment graph: loads topology from config, owns all routing and animation helpers."""
     def __init__(self, config_file, parser):
         self.LEDsArray = []                     #unused?
         self.segmentList = []
@@ -61,14 +84,30 @@ class _Table(object):
     def getRandomSegment(self):
         return random.choice(self.segmentList)
 
-    # - three route options:
+    # Route-creation strategies:
     #       1. Snake with length <=30 LEDs to prevent overlap; route is random until X inner ring segm are in list; route < 30 segm
     #       2. Solid route with list of possible options. remove options while planning to prevent crossings (TODO)
     #       3. Runes that slowly form.
 
-    # SNAKE FUNCTIONS
-    'TODO: Create Snake Class'
+    # SNAKE FUNCTIONS (to be extracted into LineGame class in Phase 2)
     def createCurrentSnake(self, goal):
+        """Build a snake route from the goal button back to the inner ring.
+
+        Algorithm:
+            1. Pick a random segment adjacent to the goal button.
+            2. Walk through the segment graph in the direction away from
+               the previous segment, appending segments until at least
+               nrOfStartSegments inner-ring segments appear in the route
+               or maxRouteLength is reached.
+            3. Record the traversal direction (+1/-1) on each segment so
+               S11 knows which LED indices to animate in order.
+
+        Args:
+            goal -- name of the target button (e.g. 'east')
+
+        Returns:
+            list of _Segment objects from goal-end to inner-ring start
+        """
         route = []
         namelist = []
         flowlist = []
@@ -108,8 +147,8 @@ class _Table(object):
         print(len(flowlist))
         return route
 
-    # Ensures the LEDs in one segment are run in the correct order/direction
-    def setRouteFlow(self,route):
+    def setRouteFlow(self, route):
+        """Set the traversal direction on every segment in route (unused helper)."""
         directionlist = []
         i = 0
         while i < len(route)-1:
@@ -117,7 +156,11 @@ class _Table(object):
             i = i+1
         print('Segment flow = ', directionlist)
     
-    def setRouteSegmentFlow(self,currentSegment,previousSegment):
+    def setRouteSegmentFlow(self, currentSegment, previousSegment):
+        """Record +1 or -1 on previousSegment depending on which direction currentSegment lies.
+
+        Returns the flow value recorded, or 0 if the segments are not connected.
+        """
         if currentSegment.name in previousSegment.flowSegments:
             previousSegment.addSegmentFlow(1)
             if (len(previousSegment.flow)) > 1:
@@ -134,8 +177,12 @@ class _Table(object):
             print("ERROR: Segments not linked! re-run route")
             return 0
 
-    # Ensures the LEDs in the final segment are run in the correct order/direction
-    def setDestinationSegmentFlow(self,destination,segment):
+    def setDestinationSegmentFlow(self, destination, segment):
+        """Record the traversal direction on the first (goal-end) segment of the route.
+
+        Looks up whether segment is in destination's flowSegments or counterSegments
+        and records the direction accordingly.
+        """
         if segment.name in destination.flowSegments:
             segment.addSegmentFlow(1)
             return 1
@@ -164,6 +211,10 @@ class _Table(object):
         self.currentRoute.clear()
 
     def getLEDData(self):
+        """Return a flat list of [R, G, B] triples for all LEDs in segment order.
+
+        This is the data passed to _Devices.transmitLED().
+        """
         LEDData = []
         for segment in self.segmentList:
             LEDData += segment.getLEDvalues()
@@ -213,6 +264,20 @@ class _Table(object):
     
 
 class _Segment(object):
+    """One physical LED strip segment on the table.
+
+    Attributes:
+        name            -- config key (e.g. 'segm0')
+        nrLEDs          -- number of physical NeoPixels
+        flowSegments    -- neighbour names in the forward direction
+        counterSegments -- neighbour names in the reverse direction
+        flow            -- list of direction values recorded during route building
+                           (+1 = forward, -1 = reverse)
+        LEDvalues       -- list of [R, G, B] triples, one per LED
+        LEDUsers        -- list of owner strings per LED ('Unused', 'snake', 'spark', ...)
+        timesInRoute    -- number of times this segment appears in the current route
+    """
+
     def __init__(self, name, nrLEDs, flowSegs, counterSegs, defaultColor):
         self.name = name
         self.nrLEDs = nrLEDs
@@ -261,6 +326,11 @@ class _Segment(object):
                 
     
 class _Button(object):
+    """One of the 8 outer game buttons.
+
+    Holds the two associated outer-ring segment names (flow and counter side).
+    """
+
     def __init__(self, name, flowSegments, counterSegments):
         self.name = name
         self.flowSegments = flowSegments
@@ -273,6 +343,12 @@ class _Button(object):
 
 
 class Spark(object):
+    """A short random LED animation used during idle/broken table states.
+
+    Travels along a 1–5 segment path with a random length (5–20 LEDs).
+    resetSpark() must be called before each animation cycle.
+    """
+
     def __init__(self, name, segments):
         self.name = name
         self.segments = segments

@@ -1,3 +1,14 @@
+"""
+MARVIN.py — Main entry point for the MARVIN table controller.
+
+Instantiates all 13 state objects and runs the state machine loop.
+Each state's run() method returns the integer value of the next state.
+The loop dispatches to the appropriate state until Sx_Quit is reached.
+
+Hardware note: serial devices are detected at import time via glbs.py.
+Run without hardware to enter keyboard/simulation mode automatically.
+"""
+
 import tkinter as tk
 from tkinter.ttk import Frame, Button, Style
 
@@ -25,11 +36,6 @@ import glbs
 
 SERIAL_BAUD_RATE = 57600
 
-# TODO lijst:
-#   - PI times voor ontkoppelen en aansluiten
-#   - Interface naar GSM Arduino
-#   - Interface naar RFID
-
 #############################################
 # Main function
 # ===========================================
@@ -40,6 +46,12 @@ SERIAL_BAUD_RATE = 57600
 # - Light Control
 #############################################
 def main():
+    """Run the MARVIN state machine.
+
+    Creates one instance of each state class, then loops indefinitely,
+    calling the current state's run() and transitioning to the returned state.
+    Exits when Sx_Quit (value 100) is reached.
+    """
 
     states_enum = StatesEnum()
     all_states = states_enum.all_states

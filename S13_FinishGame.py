@@ -19,7 +19,7 @@ class S13_FinishGame():
             print("Game finished successfully")
             glbs.table.setAllTableLEDs(glbs.table.colorsLED["emerald"])
             glbs.devices.transmitLED(glbs.table.getLEDData())
-            if glbs.returnState.value is self.states.S8.value or glbs.returnState.value is self.states.S7.value:  #TODO: change to S7 and add S4 when disconnecting 1 item
+            if glbs.returnState.value is self.states.S8.value or glbs.returnState.value is self.states.S7.value:
                 glbs.items.connectItem()
             elif glbs.returnState.value is self.states.S4.value:
                 glbs.items.disconnectItem()

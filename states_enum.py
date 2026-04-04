@@ -133,10 +133,10 @@ class StatesEnum():
     def get_states_s13(self):
         class State13_states(Enum):
             S2 = self.all_states.S2_Welcome.value
-            S3 = self.all_states.S3_Disconnect_All.value # TODO remove this state
-            S4 = self.all_states.S4_Disconnect_Item.value # TODO remove this state
+            S3 = self.all_states.S3_Disconnect_All.value  # used to identify disconnect-all return path
+            S4 = self.all_states.S4_Disconnect_Item.value  # used to identify disconnect-item return path
             S7 = self.all_states.S7_Connect_Item.value
-            S8 = self.all_states.S8_Items.value # TODO remove this state
+            S8 = self.all_states.S8_Items.value  # used to identify connect-item return path
             S13 = self.all_states.S13_FinishGame.value
         return State13_states
     

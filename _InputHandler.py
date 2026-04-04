@@ -1,7 +1,29 @@
+"""
+_InputHandler.py — Input abstraction layer for MARVIN.
+
+Polls the RFID_LED Arduino for serial data (buttons and RFID tags) and
+falls back to keyboard input when no hardware is connected (desktop mode).
+
+Serial message types handled:
+    'B' -- button bitmask (byte 1: screen buttons, byte 2: game buttons)
+    'T' -- RFID tag ID (bytes 1-4, big-endian 32-bit integer)
+    'quit' -- hardware shutdown request
+
+All input is normalised into event dicts and appended to self.elist:
+    {"event": "keydown", "data": "left"|"right"|"up"|"down"|"east"|...}
+    {"event": "rfid",    "data": <int tag ID>}
+    {"event": "serial",  "data": <raw bytes>}
+
+The 1 ms pygame.time.wait(1) at the end of event_handler() is intentional:
+it rate-limits the polling loop to prevent missed or double button triggers.
+"""
+
 import glbs
 import os
 
 class _InputHandler(object):
+    """Input handler: normalises hardware serial input and keyboard input into event dicts."""
+
     def __init__(self):
         self.init = 1
         self.SERIAL = glbs.pygame.USEREVENT + 1
@@ -10,6 +32,15 @@ class _InputHandler(object):
         glbs.pygame.event.set_allowed(self.allowed_events)
 
     def event_handler(self):
+        """Poll for input and return the accumulated event list.
+
+        If a hardware device is available, reads one serial frame.
+        Otherwise falls back to keyboard events.
+        Clears the pygame event queue after each call.
+
+        Returns:
+            list of event dicts (may be empty if no input occurred)
+        """
         tempTime = glbs.time.time()
         dev = glbs.devices.get_device("RFID_LED")
         if dev:
@@ -37,6 +68,11 @@ class _InputHandler(object):
     # * quit - Shutdown button was pressed              #
     #***************************************************#
     def serial_event_handler(self):
+        """Parse a serial event already posted to the pygame event queue.
+
+        Reads the pending pygame event, extracts the 'line' bytes, and
+        converts them to keydown or rfid events appended to self.elist.
+        """
         event = glbs.pygame.event.peek()
         data = event.dict["line"]
         # Parse screen buttons
@@ -70,6 +106,20 @@ class _InputHandler(object):
     # Function handeling keyboard data (backup)         #
     #***************************************************#
     def keyboard_event_handler(self):
+        """Handle keyboard input as a fallback when no hardware is connected.
+
+        Key mapping:
+            Arrow keys      → up / down / left / right
+            H               → east
+            Y               → northeast
+            T               → north
+            R               → northwest
+            F               → west
+            V               → southwest
+            B               → south
+            N               → southeast
+            ESC             → quit
+        """
         event = glbs.pygame.event.peek()
         if event.type == glbs.pygame.KEYDOWN:
             glbs.systemWakeTime = glbs.time.time()
@@ -89,7 +139,7 @@ class _InputHandler(object):
                 glbs.pygame.quit()
 
             elif event.key == glbs.pygame.K_l:
-                glbs.pygame.draw.circle()
+                pass  # placeholder for future LED ring visualisation (Phase 2)
 
             elif event.key == glbs.pygame.K_h:
                 self.elist.append({"event": "keydown", "data": "east"})
