@@ -1,12 +1,12 @@
 """
-_Table.py — LED segment graph, snake routing, and spark animation engine.
+_Table.py — LED segment graph, animation engine, and segment primitives.
 
 The physical table has 64 LED segments across three concentric octagonal
 rings connected by radial bridges. This module provides:
 
   _Table       -- the segment graph (loaded from tableconfig.txt) and
-                  all operations on it: snake route creation, LED colour
-                  management, and spark effect generation.
+                  all operations on it: LED colour management, spark
+                  effect generation, and segment/button lookups.
 
   _Segment     -- one physical LED strip segment (5–11 LEDs). Tracks LED
                   colours, the users of each LED, and the traversal direction
@@ -18,12 +18,11 @@ rings connected by radial bridges. This module provides:
   Spark        -- a short animated LED effect used during idle/broken states.
                   Travels along a random 1–5 segment path.
 
-Snake routing (createCurrentSnake):
-  Starts at a random segment near the goal button and walks inward through
-  the segment graph until at least nrOfStartSegments inner-ring segments
-  have been visited, or maxRouteLength is reached. Each segment records
-  its traversal direction (+1 / -1) so the animation in S11 knows which
-  LED index to advance.
+  EnergyFlow   -- softly glowing energy trail for the Active idle state.
+
+Snake routing is handled by LineGame in _LineGame.py.
+_Table.createCurrentSnake() is a backward-compatible wrapper that delegates
+to the active glbs.game instance.
 """
 
 import random
@@ -85,130 +84,18 @@ class _Table(object):
     def getRandomSegment(self):
         return random.choice(self.segmentList)
 
-    # Route-creation strategies:
-    #       1. Snake with length <=30 LEDs to prevent overlap; route is random until X inner ring segm are in list; route < 30 segm
-    #       2. Solid route with list of possible options. remove options while planning to prevent crossings (TODO)
-    #       3. Runes that slowly form.
-
-    # SNAKE FUNCTIONS (to be extracted into LineGame class in Phase 2)
     def createCurrentSnake(self, goal):
-        """Build a snake route from the goal button back to the inner ring.
+        """Backward-compatible wrapper: delegates to glbs.game (LineGame).
 
-        Algorithm:
-            1. Pick a random segment adjacent to the goal button.
-            2. Walk through the segment graph in the direction away from
-               the previous segment, appending segments until at least
-               nrOfStartSegments inner-ring segments appear in the route
-               or maxRouteLength is reached.
-            3. Record the traversal direction (+1/-1) on each segment so
-               S11 knows which LED indices to animate in order.
-
-        Args:
-            goal -- name of the target button (e.g. 'east')
-
-        Returns:
-            list of _Segment objects from goal-end to inner-ring start
+        Kept so existing call sites in S10 continue to work unchanged.
+        New code should call glbs.game.start(goal) directly.
         """
-        route = []
-        namelist = []
-        flowlist = []
+        import glbs
+        glbs.game.start(goal)
+        return glbs.currentGameRoute
 
-        ## Option 1 ##
-        #determine ending segment first
-        destination = self.getButton(goal)
-        route.append(self.getSegment(destination.getRandomButtonSegment()))
-        namelist.append(route[0].name)
-        flowlist.append(self.setDestinationSegmentFlow(destination,route[0]))
-        if (len(route[0].flowSegments) > 1):
-            route.append(self.getSegment(route[0].flowSegments[random.randint(0,len(route[0].flowSegments)-1)]))
-        else:
-            route.append(self.getSegment(route[0].counterSegments[random.randint(0,len(route[0].counterSegments)-1)]))
-        namelist.append(route[-1].name)
-
-        #random loop back to starting segment (refactor needed)
-        finishlist = ["segm0","segm1","segm2","segm3","segm4","segm5","segm6","segm7","segm8","segm9","segm10","segm11","segm12","segm13","segm14","segm15"] #segm in inner ring
-        duplicates = 0 #nr of segm in route in inner ring
-    
-        while ((duplicates < self.nrOfStartSegments) & (len(route) < self.maxRouteLength)):
-            if (route[-2].name in route[-1].flowSegments):
-                route.append(self.getSegment(route[-1].counterSegments[random.randint(0,len(route[-1].counterSegments)-1)]))
-            else:
-                route.append(self.getSegment(route[-1].flowSegments[random.randint(0,len(route[-1].flowSegments)-1)]))
-            namelist.append(route[-1].name)
-            duplicates += finishlist.count(namelist[-1])
-
-        i = 0
-        while i < len(route)-1:
-            flowlist.append(self.setRouteSegmentFlow(route[i],route[i+1]))
-            i = i+1
-
-        print(namelist)
-        print(flowlist)
-        print(len(namelist))
-        print(len(flowlist))
-        return route
-
-    def setRouteFlow(self, route):
-        """Set the traversal direction on every segment in route (unused helper)."""
-        directionlist = []
-        i = 0
-        while i < len(route)-1:
-            directionlist.append(self.setRouteSegmentFlow(route[i],route[i+1]))
-            i = i+1
-        print('Segment flow = ', directionlist)
-    
-    def setRouteSegmentFlow(self, currentSegment, previousSegment):
-        """Record +1 or -1 on previousSegment depending on which direction currentSegment lies.
-
-        Returns the flow value recorded, or 0 if the segments are not connected.
-        """
-        if currentSegment.name in previousSegment.flowSegments:
-            previousSegment.addSegmentFlow(1)
-            if (len(previousSegment.flow)) > 1:
-                print("FLOW is > 1")
-                print(previousSegment.flow)
-            return 1
-        elif currentSegment.name in previousSegment.counterSegments:
-            previousSegment.addSegmentFlow(-1)
-            if (len(previousSegment.flow)) > 1:
-                print("FLOW is > 1")
-                print(previousSegment.flow)
-            return -1
-        else:
-            print("ERROR: Segments not linked! re-run route")
-            return 0
-
-    def setDestinationSegmentFlow(self, destination, segment):
-        """Record the traversal direction on the first (goal-end) segment of the route.
-
-        Looks up whether segment is in destination's flowSegments or counterSegments
-        and records the direction accordingly.
-        """
-        if segment.name in destination.flowSegments:
-            segment.addSegmentFlow(1)
-            return 1
-        elif segment.name in destination.counterSegments:
-            segment.addSegmentFlow(-1)
-            return -1
-        else:
-            print("ERROR: Destination and segment not linked! re-run route")
-            return 0
- 
-    # check if the route is set correctly
-    def checkRoute(self, route):
-        check = []
-        c = 0
-        while (c < (len(route)-1)):
-            if ((route[-1].getLastSegmentFlow()) > 0):
-                check[c] = 1 if route[-2] in route[-1].flowSegments else 0
-            else:
-                check[c] = 1 if route[-2] in route[-1].counterSegments else 0
-        if 0 in check:
-            return False
-        return True       
-
-    # Remove the reacted route list
     def clearRoute(self):
+        """Clear the current route list."""
         self.currentRoute.clear()
 
     def getLEDData(self):

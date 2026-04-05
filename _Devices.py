@@ -1,11 +1,3 @@
-import re
-import serial
-import serial.tools.list_ports
-import time
-import threading
-import subprocess
-from sys import platform
-
 """
 _Devices.py — Serial device manager for MARVIN.
 
@@ -25,13 +17,35 @@ Message frame format (transmit):
 
 Message frame format (receive, via Device.read/parse_status_response):
     [startByte] [payload bytes] [stopByte] [CRC]
+
+Reconnection:
+    A background daemon thread watches for disconnected devices every 5 s.
+    When a device's serial port raises SerialException, it is marked offline.
+    The watcher re-scans USB ports by VID:PID and reconnects automatically.
+    Devices that were absent at startup are also picked up by the watcher.
 """
 
+import re
+import serial
+import serial.tools.list_ports
+import time
+import threading
+import subprocess
+from sys import platform
+
+
 class _Devices(object):
-    """Container for all configured serial devices. Detects and connects devices at init."""
+    """Container for all configured serial devices. Detects and connects devices at init.
+
+    All configured devices are registered on construction (connected or not).
+    A background thread continuously retries offline devices every 5 seconds.
+    """
+
     def __init__(self, config_file, parser):
         self.connectedDevices = []
+        self._all_device_specs = []   # all configured specs, including offline ones
         self.parse_config(config_file, parser)
+        self._start_reconnect_watcher()
 
     def parse_config(self, config_file, parser):
         parser.read(config_file)
@@ -41,13 +55,21 @@ class _Devices(object):
             baudrate = parser.getint(devicename, 'baudrate')
             startByte = parser.get(devicename, 'startByte').encode("ascii")
             stopByte = parser.get(devicename, 'stopByte').encode("ascii")
+            spec = {
+                'name': devicename,
+                'devID': dID,
+                'baudrate': baudrate,
+                'startByte': startByte,
+                'stopByte': stopByte,
+            }
+            self._all_device_specs.append(spec)
             port = self.port_by_id(dID)
             if port:
                 print("device connected: {}".format(dID))
-                self.connectedDevices.append(Device(devicename, port, dID, baudrate, startByte, stopByte))
+                self.connectedDevices.append(
+                    Device(devicename, port, dID, baudrate, startByte, stopByte))
             else:
                 print("device not connected: {}".format(dID))
-                # TODO: change to re-detect devices later
 
     def port_by_id(self, currentID):
         vid = int(currentID.split(':')[0], 16)
@@ -58,21 +80,54 @@ class _Devices(object):
                 return port.device
         return None
 
-    def connected_serial_devices(self):
-        device_re = re.compile(b'Bus\s+(?P<bus>\d+)\s+Device\s+(?P<device>\d+).+ID\s(?P<id>\w+:\w+)\s(?P<tag>.+)', re.I)
-        df = subprocess.check_output("lsusb").decode().strip()
-        foundDevices = []
-        if df:
-            for i in df:
-                info = device_re.match(i)
-                if info:
-                    dinfo = info.groupdict()
-                    dinfo['device'] = '/dev/bus/%s/%s' % (dinfo.pop('bus'),dinfo.pop('device'))
-                    foundDevices.append(dinfo)
-        for device in foundDevices:
-            print(device)
-        return foundDevices
+    # ------------------------------------------------------------------ #
+    # Reconnection watcher                                                 #
+    # ------------------------------------------------------------------ #
+    def _start_reconnect_watcher(self):
+        """Start the background reconnect thread (daemon)."""
+        t = threading.Thread(target=self._reconnect_loop, daemon=True)
+        t.start()
 
+    def _reconnect_loop(self):
+        """Every 5 s: reconnect offline devices and pick up newly appeared ones."""
+        while True:
+            time.sleep(5)
+            self._reconnect_offline()
+            self._connect_missing()
+
+    def _reconnect_offline(self):
+        """Try to reconnect any Device that has flagged itself as offline."""
+        for dev in list(self.connectedDevices):
+            if dev.offline:
+                port = self.port_by_id(dev.devID)
+                if port:
+                    try:
+                        dev.ser.port = port
+                        dev.connect()
+                        dev.offline = False
+                        print(f"_Devices: reconnected {dev.name} on {port}")
+                    except Exception as e:
+                        print(f"_Devices: reconnect {dev.name} failed: {e}")
+
+    def _connect_missing(self):
+        """Connect devices that were absent at startup but are now present."""
+        connected_names = {d.name for d in self.connectedDevices}
+        for spec in self._all_device_specs:
+            if spec['name'] not in connected_names:
+                port = self.port_by_id(spec['devID'])
+                if port:
+                    try:
+                        dev = Device(
+                            spec['name'], port, spec['devID'],
+                            spec['baudrate'], spec['startByte'], spec['stopByte'])
+                        self.connectedDevices.append(dev)
+                        print(f"_Devices: late-connected {spec['name']} on {port}")
+                    except Exception as e:
+                        print(f"_Devices: late-connect {spec['name']} failed: {e}")
+
+    # ------------------------------------------------------------------ #
+    # Public interface                                                     #
+    # ------------------------------------------------------------------ #
     def transmitLED(self, ledData):
         """Send a full LED frame to the RFID_LED device.
 
@@ -92,17 +147,43 @@ class _Devices(object):
             import glbs as _glbs
             if hasattr(_glbs, 'display') and _glbs.display is not None:
                 _glbs.display.update_leds()
-        
+
     def get_device(self, name):
         for device in self.connectedDevices:
-            if device.name == name:
+            if device.name == name and not device.offline:
                 return device
+        return None
+
+    def connected_serial_devices(self):
+        device_re = re.compile(
+            b'Bus\\s+(?P<bus>\\d+)\\s+Device\\s+(?P<device>\\d+).+ID\\s(?P<id>\\w+:\\w+)\\s(?P<tag>.+)',
+            re.I)
+        df = subprocess.check_output("lsusb").decode().strip()
+        foundDevices = []
+        if df:
+            for i in df:
+                info = device_re.match(i)
+                if info:
+                    dinfo = info.groupdict()
+                    dinfo['device'] = '/dev/bus/%s/%s' % (
+                        dinfo.pop('bus'), dinfo.pop('device'))
+                    foundDevices.append(dinfo)
+        for device in foundDevices:
+            print(device)
+        return foundDevices
 
 
 class Device(object):
-    """A single serial device with framed message protocol and CRC validation."""
+    """A single serial device with framed message protocol and CRC validation.
+
+    The `offline` flag is set True when a send/read raises SerialException.
+    The reconnect watcher in _Devices checks this flag and re-opens the port.
+    """
+
     def __init__(self, name, port, devID, baudrate, startByte, stopByte):
         self.name = name
+        self.devID = devID
+        self.offline = False
         self.ser = serial.Serial()
         self.ser.port = port
         self.ser.baudrate = baudrate
@@ -125,8 +206,16 @@ class Device(object):
     def send(self, data):
         self.open()
         if self.ser.is_open:
-            msg = self.format_msg(data)
-            self.ser.write(msg)
+            try:
+                msg = self.format_msg(data)
+                self.ser.write(msg)
+            except serial.SerialException as e:
+                print(f"Device {self.name}: send failed ({e}), marking offline")
+                self.offline = True
+                try:
+                    self.ser.close()
+                except Exception:
+                    pass
 
     def format_msg(self, data):
         """Build a framed serial message with XOR CRC.
@@ -155,10 +244,18 @@ class Device(object):
         """
         self.open()
         if self.ser.in_waiting:
-            data = self.ser.read_until()
-            crc = self.ser.read()
-            result = self.parse_status_response(data, crc)
-            return result
+            try:
+                data = self.ser.read_until()
+                crc = self.ser.read()
+                result = self.parse_status_response(data, crc)
+                return result
+            except serial.SerialException as e:
+                print(f"Device {self.name}: read failed ({e}), marking offline")
+                self.offline = True
+                try:
+                    self.ser.close()
+                except Exception:
+                    pass
 
     def parse_status_response(self, data, crc):
         """Validate CRC and extract the payload from a received message.
@@ -178,19 +275,16 @@ class Device(object):
             if dataByte == self.startByte:
                 startIndex = pos
                 startFound = True
-
             elif dataByte == self.stopByte and not endFound:
                 endIndex = pos
                 endFound = True
-
             else:
                 if startFound and not endFound:
                     calculatedCrc ^= ord(dataByte)
-
             pos += 1
 
         try:
             if calculatedCrc == ord(crc):
                 return data[startIndex + 1:endIndex]
-        except:
+        except Exception:
             return []

@@ -12,6 +12,7 @@ Subsystem objects (read-only after init):
     devices   -- serial device connections
     table     -- LED segment graph and animation engine
     players   -- player registry and active-player tracker
+    game      -- active game mode instance (LineGame by default; swap for RuneGame)
 
 Round variables (mutated by state modules):
     gameStartTime, gameTimeout, currentInput, currentGameRoute,
@@ -30,6 +31,7 @@ from _Items import _Items
 from _Devices import _Devices
 from _Table import _Table
 from _Players import _Players
+from _LineGame import LineGame
 import configparser
 import time
 import random
@@ -48,6 +50,7 @@ devices  = _Devices(config_file, parser)   # must be before _Display (sim-mode d
 table    = _Table(table_file, parser)       # must be before _Display (LED positions)
 players  = _Players(player_file, parser)
 display  = _Display(config_file, parser)   # last: can see all objects
+game     = LineGame(table)                 # active game mode instance
 
 #Round variables
 gameStartTime = 0

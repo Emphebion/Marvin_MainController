@@ -51,9 +51,9 @@ class _Items(object):
             else:
                 connected = False
             self.currentItemName = name
-            # Improve statement below when we switch to full item ID opperation
-            self.items[name] = Item(name,function,ID,level,activationSkill,load,connected)
-            self.itemsIDs[ID] = Item(name,function,ID,level,activationSkill,load,connected)
+            item = Item(name, function, ID, level, activationSkill, load, connected)
+            self.items[name]   = item
+            self.itemsIDs[ID]  = item
         try:
             self._mtime = os.path.getmtime(config_file)
         except OSError:

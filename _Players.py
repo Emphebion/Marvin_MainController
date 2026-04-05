@@ -51,7 +51,8 @@ class _Players(object):
             name = parser.get(section, 'name')
             skills = parser.get(section, 'skills').split(',')
             player = _Player(name, ID, skills, section)
-            self.playerDict[ID] = player
+            if ID != 0:
+                self.playerDict[ID] = player
             self._player_sections[section] = player
 
     # ------------------------------------------------------------------ #
@@ -83,7 +84,8 @@ class _Players(object):
             name = parser.get(section, 'name')
             skills = parser.get(section, 'skills').split(',')
             player = _Player(name, ID, skills, section)
-            new_dict[ID] = player
+            if ID != 0:
+                new_dict[ID] = player
             new_sections[section] = player
 
         # Atomic assignment under CPython GIL
