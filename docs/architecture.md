@@ -15,13 +15,15 @@ MARVIN.py  (entry point)
 │
 ├── states_enum.py         # State/transition definitions (no side effects)
 ├── glbs.py                # Global initialisation & shared state
-│   ├── _Display.py        # Pygame screen rendering
-│   ├── _InputHandler.py   # Button, RFID, and keyboard input
+│   ├── _Display.py        # Pygame screen rendering (hardware + simulation)
+│   ├── _InputHandler.py   # Button, RFID, keyboard, and mouse input
 │   │   └── _Table.py      # (button name lookup)
 │   ├── _Items.py          # Item inventory & power node
-│   ├── _Devices.py        # Serial communication to Arduino(s)
-│   ├── _Table.py          # LED segment graph, snake routing, spark effects
-│   └── _Players.py        # Player registry & skill lookup
+│   ├── _Devices.py        # Serial communication to Arduino(s) + reconnect
+│   ├── _Table.py          # LED segment graph, spark/energy-flow effects
+│   ├── _Players.py        # Player registry & skill lookup
+│   ├── _LineGame.py       # BaseGame ABC + LineGame (snake) implementation
+│   └── _GameContext.py    # Round-state dataclass (glbs.ctx)
 │
 ├── S1_Reset.py            # (all state modules import glbs)
 ├── S2_Welcome.py
@@ -97,7 +99,7 @@ stateDiagram-v2
 
 | # | Name | Purpose |
 |---|------|---------|
-| S1 | Reset | Idle state. Plays spark animations. Wakes on RFID scan. Handles table status (Off / Active / Broken / Overload). |
+| S1 | Reset | Idle state. **Active** status: soft glowing EnergyFlow animation. **Broken**: random spark flashes. Wakes on RFID scan. `down` key enters GM tag-assign sub-loop. |
 | S2 | Welcome | Shows the active player's name. Any input advances to S3. |
 | S3 | Disconnect All | Menu to disconnect all connected items. Requires `disconnectall` skill. |
 | S4 | Disconnect Item | Disconnect a single item via RFID scan. Requires `disconnect1item` skill. |
@@ -105,11 +107,11 @@ stateDiagram-v2
 | S6 | Well Size | Displays current power draw vs. capacity as a circle on screen. |
 | S7 | Connect Item | Connect an item via RFID scan. Validates player skill against item level. |
 | S8 | Items | Scrollable item menu for manual selection (GM override path). |
-| S9 | StartGame | Sets `gameStartTime` and `gameTimeout`; transitions immediately to S10. |
+| S9 | StartGame | Sets `glbs.ctx.gameStartTime` and `glbs.ctx.gameTimeout`; transitions immediately to S10. |
 | S10 | IdleGame | Picks a random goal button, builds the LED snake route, checks win/fail conditions. |
 | S11 | AwaitInput | Animates the snake (one LED per loop) and reads button input. |
 | S12 | ChangeGame | Transmits the updated LED array to the Arduino and returns to S11. |
-| S13 | FinishGame | Displays result, updates item state, resets game globals. |
+| S13 | FinishGame | Displays result, updates item state, calls `glbs.ctx.reset()` to clear all round variables. |
 
 ---
 
@@ -144,12 +146,21 @@ Placeholder device. Not yet used in active game logic.
 ## Startup Sequence
 
 1. `MARVIN.py` is invoked.
-2. `import glbs` executes module-level code:
+2. `import glbs` executes module-level code in order:
    - `pygame.init()`
-   - Config files parsed: `marvinconfig.txt`, `itemconfig.txt`, `tableconfig.txt`, `playerconfig.txt`
-   - All subsystem objects created: `_Display`, `_InputHandler`, `_Items`, `_Devices`, `_Table`, `_Players`
+   - `glbs.parser` reads `marvinconfig.txt` (state config, device IDs, screen size).
+   - `_InputHandler()` — input abstraction layer.
+   - `_Items(item_file)` — reads `itemconfig.txt` with its own parser; starts hot-reload watcher.
+   - `_Devices(config_file)` — reads `marvinconfig.txt` with its own parser; starts reconnect watcher. **Must be before `_Display`** (sim-mode detection).
+   - `_Table(table_file)` — reads `tableconfig.txt` with its own parser. **Must be before `_Display`** (LED positions).
+   - `_Players(player_file)` — reads `playerconfig.txt` with its own parser; starts hot-reload watcher.
+   - `_Display(config_file)` — last; detects sim vs hardware by checking `_Devices.get_device("RFID_LED")`.
+   - `LineGame(table)` — bound to the table graph; assigned to `glbs.game`.
+   - `GameContext()` — round-state dataclass; assigned to `glbs.ctx`.
 3. `main()` instantiates all 13 state objects.
 4. Main loop starts at `S1_Reset`.
+
+**Each subsystem reads its own config file with a private `configparser` instance.** `glbs.parser` contains only marvinconfig.txt and is used by state modules to read their `[StateN]` sections.
 
 ---
 
@@ -168,7 +179,16 @@ See [config_reference.md](config_reference.md) for full key documentation.
 
 ## Desktop Simulation Mode
 
-When no Arduino is detected (`_Devices` finds no matching USB device), `_InputHandler` falls back to keyboard input:
+When no Arduino is detected at startup (`_Devices.get_device("RFID_LED")` returns `None`), the system runs in simulation mode automatically — no flag or config change needed.
+
+**Window:** 950×700 pygame window with two panels:
+
+| Panel | Content |
+|-------|---------|
+| Left (0–700 px) | Live LED ring renderer: all 64 segments drawn at their physical positions. Menu screen image overlaid centred in the ring when active. |
+| Right (700–950 px) | RFID scan panel: clickable player and item buttons inject RFID events. Active player, last input, current round inputs, and route length shown at the bottom. |
+
+**Keyboard input:**
 
 | Key | Action |
 |-----|--------|
@@ -183,4 +203,66 @@ When no Arduino is detected (`_Devices` finds no matching USB device), `_InputHa
 | N | southeast button |
 | ESC | quit |
 
-The pygame window (480×320, `NOFRAME`) shows menu JPEGs from the `menu/` folder and power-usage circles. Full LED ring visualisation is planned for Phase 2.
+**Mouse input:**
+
+| Click target | Action |
+|-------------|--------|
+| Outer button label (ring edge) | Injects the corresponding game button keydown event |
+| Player name in RFID panel | Injects an RFID scan event for that player |
+| Item name in RFID panel | Injects an RFID scan event for that item |
+
+The last-pressed outer button is highlighted with a filled circle until the next click.
+
+---
+
+## Game Mode Architecture
+
+The snake game logic is extracted from `_Table.py` into `_LineGame.py`:
+
+- **`BaseGame`** (abstract) — defines the interface `start(goal)`, `update()`, `is_complete()`, `clear()`.
+- **`LineGame`** (concrete) — builds snake routes through the segment graph; implements `BaseGame`.
+- **`glbs.game`** — the active `BaseGame` instance. Swap `LineGame` for `RuneGame` (Phase 3) without touching any state module.
+- `_Table.createCurrentSnake()` is a backward-compatible wrapper that delegates to `glbs.game.start()`.
+
+---
+
+## Round State (`glbs.ctx`)
+
+All mutable per-round variables live in a `GameContext` dataclass at `glbs.ctx`:
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `gameStartTime` | float | `time.time()` when the round started |
+| `gameTimeout` | float | Allowed duration in seconds |
+| `currentInput` | str | Last raw input (currently unused) |
+| `currentGameRoute` | list | `_Segment` objects for the active snake; set by `LineGame.start()` |
+| `currentRoundInputs` | list | Button inputs recorded this round |
+| `gameSuccess` | bool | True if the round was completed successfully |
+| `gameFailures` | int | Failure count (starts at −1 to compensate S10 first-call logic) |
+| `snakeCounter` | int | LED-step counter for the S11 animation loop |
+| `returnState` | any | State to return to after S9/S13 |
+| `prevStateName` | any | Previous menu state name (used by skip logic in S3/S4/S5/S7) |
+
+`glbs.ctx.reset()` clears all of the above to their initial values. Called by S13 after each round.
+
+---
+
+## RFID Tag Management
+
+Player and item RFID tags can be updated without restarting MARVIN:
+
+**Hot-reload (automatic):** `_Players` and `_Items` each run a background daemon thread that polls their config file every 3 seconds. If the file modification time changes (e.g. after an SSH edit or USB copy), `reload()` is called immediately. Item `connected` state and the active player reference are preserved across reloads.
+
+**GM scan-to-assign (in-app):** In S1_Reset, pressing `down` enters a tag assignment sub-loop:
+
+```
+down         →  enter GM mode (display shows player + item list)
+left / right →  move highlight through the list
+present tag  →  writes new ID to config file; reload fires immediately
+left / right →  move to next entry
+up           →  exit, return to S1 idle
+```
+
+Entries updated in the current session show `✓ <name> [<new_id>]`. On hardware the full screen is used; in simulation the right panel shows the assign list.
+
+**Scope:** Tag reassignment only. Adding new player names, changing skills, or adding items requires editing the config file externally (SSH or USB).
