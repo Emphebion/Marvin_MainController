@@ -31,16 +31,18 @@ import math
 
 class _Table(object):
     """LED segment graph: loads topology from config, owns all routing and animation helpers."""
-    def __init__(self, config_file, parser):
+    def __init__(self, config_file):
         self.LEDsArray = []                     #unused?
         self.segmentList = []
         self.buttonList = []
         self.colorsLED = {}
-        self.parse_config(config_file,parser)
+        self.parse_config(config_file)
         self.startSegment = ''
         self.currentRoute = []
 
-    def parse_config(self, config_file, parser):
+    def parse_config(self, config_file):
+        import configparser as _cp
+        parser = _cp.ConfigParser()
         parser.read(config_file)
         colors = parser.get('common', 'colors').split(',')
         for color in colors:
@@ -92,7 +94,7 @@ class _Table(object):
         """
         import glbs
         glbs.game.start(goal)
-        return glbs.currentGameRoute
+        return glbs.ctx.currentGameRoute
 
     def clearRoute(self):
         """Clear the current route list."""

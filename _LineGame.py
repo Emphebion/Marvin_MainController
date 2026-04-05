@@ -102,8 +102,8 @@ class LineGame(BaseGame):
         """
         import glbs
         self.route = self._build_route(goal)
-        glbs.currentGameRoute = self.route
-        glbs.snakeCounter = 0
+        glbs.ctx.currentGameRoute = self.route
+        glbs.ctx.snakeCounter = 0
 
     def update(self):
         """No-op: snake animation is driven directly by S11/S12.
@@ -116,12 +116,12 @@ class LineGame(BaseGame):
     def is_complete(self):
         """Return True when the route list is empty (S11 has consumed it)."""
         import glbs
-        return not glbs.currentGameRoute
+        return not glbs.ctx.currentGameRoute
 
     def clear(self):
         """Clear the route list and reset all segment flow records."""
         import glbs
-        glbs.currentGameRoute.clear()
+        glbs.ctx.currentGameRoute.clear()
         self.route.clear()
         self._table.clearRoute()
 

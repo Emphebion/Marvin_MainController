@@ -16,9 +16,9 @@ class S8_Items(object):
         glbs.display.display(self.folder,self.name,self.location)
         
         # FUTURE: This can be removed if the Item ID setup is working
-        if glbs.returnState.value == self.states.S4.value:
+        if glbs.ctx.returnState.value == self.states.S4.value:
             glbs.items.setCurrentItemToLowestActiveItem()
-        elif glbs.returnState.value == self.states.S7.value:
+        elif glbs.ctx.returnState.value == self.states.S7.value:
             glbs.items.setCurrentItemToLowestInactiveItem()
 
         # FUTURE: change the function below to show "ITEM DETECTED" for this Item ID setup
@@ -49,23 +49,23 @@ class S8_Items(object):
             # Handle the (sub)menu input buttons for this state
             if new_input["event"] == "keydown":
                 if new_input["data"] == "right":
-                    glbs.display.display(glbs.items.folder, glbs.items.selectNextItem(glbs.returnState.value), glbs.items.location)
+                    glbs.display.display(glbs.items.folder, glbs.items.selectNextItem(glbs.ctx.returnState.value), glbs.items.location)
                     self.state = self.states.S8
                 elif new_input["data"] == "down":
-                    glbs.returnState = self.states.S8
-                    glbs.gameTimeout = self.gameTime 
+                    glbs.ctx.returnState = self.states.S8
+                    glbs.ctx.gameTimeout = self.gameTime 
                     self.state = self.states.S9
                 elif new_input["data"] == "left":
-                    glbs.display.display(glbs.items.folder, glbs.items.selectPrevItem(glbs.returnState.value), glbs.items.location)
+                    glbs.display.display(glbs.items.folder, glbs.items.selectPrevItem(glbs.ctx.returnState.value), glbs.items.location)
                     self.state = self.states.S8
                 elif new_input["data"] == "up":
-                    self.state = glbs.returnState
+                    self.state = glbs.ctx.returnState
                 else:
                     self.state = self.states.S8
         
         #return to returnState if no items can be (dis)connected
         if not glbs.items.currentItemName:
-            self.state = glbs.returnState
+            self.state = glbs.ctx.returnState
 
         #reset state machine if no input has been provided for 15 minutes
         if glbs.bedTime():

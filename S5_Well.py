@@ -30,12 +30,12 @@ class S5_Well(object):
             new_input = input_list.pop()
             if new_input["event"] == "keydown":
                 if new_input["data"] == "right":
-                    glbs.prevStateName = self.state.name
+                    glbs.ctx.prevStateName = self.state.name
                     self.state = self.states.S7
                 elif new_input["data"] == "down":
                     self.state = self.states.S6
                 elif new_input["data"] == "left":
-                    glbs.prevStateName = self.state.name
+                    glbs.ctx.prevStateName = self.state.name
                     self.state = self.states.S4
                 elif new_input["data"] == "up":
                     self.state = self.states.S5
@@ -47,10 +47,10 @@ class S5_Well(object):
             self.state = self.states.S1
 
     def _skipThisState(self):
-        name = glbs.prevStateName
-        print(glbs.prevStateName)
-        glbs.prevStateName = self.state.name
-        print(glbs.prevStateName)
+        name = glbs.ctx.prevStateName
+        print(glbs.ctx.prevStateName)
+        glbs.ctx.prevStateName = self.state.name
+        print(glbs.ctx.prevStateName)
         if name == self.states.S7.name:
             self.state = self.states.S4
         elif name == self.states.S4.name:

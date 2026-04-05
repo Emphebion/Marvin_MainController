@@ -50,8 +50,8 @@ class S7_Connect_Item():
                         self.state = self.states.S1
                     elif playerCanActivate and (glbs.items.currentItemName != newItem.name) and not(newItem.connected):
                         glbs.items.currentItemName = newItem.name
-                        glbs.gameTimeout = self.gameTime  # Set game timeout (in seconds) to the value in the config
-                        glbs.returnState = self.states.S7
+                        glbs.ctx.gameTimeout = self.gameTime  # Set game timeout (in seconds) to the value in the config
+                        glbs.ctx.returnState = self.states.S7
                         self.state = self.states.S9
                     elif not playerCanActivate:
                         glbs.table.setAllTableLEDs(glbs.table.colorsLED["orange"])
@@ -64,12 +64,12 @@ class S7_Connect_Item():
             # Handle the menu input buttons for this state
             elif new_input["event"] == "keydown":
                 if new_input["data"] == "right":
-                    glbs.prevStateName = self.state.name
+                    glbs.ctx.prevStateName = self.state.name
                     self.state = self.states.S3
                 elif new_input["data"] == "down":
                     self.state = self.states.S7
                 elif new_input["data"] == "left":
-                    glbs.prevStateName = self.state.name
+                    glbs.ctx.prevStateName = self.state.name
                     self.state = self.states.S5
                 elif new_input["data"] == "up":
                     self.state = self.states.S7
@@ -81,10 +81,10 @@ class S7_Connect_Item():
             self.state = self.states.S1
 
     def _skipThisState(self):
-        name = glbs.prevStateName
-        print(glbs.prevStateName)
-        glbs.prevStateName = self.state.name
-        print(glbs.prevStateName)
+        name = glbs.ctx.prevStateName
+        print(glbs.ctx.prevStateName)
+        glbs.ctx.prevStateName = self.state.name
+        print(glbs.ctx.prevStateName)
         if name == self.states.S5.name:
             self.state = self.states.S3
         elif name == self.states.S3.name:

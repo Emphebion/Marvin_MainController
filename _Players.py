@@ -23,23 +23,25 @@ import threading
 import configparser as _cp
 
 
+
 class _Players(object):
     """Player registry: maps RFID IDs to _Player objects and tracks the active player."""
 
-    def __init__(self, config_file, parser):
+    def __init__(self, config_file):
         self.playerDict = {}
         self._player_sections = {}   # section_name → _Player (for GM assign)
         self.config_file = config_file
         self.activePlayer = None
         self._mtime = 0
-        self.parse_config(config_file, parser)
+        self.parse_config(config_file)
         try:
             self._mtime = os.path.getmtime(config_file)
         except OSError:
             pass
         self._start_watcher()
 
-    def parse_config(self, config_file, parser):
+    def parse_config(self, config_file):
+        parser = _cp.ConfigParser()
         parser.read(config_file)
         playerList = parser.get('common', 'players').split(',')
         for section in playerList:

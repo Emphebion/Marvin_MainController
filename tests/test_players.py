@@ -10,7 +10,7 @@ from _Players import _Players, _Player
 
 def make_players(player_config_file):
     parser = configparser.ConfigParser()
-    return _Players(player_config_file, parser)
+    return _Players(player_config_file)
 
 
 # ---------------------------------------------------------------------------

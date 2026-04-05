@@ -31,7 +31,7 @@ class S11_AwaitInput():
             self.state = self.states.S11
         else:
             # Check if the snake is done
-            if(not self.routeDone) & (not glbs.currentGameRoute):
+            if(not self.routeDone) & (not glbs.ctx.currentGameRoute):
                 self.state = self.states.S10
             # Check if the game is finished
             else:
@@ -62,22 +62,22 @@ class S11_AwaitInput():
                         for index, bit in enumerate(bits):
                             if bit:
                                 result.append(glbs.table.buttonList[index].name)
-                        glbs.currentRoundInputs += result
+                        glbs.ctx.currentRoundInputs += result
                 elif input_list:
-                    glbs.currentRoundInputs.append(input_list.pop())
+                    glbs.ctx.currentRoundInputs.append(input_list.pop())
             elif new_input["event"] == "keydown":
                 # Simulation: outer button clicks arrive as keydown events
                 if new_input["data"] in glbs.table.gameButtons:
-                    glbs.currentRoundInputs.append(new_input["data"])
+                    glbs.ctx.currentRoundInputs.append(new_input["data"])
 
     #Future: Move to better location and generalise over functions
     #Future: Re-factoring needed
     def _setLEDOutput(self):
-        if glbs.currentGameRoute:
-            glbs.snakeCounter = glbs.snakeCounter + 1
-            if self.setLEDinSnake(glbs.currentGameRoute[-1], glbs.table.colorsLED["black"], glbs.table.colorsLED["turquoise"]):
-                self.routeDone.append(glbs.currentGameRoute.pop())
-        if (glbs.snakeCounter > self.snakeLength) & (len(self.routeDone) > 0):
+        if glbs.ctx.currentGameRoute:
+            glbs.ctx.snakeCounter = glbs.ctx.snakeCounter + 1
+            if self.setLEDinSnake(glbs.ctx.currentGameRoute[-1], glbs.table.colorsLED["black"], glbs.table.colorsLED["turquoise"]):
+                self.routeDone.append(glbs.ctx.currentGameRoute.pop())
+        if (glbs.ctx.snakeCounter > self.snakeLength) & (len(self.routeDone) > 0):
             if (self.setLEDinSnake(self.routeDone[0], glbs.table.colorsLED["turquoise"], glbs.table.colorsLED["black"])):
                 oldSegment = self.routeDone.pop(0)
                 oldSegment.flow.pop()

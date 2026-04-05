@@ -10,7 +10,7 @@ from _Table import _Table, _Segment, _Button
 
 def make_table(table_config_file):
     parser = configparser.ConfigParser()
-    return _Table(table_config_file, parser)
+    return _Table(table_config_file)
 
 
 # ---------------------------------------------------------------------------

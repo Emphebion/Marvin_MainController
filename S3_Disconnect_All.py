@@ -33,7 +33,7 @@ class S3_Disconnect_All(object):
             new_input = input_list.pop()
             if new_input["event"] == "keydown":
                 if new_input["data"] == "right":
-                    glbs.prevStateName = self.state.name
+                    glbs.ctx.prevStateName = self.state.name
                     self.state = self.states.S4
                 elif new_input["data"] == "down":  # Dummy
                     if glbs.players.activePlayer.isGM:
@@ -41,11 +41,11 @@ class S3_Disconnect_All(object):
                         # improve return state (to S2?) Maybe this is the best return state for all except sleep
                         self.state = self.states.S3
                     else:
-                        glbs.gameTimeout = self.gameTime  #Set game timeout (in seconds) to the value in the config
-                        glbs.returnState = self.states.S3
+                        glbs.ctx.gameTimeout = self.gameTime  #Set game timeout (in seconds) to the value in the config
+                        glbs.ctx.returnState = self.states.S3
                     self.state = self.states.S9
                 elif new_input["data"] == "left":
-                    glbs.prevStateName = self.state.name
+                    glbs.ctx.prevStateName = self.state.name
                     self.state = self.states.S7
                 elif new_input["data"] == "up":
                     self.state = self.states.S3
@@ -57,10 +57,10 @@ class S3_Disconnect_All(object):
             self.state = self.states.S1
 
     def _skipThisState(self):
-        name = glbs.prevStateName
-        print(glbs.prevStateName)
-        glbs.prevStateName = self.state.name
-        print(glbs.prevStateName)
+        name = glbs.ctx.prevStateName
+        print(glbs.ctx.prevStateName)
+        glbs.ctx.prevStateName = self.state.name
+        print(glbs.ctx.prevStateName)
         if name == self.states.S7.name:
             self.state = self.states.S4
         elif name == self.states.S4.name:

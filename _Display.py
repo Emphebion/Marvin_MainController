@@ -70,12 +70,14 @@ class _Display(object):
     # ------------------------------------------------------------------ #
     # Initialisation                                                       #
     # ------------------------------------------------------------------ #
-    def __init__(self, config_file, parser):
+    def __init__(self, config_file):
         """Set up display in hardware or simulation mode.
 
         glbs.devices, glbs.table, glbs.players, and glbs.items must all
         exist before this is called (they are created first in glbs.py).
         """
+        import configparser as _cp
+        parser = _cp.ConfigParser()
         parser.read(config_file)
         self._sim = glbs.devices.get_device("RFID_LED") is None
 
@@ -436,7 +438,7 @@ class _Display(object):
         by += 14
 
         # Current round inputs accumulated so far
-        inputs = glbs.currentRoundInputs
+        inputs = glbs.ctx.currentRoundInputs
         if inputs:
             inp_str = ("Inputs : " + ",".join(str(x) for x in inputs))[-26:]
             self.screen.blit(
@@ -449,7 +451,7 @@ class _Display(object):
         by += 14
 
         # Snake route remaining
-        route_len = len(glbs.currentGameRoute)
+        route_len = len(glbs.ctx.currentGameRoute)
         route_txt = f"Route  : {route_len} seg remaining"
         self.screen.blit(
             self._font_sm.render(route_txt, True, (120, 160, 220)),

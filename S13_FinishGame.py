@@ -15,15 +15,15 @@ class S13_FinishGame():
         print("current state is {}".format(self.state))
 
         #Handle the consequences of the game
-        if glbs.gameSuccess:
+        if glbs.ctx.gameSuccess:
             print("Game finished successfully")
             glbs.table.setAllTableLEDs(glbs.table.colorsLED["emerald"])
             glbs.devices.transmitLED(glbs.table.getLEDData())
-            if glbs.returnState.value is self.states.S8.value or glbs.returnState.value is self.states.S7.value:
+            if glbs.ctx.returnState.value is self.states.S8.value or glbs.ctx.returnState.value is self.states.S7.value:
                 glbs.items.connectItem()
-            elif glbs.returnState.value is self.states.S4.value:
+            elif glbs.ctx.returnState.value is self.states.S4.value:
                 glbs.items.disconnectItem()
-            elif glbs.returnState.value is self.states.S3.value:
+            elif glbs.ctx.returnState.value is self.states.S3.value:
                 glbs.items.disconnectAll()
         else:
             print("Game failed")
@@ -35,12 +35,7 @@ class S13_FinishGame():
         while (stopTime - glbs.time.time() > 0):
             delay = 1
 
-        glbs.gameSuccess = False # Reset game success to False for next game
-        glbs.gameFailures = -1  # Reset game failures to -1 to compensate for the first failure at snake 0
-        glbs.gameStartTime = 0  # Reset game start time
-        glbs.gameTimeout = 0  # Reset game timeout
-        glbs.returnState = None # Reset return state
-        glbs.prevStateName = None # Reset previous state name
+        glbs.ctx.reset()  # Reset all round variables for the next game
 
         #reset table to off
         glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])

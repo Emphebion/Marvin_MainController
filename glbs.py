@@ -14,10 +14,10 @@ Subsystem objects (read-only after init):
     players   -- player registry and active-player tracker
     game      -- active game mode instance (LineGame by default; swap for RuneGame)
 
-Round variables (mutated by state modules):
-    gameStartTime, gameTimeout, currentInput, currentGameRoute,
-    currentRoundInputs, gameSuccess, gameFailures, snakeCounter,
-    returnState, prevStateName
+Round variables (grouped in ctx — mutated by state modules):
+    ctx.gameStartTime, ctx.gameTimeout, ctx.currentInput, ctx.currentGameRoute,
+    ctx.currentRoundInputs, ctx.gameSuccess, ctx.gameFailures, ctx.snakeCounter,
+    ctx.returnState, ctx.prevStateName
 
 Sleep variables:
     systemTimeout   -- seconds of idle before auto-reset (from config)
@@ -32,45 +32,40 @@ from _Devices import _Devices
 from _Table import _Table
 from _Players import _Players
 from _LineGame import LineGame
+from _GameContext import GameContext
 import configparser
 import time
 import random
 
-# TODO: refactor parser per constructor to prevent override of settings
 config_file = 'marvinconfig.txt'
 item_file = 'itemconfig.txt'
 table_file = 'tableconfig.txt'
 player_file = 'playerconfig.txt'
+
 pygame.init()
+
+# parser is kept for state modules that read their config sections
+# (State1…State13, StateT1…StateT4) from marvinconfig.txt.
+# Subsystem constructors each create their own parser so this one stays clean.
 parser = configparser.ConfigParser()
 parser.read(config_file)
+
 handler  = _InputHandler()
 items    = _Items(item_file)
-devices  = _Devices(config_file, parser)   # must be before _Display (sim-mode detection)
-table    = _Table(table_file, parser)       # must be before _Display (LED positions)
-players  = _Players(player_file, parser)
-display  = _Display(config_file, parser)   # last: can see all objects
-game     = LineGame(table)                 # active game mode instance
+devices  = _Devices(config_file)               # must be before _Display (sim-mode detection)
+table    = _Table(table_file)                  # must be before _Display (LED positions)
+players  = _Players(player_file)
+display  = _Display(config_file)               # last: can see all objects
+game     = LineGame(table)                     # active game mode instance
 
-#Round variables
-gameStartTime = 0
-gameTimeout = 0
-currentInput = ""
-currentGameRoute = []
-currentRoundInputs = []
-gameSuccess = False
-gameFailures = -1   # Start at -1 to compensate first failure at snake 0
-snakeCounter = 0
-returnState = None
-prevStateName = None
-#TODO: Make skill-state dictionary dynamic
-skillStateDict = {"S1": "welcome","S3": "disconnectall","S4": "disconnect1item", "S5": "wellsize", "S7": "connect"}
+# Round state — all mutable per-round variables live here
+ctx = GameContext()
 
-# Sleep variables
-parser.read(config_file)
-systemTimeout = parser.getint('common', 'systemTimeout')
+# Sleep variables (system-level, not round-level)
+systemTimeout  = parser.getint('common', 'systemTimeout')
 systemWakeTime = time.time()
-handlerTime = time.time()
+handlerTime    = time.time()
+
 
 def bedTime():
     """Return True if the system has been idle longer than systemTimeout.
@@ -79,10 +74,7 @@ def bedTime():
     RFID scan starts a fresh session.
     """
     sleep = False
-    timmy = systemTimeout - (time.time() - systemWakeTime)
-    #print("Current time before bed = " + str(timmy))
     if (time.time() - systemWakeTime) > systemTimeout:
         players.resetActivePlayer()
         sleep = True
     return sleep
-

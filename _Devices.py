@@ -41,13 +41,14 @@ class _Devices(object):
     A background thread continuously retries offline devices every 5 seconds.
     """
 
-    def __init__(self, config_file, parser):
+    def __init__(self, config_file):
         self.connectedDevices = []
         self._all_device_specs = []   # all configured specs, including offline ones
-        self.parse_config(config_file, parser)
+        self.parse_config(config_file)
         self._start_reconnect_watcher()
 
-    def parse_config(self, config_file, parser):
+    def parse_config(self, config_file):
+        parser = __import__('configparser').ConfigParser()
         parser.read(config_file)
         devicenames = parser.get('common', 'devices').split(',')
         for devicename in devicenames:

@@ -24,5 +24,5 @@ class S9_StartGame(object):
 
     def _setState(self):
         glbs.systemWakeTime = glbs.time.time()
-        glbs.gameStartTime = glbs.time.time()
+        glbs.ctx.gameStartTime = glbs.time.time()
         self.state = self.states.S10

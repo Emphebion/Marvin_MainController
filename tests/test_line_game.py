@@ -11,7 +11,7 @@ from _LineGame import LineGame, BaseGame
 
 def make_table(table_config_file):
     parser = configparser.ConfigParser()
-    return _Table(table_config_file, parser)
+    return _Table(table_config_file)
 
 
 # ---------------------------------------------------------------------------
@@ -47,25 +47,25 @@ class TestRouteBuild:
         # Provide a minimal glbs stub so LineGame.start() can write to it
         import types
         glbs_stub = types.SimpleNamespace(
-            currentGameRoute=[],
-            snakeCounter=0,
+            ctx=types.SimpleNamespace(currentGameRoute=[], snakeCounter=0),
         )
         monkeypatch.setitem(
             __import__('sys').modules, 'glbs', glbs_stub)
 
         game.start('east')
-        assert len(glbs_stub.currentGameRoute) > 0
+        assert len(glbs_stub.ctx.currentGameRoute) > 0
 
     def test_start_sets_snake_counter_zero(self, table_config_file, monkeypatch):
         table = make_table(table_config_file)
         game = LineGame(table)
 
         import types, sys
-        glbs_stub = types.SimpleNamespace(currentGameRoute=[], snakeCounter=99)
+        glbs_stub = types.SimpleNamespace(
+            ctx=types.SimpleNamespace(currentGameRoute=[], snakeCounter=99))
         monkeypatch.setitem(sys.modules, 'glbs', glbs_stub)
 
         game.start('east')
-        assert glbs_stub.snakeCounter == 0
+        assert glbs_stub.ctx.snakeCounter == 0
 
     def test_route_segments_are_connected(self, table_config_file, monkeypatch):
         """Each consecutive pair in the route must be graph neighbours."""
@@ -73,11 +73,12 @@ class TestRouteBuild:
         game = LineGame(table)
 
         import types, sys
-        glbs_stub = types.SimpleNamespace(currentGameRoute=[], snakeCounter=0)
+        glbs_stub = types.SimpleNamespace(
+            ctx=types.SimpleNamespace(currentGameRoute=[], snakeCounter=0))
         monkeypatch.setitem(sys.modules, 'glbs', glbs_stub)
 
         game.start('east')
-        route = glbs_stub.currentGameRoute
+        route = glbs_stub.ctx.currentGameRoute
         for i in range(len(route) - 1):
             curr = route[i]
             nxt = route[i + 1]
@@ -94,11 +95,12 @@ class TestRouteBuild:
         game = LineGame(table)
 
         import types, sys
-        glbs_stub = types.SimpleNamespace(currentGameRoute=[], snakeCounter=0)
+        glbs_stub = types.SimpleNamespace(
+            ctx=types.SimpleNamespace(currentGameRoute=[], snakeCounter=0))
         monkeypatch.setitem(sys.modules, 'glbs', glbs_stub)
 
         game.start('east')
-        route = glbs_stub.currentGameRoute
+        route = glbs_stub.ctx.currentGameRoute
         for seg in route[:-1]:
             assert len(seg.flow) > 0, f"{seg.name} has no flow recorded"
 
@@ -113,14 +115,15 @@ class TestClear:
         game = LineGame(table)
 
         import types, sys
-        glbs_stub = types.SimpleNamespace(currentGameRoute=[], snakeCounter=0)
+        glbs_stub = types.SimpleNamespace(
+            ctx=types.SimpleNamespace(currentGameRoute=[], snakeCounter=0))
         monkeypatch.setitem(sys.modules, 'glbs', glbs_stub)
 
         game.start('east')
-        assert len(glbs_stub.currentGameRoute) > 0
+        assert len(glbs_stub.ctx.currentGameRoute) > 0
 
         game.clear()
-        assert glbs_stub.currentGameRoute == []
+        assert glbs_stub.ctx.currentGameRoute == []
         assert game.route == []
 
     def test_is_complete_after_clear(self, table_config_file, monkeypatch):
@@ -128,7 +131,8 @@ class TestClear:
         game = LineGame(table)
 
         import types, sys
-        glbs_stub = types.SimpleNamespace(currentGameRoute=[], snakeCounter=0)
+        glbs_stub = types.SimpleNamespace(
+            ctx=types.SimpleNamespace(currentGameRoute=[], snakeCounter=0))
         monkeypatch.setitem(sys.modules, 'glbs', glbs_stub)
 
         game.start('east')
