@@ -14,9 +14,16 @@ Two parallel dicts are maintained:
     itemsIDs -- int ID → Item (for RFID lookup by tag ID)
 """
 import configparser
+import os
+import threading
 
 class _Items(object):
-    """Item inventory: menu navigation, connection state, and overload protection."""
+    """Item inventory: menu navigation, connection state, and overload protection.
+
+    Hot-reload: a background thread watches itemconfig.txt for changes.
+    When the file is modified (e.g. via SSH or USB copy), reload() is called
+    automatically. Connected state is preserved across reloads.
+    """
     def __init__(self, config_file):
         #FUTURE: rework Item to make an ID dict similar to player
         self.items = {}
@@ -25,6 +32,7 @@ class _Items(object):
         self.currentItem = None
         self.parser = configparser.ConfigParser()
         self.config_file = config_file
+        self._mtime = 0
         self.parser.read(config_file)
         self.parser.sections()
         self.source = self.parser.getint('items','source')
@@ -46,6 +54,103 @@ class _Items(object):
             # Improve statement below when we switch to full item ID opperation
             self.items[name] = Item(name,function,ID,level,activationSkill,load,connected)
             self.itemsIDs[ID] = Item(name,function,ID,level,activationSkill,load,connected)
+        try:
+            self._mtime = os.path.getmtime(config_file)
+        except OSError:
+            pass
+        self._start_watcher()
+
+    # ------------------------------------------------------------------ #
+    # Hot-reload                                                           #
+    # ------------------------------------------------------------------ #
+    def reload(self):
+        """Re-read itemconfig.txt and update in-memory state.
+
+        Connected state is preserved for items that still exist in the config.
+        Called by the file-watcher thread and immediately after write_tag().
+        """
+        connected_state = {name: item.connected for name, item in self.items.items()}
+
+        parser = configparser.ConfigParser()
+        parser.read(self.config_file)
+
+        try:
+            itemnames = [x.strip() for x in parser.get('items', 'names').split(',')]
+        except Exception:
+            return
+
+        new_items = {}
+        new_itemsIDs = {}
+        for name in itemnames:
+            try:
+                function = parser.get(name, 'function')
+                ID = parser.getint(name, 'ID')
+                level = parser.getint(name, 'level')
+                activationSkill = f"connect{level}"
+                load = parser.getint(name, 'load')
+                # Preserve in-memory connected state; fall back to config value
+                connected = connected_state.get(
+                    name, parser.getint(name, 'connected') > 0)
+                item = Item(name, function, ID, level, activationSkill, load, connected)
+                new_items[name] = item
+                new_itemsIDs[ID] = item
+            except Exception as e:
+                print(f"_Items reload: skipping {name}: {e}")
+
+        # Atomic assignment under CPython GIL
+        self.items = new_items
+        self.itemsIDs = new_itemsIDs
+        self.itemnames = itemnames
+        print("_Items: config reloaded from disk")
+
+    def write_tag(self, item_name, new_id):
+        """Write a new RFID tag ID for the given item to disk.
+
+        Updates in-memory state immediately and advances the mtime sentinel
+        so the watcher does not trigger a redundant reload.
+
+        Args:
+            item_name -- config section / item name key (e.g. 'item3')
+            new_id    -- new integer tag ID
+        """
+        self.parser.read(self.config_file)
+        old_id = None
+        if item_name in self.items:
+            old_id = self.items[item_name].ID
+        self.parser.set(item_name, 'id', str(new_id))
+        with open(self.config_file, 'w') as f:
+            self.parser.write(f)
+
+        try:
+            self._mtime = os.path.getmtime(self.config_file)
+        except OSError:
+            pass
+
+        # Update in-memory immediately
+        if old_id is not None and old_id in self.itemsIDs:
+            item = self.itemsIDs.pop(old_id)
+            item.ID = new_id
+            self.itemsIDs[new_id] = item
+        if item_name in self.items:
+            self.items[item_name].ID = new_id
+
+    def _start_watcher(self):
+        """Start the background file-change watcher thread (daemon)."""
+        t = threading.Thread(target=self._watch_loop, daemon=True)
+        t.start()
+
+    def _watch_loop(self):
+        """Poll itemconfig.txt every 3 s; reload on change."""
+        import time
+        while True:
+            time.sleep(3)
+            try:
+                mtime = os.path.getmtime(self.config_file)
+                if mtime != self._mtime:
+                    self._mtime = mtime
+                    self.reload()
+            except Exception as e:
+                print(f"_Items watcher error: {e}")
         
 # Menu functions
     def selectNextItem(self, stateNr):

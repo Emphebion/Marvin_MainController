@@ -76,6 +76,10 @@ class _Devices(object):
     def transmitLED(self, ledData):
         """Send a full LED frame to the RFID_LED device.
 
+        In hardware mode, serialises and writes the frame via the Device.
+        In simulation mode (no device), refreshes the on-screen LED ring renderer
+        so the display updates at the same cadence as the hardware would.
+
         Args:
             ledData -- list of [R, G, B] triples, one per LED, in segment order
                        (segm0 index 0 → segm63 last index)
@@ -84,7 +88,10 @@ class _Devices(object):
         if dev:
             dev.send(ledData)
         else:
-            print("Failed to transmit led data, device RFID_LED does not exist")
+            # Simulation: drive the pygame LED ring renderer instead of serial
+            import glbs as _glbs
+            if hasattr(_glbs, 'display') and _glbs.display is not None:
+                _glbs.display.update_leds()
         
     def get_device(self, name):
         for device in self.connectedDevices:

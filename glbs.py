@@ -42,12 +42,12 @@ player_file = 'playerconfig.txt'
 pygame.init()
 parser = configparser.ConfigParser()
 parser.read(config_file)
-handler = _InputHandler()
-display = _Display(config_file,parser)
-items = _Items(item_file)
-devices = _Devices(config_file,parser)
-table = _Table(table_file,parser)
-players = _Players(player_file,parser) # Add re-read option if obj is empty in state1
+handler  = _InputHandler()
+items    = _Items(item_file)
+devices  = _Devices(config_file, parser)   # must be before _Display (sim-mode detection)
+table    = _Table(table_file, parser)       # must be before _Display (LED positions)
+players  = _Players(player_file, parser)
+display  = _Display(config_file, parser)   # last: can see all objects
 
 #Round variables
 gameStartTime = 0

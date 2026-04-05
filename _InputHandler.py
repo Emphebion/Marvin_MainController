@@ -28,7 +28,8 @@ class _InputHandler(object):
         self.init = 1
         self.SERIAL = glbs.pygame.USEREVENT + 1
         self.elist = []
-        self.allowed_events = [glbs.pygame.KEYDOWN, glbs.pygame.USEREVENT, self.SERIAL]
+        self.allowed_events = [glbs.pygame.KEYDOWN, glbs.pygame.MOUSEBUTTONDOWN,
+                               glbs.pygame.USEREVENT, self.SERIAL]
         glbs.pygame.event.set_allowed(self.allowed_events)
 
     def event_handler(self):
@@ -106,7 +107,7 @@ class _InputHandler(object):
     # Function handeling keyboard data (backup)         #
     #***************************************************#
     def keyboard_event_handler(self):
-        """Handle keyboard input as a fallback when no hardware is connected.
+        """Handle keyboard and mouse input when no hardware is connected.
 
         Key mapping:
             Arrow keys      → up / down / left / right
@@ -119,48 +120,54 @@ class _InputHandler(object):
             B               → south
             N               → southeast
             ESC             → quit
+
+        Mouse clicks are forwarded to the display's RFID panel so that
+        clicking a player or item button in the simulation injects an rfid event.
         """
-        event = glbs.pygame.event.peek()
-        if event.type == glbs.pygame.KEYDOWN:
+        for event in glbs.pygame.event.get():
             glbs.systemWakeTime = glbs.time.time()
-            if event.key == glbs.pygame.K_LEFT:
-                self.elist.append({"event": "keydown", "data": "left"})
 
-            elif event.key == glbs.pygame.K_RIGHT:
-                self.elist.append({"event": "keydown", "data": "right"})
+            if event.type == glbs.pygame.KEYDOWN:
+                if event.key == glbs.pygame.K_LEFT:
+                    self.elist.append({"event": "keydown", "data": "left"})
 
-            elif event.key == glbs.pygame.K_DOWN:
-                self.elist.append({"event": "keydown", "data": "down"})
+                elif event.key == glbs.pygame.K_RIGHT:
+                    self.elist.append({"event": "keydown", "data": "right"})
 
-            elif event.key == glbs.pygame.K_UP:
-                self.elist.append({"event": "keydown", "data": "up"})
+                elif event.key == glbs.pygame.K_DOWN:
+                    self.elist.append({"event": "keydown", "data": "down"})
 
-            elif event.key == glbs.pygame.K_ESCAPE:
-                glbs.pygame.quit()
+                elif event.key == glbs.pygame.K_UP:
+                    self.elist.append({"event": "keydown", "data": "up"})
 
-            elif event.key == glbs.pygame.K_l:
-                pass  # placeholder for future LED ring visualisation (Phase 2)
+                elif event.key == glbs.pygame.K_ESCAPE:
+                    glbs.pygame.quit()
 
-            elif event.key == glbs.pygame.K_h:
-                self.elist.append({"event": "keydown", "data": "east"})
+                elif event.key == glbs.pygame.K_h:
+                    self.elist.append({"event": "keydown", "data": "east"})
 
-            elif event.key == glbs.pygame.K_y:
-                self.elist.append({"event": "keydown", "data": "northeast"})
-                
-            elif event.key == glbs.pygame.K_t:
-                self.elist.append({"event": "keydown", "data": "north"})
-                
-            elif event.key == glbs.pygame.K_r:
-                self.elist.append({"event": "keydown", "data": "northwest"})
+                elif event.key == glbs.pygame.K_y:
+                    self.elist.append({"event": "keydown", "data": "northeast"})
 
-            elif event.key == glbs.pygame.K_f:
-                self.elist.append({"event": "keydown", "data": "west"})
+                elif event.key == glbs.pygame.K_t:
+                    self.elist.append({"event": "keydown", "data": "north"})
 
-            elif event.key == glbs.pygame.K_v:
-                self.elist.append({"event": "keydown", "data": "southwest"})
+                elif event.key == glbs.pygame.K_r:
+                    self.elist.append({"event": "keydown", "data": "northwest"})
 
-            elif event.key == glbs.pygame.K_b:
-                self.elist.append({"event": "keydown", "data": "south"})
+                elif event.key == glbs.pygame.K_f:
+                    self.elist.append({"event": "keydown", "data": "west"})
 
-            elif event.key == glbs.pygame.K_n:
-                self.elist.append({"event": "keydown", "data": "southeast"})
+                elif event.key == glbs.pygame.K_v:
+                    self.elist.append({"event": "keydown", "data": "southwest"})
+
+                elif event.key == glbs.pygame.K_b:
+                    self.elist.append({"event": "keydown", "data": "south"})
+
+                elif event.key == glbs.pygame.K_n:
+                    self.elist.append({"event": "keydown", "data": "southeast"})
+
+            elif event.type == glbs.pygame.MOUSEBUTTONDOWN:
+                sim_event = glbs.display.handle_click(event.pos)
+                if sim_event:
+                    self.elist.append(sim_event)

@@ -65,6 +65,10 @@ class S11_AwaitInput():
                         glbs.currentRoundInputs += result
                 elif input_list:
                     glbs.currentRoundInputs.append(input_list.pop())
+            elif new_input["event"] == "keydown":
+                # Simulation: outer button clicks arrive as keydown events
+                if new_input["data"] in glbs.table.gameButtons:
+                    glbs.currentRoundInputs.append(new_input["data"])
 
     #Future: Move to better location and generalise over functions
     #Future: Re-factoring needed

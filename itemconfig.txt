@@ -10,7 +10,7 @@ function = Onbekend in de pilaar
 id = 14531606
 level = 2
 load = 30
-connected = 0
+connected = 1
 
 [item2]
 name = Mini Verzamel Golem
@@ -107,3 +107,4 @@ id = 14466855
 level = 0
 load = 0
 connected = 0
+

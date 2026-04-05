@@ -89,7 +89,84 @@ class S1_Reset():
                     glbs.players.setActivePlayer(ID)
             elif new_input["event"] == "keydown":
                 if new_input["data"] == "down":
-                    glbs.players.setActivePlayer(10)  # GM override key
+                    self._run_gm_assign()  # GM mode: assign RFID tags
+
+    # ------------------------------------------------------------------ #
+    # GM tag assignment                                                    #
+    # ------------------------------------------------------------------ #
+    def _run_gm_assign(self):
+        """Sub-loop for GM RFID tag reassignment.
+
+        Navigation (screen buttons only, no mouse/keyboard):
+            LEFT / RIGHT  -- move highlight through players then items
+            Present tag   -- write new ID to config + reload immediately
+            UP            -- exit and return to S1 idle
+
+        Session feedback: entries updated this session show a checkmark
+        and the new ID. Discarded when the sub-loop exits.
+        """
+        entries = self._build_gm_entries()
+        if not entries:
+            return
+
+        sel_idx = 0
+        updated = {}   # entry index → new_id assigned this session
+
+        glbs.display.draw_gm_assign(entries, sel_idx, updated)
+
+        while True:
+            input_list = glbs.handler.event_handler()
+            if input_list:
+                ev = input_list.pop()
+                if ev["event"] == "keydown":
+                    if ev["data"] == "up":
+                        break
+                    elif ev["data"] == "left":
+                        sel_idx = (sel_idx - 1) % len(entries)
+                    elif ev["data"] == "right":
+                        sel_idx = (sel_idx + 1) % len(entries)
+                elif ev["event"] == "rfid":
+                    new_id = ev["data"]
+                    entry = entries[sel_idx]
+                    if entry["type"] == "player":
+                        glbs.players.write_tag(entry["section"], new_id)
+                    else:
+                        glbs.items.write_tag(entry["section"], new_id)
+                    updated[sel_idx] = new_id
+                    entry["current_id"] = new_id
+                    print(f"GM assign: {entry['label']} → {new_id}")
+                glbs.display.draw_gm_assign(entries, sel_idx, updated)
+
+        # Restore idle display
+        glbs.display.screenOff()
+
+    def _build_gm_entries(self):
+        """Return a flat ordered list of assignable player and item entries.
+
+        Each entry is a dict with keys:
+            type       -- 'player' or 'item'
+            label      -- display name
+            section    -- config section / key for write_tag()
+            current_id -- current integer tag ID
+        """
+        entries = []
+        for section, player in glbs.players._player_sections.items():
+            if player.ID in (0, 10):
+                continue
+            entries.append({
+                'type': 'player',
+                'label': player.name,
+                'section': section,
+                'current_id': player.ID,
+            })
+        for item_name, item in glbs.items.items.items():
+            entries.append({
+                'type': 'item',
+                'label': item.name,
+                'section': item_name,
+                'current_id': item.ID,
+            })
+        return entries
 
     # ------------------------------------------------------------------ #
     # Animation setup                                                      #
