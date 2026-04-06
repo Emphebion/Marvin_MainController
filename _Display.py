@@ -86,6 +86,10 @@ class _Display(object):
         self._font_md = glbs.pygame.font.SysFont("monospace", 13)
         self._font_lg = glbs.pygame.font.SysFont("monospace", 18, bold=True)
 
+        # Image cache shared by both modes: (folder, fileName) → Surface.
+        # Avoids disk I/O and smoothscale on every state transition.
+        self._image_cache = {}
+
         if self._sim:
             self.size = [self._SIM_W, self._SIM_H]
             self.screen = glbs.pygame.display.set_mode(self.size)
@@ -94,8 +98,10 @@ class _Display(object):
             self._led_pos = {}      # (seg_name, led_idx) → (x, y)
             self._rfid_btns = []    # list of (pygame.Rect, event_dict)
             self._btn_hits = []     # list of ((cx, cy), radius, event_dict)
+            self._btn_render = []   # pre-rendered: (name, bx, by, lbl_normal, lbl_hi)
             self._menu_surface = None   # scaled menu image, or None
             self._last_input = None     # last button/rfid event for feedback
+            self._rfid_panel_state = None   # snapshot for dirty detection
             self._build_led_positions()
             self._build_button_hit_targets()
             self._draw_static_sim_chrome()
@@ -122,22 +128,27 @@ class _Display(object):
         """
         if not self._sim:
             if fileName:
-                image = glbs.pygame.image.load(folder + "/" + fileName + ".jpg").convert()
-                self.screen.blit(image, location)
+                key = (folder, fileName)
+                if key not in self._image_cache:
+                    self._image_cache[key] = glbs.pygame.image.load(
+                        folder + "/" + fileName + ".jpg").convert()
+                self.screen.blit(self._image_cache[key], location)
             glbs.pygame.display.flip()
         else:
             if fileName:
-                try:
-                    image = glbs.pygame.image.load(
-                        folder + "/" + fileName + ".jpg").convert()
-                    # Scale to fit within the menu overlay area, preserving aspect
-                    iw, ih = image.get_size()
-                    scale = min(self._MENU_W / iw, self._MENU_H / ih)
-                    new_size = (int(iw * scale), int(ih * scale))
-                    self._menu_surface = glbs.pygame.transform.smoothscale(
-                        image, new_size)
-                except Exception:
-                    self._menu_surface = None
+                key = (folder, fileName)
+                if key not in self._image_cache:
+                    try:
+                        image = glbs.pygame.image.load(
+                            folder + "/" + fileName + ".jpg").convert()
+                        iw, ih = image.get_size()
+                        scale = min(self._MENU_W / iw, self._MENU_H / ih)
+                        new_size = (int(iw * scale), int(ih * scale))
+                        self._image_cache[key] = glbs.pygame.transform.smoothscale(
+                            image, new_size)
+                    except Exception:
+                        self._image_cache[key] = None
+                self._menu_surface = self._image_cache[key]
             else:
                 self._menu_surface = None
             self.update_leds()
@@ -234,20 +245,16 @@ class _Display(object):
                         self._LED_R
                     )
 
-        # Outer game button hit circles + labels
-        for name, angle_deg in _BUTTON_ANGLES.items():
-            rad = math.radians(angle_deg)
-            bx = int(self._RING_CX + self._R_BTN * math.cos(rad))
-            by = int(self._RING_CY - self._R_BTN * math.sin(rad))
+        # Outer game button hit circles + labels (labels pre-rendered at init)
+        for name, bx, by, lbl_normal, lbl_hi in self._btn_render:
             if name == self._last_input:
-                # Highlight the most recently pressed button
                 glbs.pygame.draw.circle(self.screen, (200, 200, 60), (bx, by),
                                         self._R_BTN_HIT)
-                label = self._font_sm.render(name[:2].upper(), True, (20, 20, 20))
+                label = lbl_hi
             else:
                 glbs.pygame.draw.circle(self.screen, (60, 60, 30), (bx, by),
                                         self._R_BTN_HIT, 1)
-                label = self._font_sm.render(name[:2].upper(), True, (180, 180, 100))
+                label = lbl_normal
             self.screen.blit(label, (bx - label.get_width() // 2,
                                      by - label.get_height() // 2))
 
@@ -314,12 +321,17 @@ class _Display(object):
         """
         cx, cy = self._RING_CX, self._RING_CY
         self._btn_hits = []
+        self._btn_render = []
         for name, angle_deg in _BUTTON_ANGLES.items():
             rad = math.radians(angle_deg)
             bx = int(cx + self._R_BTN * math.cos(rad))
             by = int(cy - self._R_BTN * math.sin(rad))
             event = {"event": "keydown", "data": name}
             self._btn_hits.append(((bx, by), self._R_BTN_HIT, event))
+            # Pre-render both label variants (normal and highlighted)
+            lbl_normal = self._font_sm.render(name[:2].upper(), True, (180, 180, 100))
+            lbl_hi     = self._font_sm.render(name[:2].upper(), True, (20, 20, 20))
+            self._btn_render.append((name, bx, by, lbl_normal, lbl_hi))
 
     def _place_arc(self, seg_name, n_leds, ring_idx, radius, cx, cy):
         """Place n_leds evenly along a 22.5° arc for ring_idx.
@@ -354,12 +366,36 @@ class _Display(object):
             glbs.pygame.draw.circle(self.screen, (40, 40, 40), (cx, cy), r, 1)
         glbs.pygame.display.flip()
 
+    def _rfid_panel_snapshot(self):
+        """Return a hashable snapshot of all state shown in the RFID panel.
+
+        Used by _draw_rfid_panel() to skip re-rendering when nothing changed.
+        The right-panel area is not cleared between frames, so a skipped
+        render simply keeps the previous frame's content visible.
+        """
+        active = glbs.players.activePlayer
+        return (
+            active.ID if active else None,
+            tuple(item.connected for item in glbs.items.items.values()),
+            self._last_input,
+            tuple(glbs.ctx.currentRoundInputs),
+            len(glbs.ctx.currentGameRoute),
+        )
+
     def _draw_rfid_panel(self):
         """Draw the simulated RFID scan panel on the right side.
 
         Builds self._rfid_btns, a list of (Rect, event_dict) used by
         handle_click() to produce RFID events when clicked.
+
+        Skips re-rendering when panel content is unchanged since the last
+        call (dirty-flag check via _rfid_panel_snapshot).
         """
+        snap = self._rfid_panel_snapshot()
+        if snap == self._rfid_panel_state:
+            return  # nothing changed — keep previous render on screen
+        self._rfid_panel_state = snap
+
         px = self._PANEL_X
         pw = self._SIM_W - px
 
