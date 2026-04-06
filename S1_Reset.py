@@ -20,7 +20,6 @@ class S1_Reset():
         # Spark / idle timing (used by Broken status)
         self.idleMaxTimeout = float(glbs.parser.getint('State1', 'idletimeout'))
         self.idleStartTime = 0
-        self.sparkTimeout = float(glbs.parser.getint('State1', 'sparktimeout')) / 1000.0
         self.sparkStartTime = 0
         self.idleTimeout = glbs.random.uniform(1, self.idleMaxTimeout)
 

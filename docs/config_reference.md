@@ -41,7 +41,6 @@ One section per device listed in `[common] devices`.
 | `folder` | string | `menu` | Folder containing the menu image. |
 | `location` | int,int | `0,0` | Screen coordinates for the image. |
 | `idletimeout` | int (seconds) | `10` | Time with no input before the spark effect restarts (Broken status). |
-| `sparktimeout` | int (ms) | `80` | Delay between spark animation steps (Broken status). |
 | `energyFlowCount` | int | `3` | Number of simultaneous energy flows (Active status). |
 | `energyFlowSpeed` | int (ms) | `80` | Milliseconds between each LED step of the energy flows. Lower = faster. |
 | `energyFlowLength` | int | `30` | Gradient trail length in LEDs. Longer = more visible tail. |
@@ -103,9 +102,7 @@ One section per device listed in `[common] devices`.
 
 | Key | Type | Example | Description |
 |-----|------|---------|-------------|
-| `successPerLevel` | int,int,int | `6,12,18` | Number of successful rounds needed to win at item level 1, 2, and 3. |
-| `failuresPerLevel` | int,int,int | `4,3,2` | Maximum failures allowed before game over at each level. |
-| `roundGoalsPerLevel` | int,int,int | `1,2,3` | Number of buttons the player must identify correctly per round at each level. |
+| `failuresPerLevel` | int,int,int | `4,3,2` | Maximum failures allowed before game over at item level 1, 2, and 3. Win condition is time-based (gameTimeout); this is the only per-level threshold. |
 
 ### [State11] — S11_AwaitInput
 

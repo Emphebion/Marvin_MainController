@@ -23,7 +23,6 @@ name=reset
 folder=menu
 location=0,0
 idletimeout=10
-sparktimeout=80
 energyFlowCount=3
 energyFlowSpeed=80
 energyFlowLength=30
@@ -76,34 +75,17 @@ item_location=120,80
 gameTime=300
 
 [State9]
-name=achtergrond
-folder=menu
-location=0,0
 
 [State10]
-name=IdleGame
-folder=menu
-location=0,0
-successPerLevel=6,12,18
 failuresPerLevel=4,3,2
-roundGoalsPerLevel=1,2,3
 
 [State11]
-name=AwaitInput
-folder=menu
-location=0,0
 looptimeout=80
 snakeLength=28
 
 [State12]
-name=ChangeGame
-folder=menu
-location=0,0
 
 [State13]
-name=FinishGame
-folder=items
-location=0,0
 successTimeout=3
 
 [StateT1]

@@ -5,9 +5,6 @@ class S13_FinishGame():
     def __init__(self):
         states_enum = StatesEnum()
         self.states = states_enum.get_states_s13()
-        self.name = glbs.parser.get('State13', 'name')
-        self.folder = glbs.parser.get('State13', 'folder')
-        self.location = [int(x.strip()) for x in glbs.parser.get('State13', 'location').split(',')]
         self.successTimeout = glbs.parser.getint('State13', 'successTimeout')
 
     def run(self):

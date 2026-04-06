@@ -5,9 +5,6 @@ class S11_AwaitInput():
     def __init__(self):
         states_enum = StatesEnum()
         self.states = states_enum.get_states_s11()
-        self.name = glbs.parser.get('State11', 'name')
-        self.folder = glbs.parser.get('State11', 'folder')
-        self.location = [int(x.strip()) for x in glbs.parser.get('State11', 'location').split(',')]
         self.loopTimeout = float(glbs.parser.getint('State11', 'looptimeout'))/1000
         self.snakeLength = glbs.parser.getint('State11', 'snakeLength')
         self.loopStartTime = 0

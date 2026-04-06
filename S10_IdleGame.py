@@ -5,12 +5,7 @@ class S10_IdleGame():        #S10_GameMaster
     def __init__(self):
         states_enum = StatesEnum()
         self.states = states_enum.get_states_s10()
-        self.name = glbs.parser.get('State10', 'name')
-        self.folder = glbs.parser.get('State10', 'folder')
-        self.location = [int(x.strip()) for x in glbs.parser.get('State10', 'location').split(',')]
         self.failuresPerLevel = [int(x.strip()) for x in glbs.parser.get('State10', 'failuresPerLevel').split(',')]
-        self.successPerLevel = [int(x.strip()) for x in glbs.parser.get('State10', 'successPerLevel').split(',')]    #self.successPercentage = round(parser.getint(current, 'successPercentage'),0)
-        self.nrRoundGoalsPerLevel = [int(x.strip()) for x in glbs.parser.get('State10', 'roundGoalsPerLevel').split(',')]
         self.currentGoal = ''
         self.idleTime = 0
         self.state = None
