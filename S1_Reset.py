@@ -90,6 +90,8 @@ class S1_Reset():
             elif new_input["event"] == "keydown":
                 if new_input["data"] == "down":
                     self._run_gm_assign()  # GM mode: assign RFID tags
+                elif new_input["data"] == "right":
+                    self._run_rune_catalog()  # Sim: browse rune candidates
 
     # ------------------------------------------------------------------ #
     # GM tag assignment                                                    #
@@ -167,6 +169,60 @@ class S1_Reset():
                 'current_id': item.ID,
             })
         return entries
+
+    # ------------------------------------------------------------------ #
+    # Rune catalog browser (simulation only)                               #
+    # ------------------------------------------------------------------ #
+    def _run_rune_catalog(self):
+        """Sub-loop to browse all rune candidates in the desktop simulation.
+
+        Activated by pressing RIGHT in S1 idle (simulation mode only).
+        Navigation:
+            LEFT  -- previous rune
+            RIGHT -- next rune
+            UP    -- exit catalog and return to S1 idle
+
+        The catalog shows each rune lit on the ring renderer alongside a
+        panel with its name, section key, button assignment, and LED list.
+        The owning button marker is highlighted on the ring.
+        """
+        if not glbs.display._sim:
+            return
+
+        # Collect all runes from the rune game instance
+        all_runes = getattr(glbs, 'rune_game', None)
+        if all_runes is None:
+            return
+        runes = list(all_runes._all_runes)
+        if not runes:
+            return
+
+        catalog_idx = 0
+        total = len(runes)
+        # Use a neutral preview colour (cornflower blue / runeL1)
+        preview_color = glbs.table.colorsLED.get('runeL1', [100, 149, 237])
+
+        glbs.display.draw_rune_catalog(runes[catalog_idx], catalog_idx + 1,
+                                       total, preview_color)
+
+        while True:
+            input_list = glbs.handler.event_handler()
+            if input_list:
+                ev = input_list.pop()
+                if ev["event"] == "keydown":
+                    if ev["data"] == "up":
+                        break
+                    elif ev["data"] == "right":
+                        catalog_idx = (catalog_idx + 1) % total
+                    elif ev["data"] == "left":
+                        catalog_idx = (catalog_idx - 1) % total
+                    glbs.display.draw_rune_catalog(
+                        runes[catalog_idx], catalog_idx + 1, total, preview_color)
+
+        # Restore idle display
+        glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
+        glbs.devices.transmitLED(glbs.table.getLEDData())
+        glbs.display.screenOff()
 
     # ------------------------------------------------------------------ #
     # Animation setup                                                      #

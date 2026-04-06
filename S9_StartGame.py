@@ -25,4 +25,21 @@ class S9_StartGame(object):
     def _setState(self):
         glbs.systemWakeTime = glbs.time.time()
         glbs.ctx.gameStartTime = glbs.time.time()
+
+        # Select game mode based on item level
+        level = 1
+        if glbs.items.currentItemName and glbs.items.currentItemName in glbs.items.items:
+            level = glbs.items.items[glbs.items.currentItemName].level
+        try:
+            mode = glbs.parser.get('GameModes', f'level{level}')
+        except Exception:
+            mode = 'snake'
+
+        if mode == 'runes':
+            glbs.game = glbs.rune_game
+            glbs.ctx.gameFailures = 0  # rune mode doesn't use the -1 compensation
+        else:
+            glbs.game = glbs.snake_game
+
+        print(f"S9: game mode = {mode} (item level {level})")
         self.state = self.states.S10

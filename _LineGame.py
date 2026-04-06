@@ -78,6 +78,8 @@ class LineGame(BaseGame):
     lives here so it can be replaced or tested independently.
     """
 
+    mode = 'snake'
+
     # Inner-ring segment names used as valid route start/finish points
     _INNER_RING = {f"segm{i}" for i in range(16)}
 

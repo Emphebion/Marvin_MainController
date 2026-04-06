@@ -1,0 +1,297 @@
+; runeconfig.txt — 48 candidate rune definitions (6 per button)
+;
+; Shape templates used (applied to each of the 8 button positions):
+;   Conduit — 5 consecutive LEDs in the middle of the flow arc (FA:3-7)
+;   Shard   — 6 LEDs at the trailing end of the flow arc, approaching the button junction
+;   Lance   — 5 LEDs at the leading edge of the counter arc, from the button junction
+;   Span    — 8 LEDs crossing the button junction (4 from FA end + 4 from CA start)
+;   Hook    — 6 LEDs: 3 from the CW bridge outer section + 3 from the flow arc start (L-shape outward)
+;   Prong   — 7 LEDs: 4 from the CW bridge inner section + 3 from the adjacent middle ring arc (inward reach)
+;
+; For each button the adjacent segments are:
+;   FA  = flow arc (outer ring, clockwise of button)
+;   CA  = counter arc (outer ring, counter-clockwise of button)
+;   BCW = bridge clockwise of button (outer end BCW:8 is physically adjacent to FA:0)
+;   MID = middle ring arc connected to BCW inner end (BCW:0 adjacentt to MID:last)
+;
+; Button  ->  FA        /  CA        /  BCW      /  MID
+;   east      segm48(11) / segm49(11) / segm40(9) / segm24(8)
+;   northeast segm50(10) / segm51(11) / segm41(9) / segm25(8)
+;   north     segm52(11) / segm53(11) / segm42(9) / segm27(8)
+;   northwest segm54(11) / segm55(11) / segm43(9) / segm29(8)
+;   west      segm56(10) / segm57(11) / segm44(9) / segm31(8)
+;   southwest segm58(11) / segm59(11) / segm45(9) / segm33(8)
+;   south     segm60(11) / segm61(11) / segm46(9) / segm35(8)
+;   southeast segm62(11) / segm63(11) / segm47(9) / segm37(8)
+
+; ==============================================================
+; EAST  (button at 0 degrees)
+; ==============================================================
+
+[east_1]
+name = East Conduit
+button = east
+leds = segm48:3, segm48:4, segm48:5, segm48:6, segm48:7
+
+[east_2]
+name = East Shard
+button = east
+leds = segm48:5, segm48:6, segm48:7, segm48:8, segm48:9, segm48:10
+
+[east_3]
+name = East Lance
+button = east
+leds = segm49:0, segm49:1, segm49:2, segm49:3, segm49:4
+
+[east_4]
+name = East Span
+button = east
+leds = segm48:7, segm48:8, segm48:9, segm48:10, segm49:0, segm49:1, segm49:2, segm49:3
+
+[east_5]
+name = East Hook
+button = east
+leds = segm40:6, segm40:7, segm40:8, segm48:0, segm48:1, segm48:2
+
+[east_6]
+name = East Prong
+button = east
+leds = segm40:0, segm40:1, segm40:2, segm40:3, segm24:5, segm24:6, segm24:7
+
+; ==============================================================
+; NORTHEAST  (button at 45 degrees)
+; ==============================================================
+
+[northeast_1]
+name = Northeast Conduit
+button = northeast
+leds = segm50:3, segm50:4, segm50:5, segm50:6, segm50:7
+
+[northeast_2]
+name = Northeast Shard
+button = northeast
+leds = segm50:4, segm50:5, segm50:6, segm50:7, segm50:8, segm50:9
+
+[northeast_3]
+name = Northeast Lance
+button = northeast
+leds = segm51:0, segm51:1, segm51:2, segm51:3, segm51:4
+
+[northeast_4]
+name = Northeast Span
+button = northeast
+leds = segm50:6, segm50:7, segm50:8, segm50:9, segm51:0, segm51:1, segm51:2, segm51:3
+
+[northeast_5]
+name = Northeast Hook
+button = northeast
+leds = segm41:6, segm41:7, segm41:8, segm50:0, segm50:1, segm50:2
+
+[northeast_6]
+name = Northeast Prong
+button = northeast
+leds = segm41:0, segm41:1, segm41:2, segm41:3, segm25:5, segm25:6, segm25:7
+
+; ==============================================================
+; NORTH  (button at 90 degrees)
+; ==============================================================
+
+[north_1]
+name = North Conduit
+button = north
+leds = segm52:3, segm52:4, segm52:5, segm52:6, segm52:7
+
+[north_2]
+name = North Shard
+button = north
+leds = segm52:5, segm52:6, segm52:7, segm52:8, segm52:9, segm52:10
+
+[north_3]
+name = North Lance
+button = north
+leds = segm53:0, segm53:1, segm53:2, segm53:3, segm53:4
+
+[north_4]
+name = North Span
+button = north
+leds = segm52:7, segm52:8, segm52:9, segm52:10, segm53:0, segm53:1, segm53:2, segm53:3
+
+[north_5]
+name = North Hook
+button = north
+leds = segm42:6, segm42:7, segm42:8, segm52:0, segm52:1, segm52:2
+
+[north_6]
+name = North Prong
+button = north
+leds = segm42:0, segm42:1, segm42:2, segm42:3, segm27:5, segm27:6, segm27:7
+
+; ==============================================================
+; NORTHWEST  (button at 135 degrees)
+; ==============================================================
+
+[northwest_1]
+name = Northwest Conduit
+button = northwest
+leds = segm54:3, segm54:4, segm54:5, segm54:6, segm54:7
+
+[northwest_2]
+name = Northwest Shard
+button = northwest
+leds = segm54:5, segm54:6, segm54:7, segm54:8, segm54:9, segm54:10
+
+[northwest_3]
+name = Northwest Lance
+button = northwest
+leds = segm55:0, segm55:1, segm55:2, segm55:3, segm55:4
+
+[northwest_4]
+name = Northwest Span
+button = northwest
+leds = segm54:7, segm54:8, segm54:9, segm54:10, segm55:0, segm55:1, segm55:2, segm55:3
+
+[northwest_5]
+name = Northwest Hook
+button = northwest
+leds = segm43:6, segm43:7, segm43:8, segm54:0, segm54:1, segm54:2
+
+[northwest_6]
+name = Northwest Prong
+button = northwest
+leds = segm43:0, segm43:1, segm43:2, segm43:3, segm29:5, segm29:6, segm29:7
+
+; ==============================================================
+; WEST  (button at 180 degrees)
+; ==============================================================
+
+[west_1]
+name = West Conduit
+button = west
+leds = segm56:3, segm56:4, segm56:5, segm56:6, segm56:7
+
+[west_2]
+name = West Shard
+button = west
+leds = segm56:4, segm56:5, segm56:6, segm56:7, segm56:8, segm56:9
+
+[west_3]
+name = West Lance
+button = west
+leds = segm57:0, segm57:1, segm57:2, segm57:3, segm57:4
+
+[west_4]
+name = West Span
+button = west
+leds = segm56:6, segm56:7, segm56:8, segm56:9, segm57:0, segm57:1, segm57:2, segm57:3
+
+[west_5]
+name = West Hook
+button = west
+leds = segm44:6, segm44:7, segm44:8, segm56:0, segm56:1, segm56:2
+
+[west_6]
+name = West Prong
+button = west
+leds = segm44:0, segm44:1, segm44:2, segm44:3, segm31:5, segm31:6, segm31:7
+
+; ==============================================================
+; SOUTHWEST  (button at 225 degrees)
+; ==============================================================
+
+[southwest_1]
+name = Southwest Conduit
+button = southwest
+leds = segm58:3, segm58:4, segm58:5, segm58:6, segm58:7
+
+[southwest_2]
+name = Southwest Shard
+button = southwest
+leds = segm58:5, segm58:6, segm58:7, segm58:8, segm58:9, segm58:10
+
+[southwest_3]
+name = Southwest Lance
+button = southwest
+leds = segm59:0, segm59:1, segm59:2, segm59:3, segm59:4
+
+[southwest_4]
+name = Southwest Span
+button = southwest
+leds = segm58:7, segm58:8, segm58:9, segm58:10, segm59:0, segm59:1, segm59:2, segm59:3
+
+[southwest_5]
+name = Southwest Hook
+button = southwest
+leds = segm45:6, segm45:7, segm45:8, segm58:0, segm58:1, segm58:2
+
+[southwest_6]
+name = Southwest Prong
+button = southwest
+leds = segm45:0, segm45:1, segm45:2, segm45:3, segm33:5, segm33:6, segm33:7
+
+; ==============================================================
+; SOUTH  (button at 270 degrees)
+; ==============================================================
+
+[south_1]
+name = South Conduit
+button = south
+leds = segm60:3, segm60:4, segm60:5, segm60:6, segm60:7
+
+[south_2]
+name = South Shard
+button = south
+leds = segm60:5, segm60:6, segm60:7, segm60:8, segm60:9, segm60:10
+
+[south_3]
+name = South Lance
+button = south
+leds = segm61:0, segm61:1, segm61:2, segm61:3, segm61:4
+
+[south_4]
+name = South Span
+button = south
+leds = segm60:7, segm60:8, segm60:9, segm60:10, segm61:0, segm61:1, segm61:2, segm61:3
+
+[south_5]
+name = South Hook
+button = south
+leds = segm46:6, segm46:7, segm46:8, segm60:0, segm60:1, segm60:2
+
+[south_6]
+name = South Prong
+button = south
+leds = segm46:0, segm46:1, segm46:2, segm46:3, segm35:5, segm35:6, segm35:7
+
+; ==============================================================
+; SOUTHEAST  (button at 315 degrees)
+; ==============================================================
+
+[southeast_1]
+name = Southeast Conduit
+button = southeast
+leds = segm62:3, segm62:4, segm62:5, segm62:6, segm62:7
+
+[southeast_2]
+name = Southeast Shard
+button = southeast
+leds = segm62:5, segm62:6, segm62:7, segm62:8, segm62:9, segm62:10
+
+[southeast_3]
+name = Southeast Lance
+button = southeast
+leds = segm63:0, segm63:1, segm63:2, segm63:3, segm63:4
+
+[southeast_4]
+name = Southeast Span
+button = southeast
+leds = segm62:7, segm62:8, segm62:9, segm62:10, segm63:0, segm63:1, segm63:2, segm63:3
+
+[southeast_5]
+name = Southeast Hook
+button = southeast
+leds = segm47:6, segm47:7, segm47:8, segm62:0, segm62:1, segm62:2
+
+[southeast_6]
+name = Southeast Prong
+button = southeast
+leds = segm47:0, segm47:1, segm47:2, segm47:3, segm37:5, segm37:6, segm37:7

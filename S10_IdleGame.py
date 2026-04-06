@@ -18,24 +18,28 @@ class S10_IdleGame():        #S10_GameMaster
 
 
     def run(self):
-        # Wait between rounds
-        if self.state == self.states.S10:
+        # Wait between rounds (snake only)
+        if self.state == self.states.S10 and glbs.game.mode == 'snake':
             self.idleTime = glbs.random.randint(3,5) + glbs.time.time()
-        #print("Idle time = {} seconds".format(self.idleTime - glbs.time.time()))
         self.state = self.states.S10
         print("current state is {}".format(self.state))
-        self.checkForFailures()
-        print("failures: %s" % glbs.ctx.gameFailures)
-        
-        # Reset game variables
-        glbs.ctx.currentGameRoute.clear()
-        glbs.ctx.currentRoundInputs.clear()
 
-        # Create route for current round
-        self.setCurrentGoal()
-        glbs.ctx.currentGameRoute = glbs.table.createCurrentSnake(self.currentGoal)
-        print("current input required: " + str(self.currentGoal))
-        glbs.ctx.snakeCounter = 0
+        if glbs.game.mode == 'snake':
+            self.checkForFailures()
+            print("failures: %s" % glbs.ctx.gameFailures)
+            # Reset game variables
+            glbs.ctx.currentGameRoute.clear()
+            glbs.ctx.currentRoundInputs.clear()
+            # Create route for current round
+            self.setCurrentGoal()
+            glbs.ctx.currentGameRoute = glbs.table.createCurrentSnake(self.currentGoal)
+            print("current input required: " + str(self.currentGoal))
+            glbs.ctx.snakeCounter = 0
+        else:
+            # Rune mode: RuneGame handles sequences internally
+            print("failures: %s" % glbs.ctx.gameFailures)
+            glbs.ctx.currentRoundInputs.clear()
+            glbs.game.start(None)
 
         while(self.state == self.states.S10):
             self._setState()
@@ -45,25 +49,29 @@ class S10_IdleGame():        #S10_GameMaster
     def _setState(self):
         # 1. check if the player did not exceed the maximum number of failures
         # 2. Check if game time is exceeded
-        # 3. calculate new round 
-        # 3. wait for X time between rounds
+        # 3. wait for idle time (snake) or go directly to S11 (runes)
         if (self.failuresPerLevel[0] >= glbs.ctx.gameFailures):
             print("Currently " + str(glbs.ctx.gameFailures) + " of " + str(self.failuresPerLevel[0]) + " failures")
             # Check if game time is exceeded
-            # If game time is exceeded, the game is finished
             if self.checkGameTime():
                 print("Game time exceeded, game is finished")
                 glbs.ctx.gameSuccess = True
                 self.state = self.states.S13
-            # If the game is not finished, check if the idle time is exceeded
-            # or if the current game route is empty (no inputs received) (removed due to potential locked state)
-            elif ((self.idleTime - glbs.time.time() > 0)):
+            # Rune mode: smart timeout may have ended the game in start()
+            elif glbs.game.mode == 'runes' and glbs.game.is_complete():
+                if glbs.ctx.gameSuccess:
+                    print("RuneGame: smart timeout — game finished successfully")
+                    self.state = self.states.S13
+                else:
+                    self.state = self.states.S11
+            # Snake mode: wait between rounds
+            elif glbs.game.mode == 'snake' and (self.idleTime - glbs.time.time() > 0):
                 self.state = self.states.S10
-            # Start new round
+            # Start next round/sequence
             else:
                 self.state = self.states.S11
         # Game failed
-        else:   
+        else:
             print("Game failed, maximum number of failures exceeded")
             glbs.ctx.gameSuccess = False
             self.state = self.states.S13

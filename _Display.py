@@ -458,6 +458,120 @@ class _Display(object):
             (px + 8, by))
 
     # ------------------------------------------------------------------ #
+    # Rune catalog display (simulation only)                               #
+    # ------------------------------------------------------------------ #
+    def draw_rune_catalog(self, rune, idx, total, color):
+        """Render one rune candidate in the simulation window.
+
+        Lights the rune's LEDs on the ring renderer and shows a summary
+        panel on the right side.  Call once per catalog page change; the
+        game loop does not need to call update_leds() separately.
+
+        Args:
+            rune  -- _Rune instance to display
+            idx   -- 1-based candidate number (for display only)
+            total -- total number of candidates
+            color -- (r, g, b) tuple to use for rune LEDs
+        """
+        if not self._sim:
+            return
+
+        # Clear all LEDs then light the rune's LEDs
+        for seg in glbs.table.segmentList:
+            for i in range(len(seg.getLEDvalues())):
+                seg.setLEDValue(i, [0, 0, 0])
+        for seg_name, led_idx in rune.leds:
+            seg = glbs.table.getSegment(seg_name)
+            if seg:
+                seg.setLEDValue(led_idx, list(color))
+
+        # Ring area background + LED dots (same as update_leds but no panel)
+        self.screen.fill((15, 15, 15),
+                         glbs.pygame.Rect(0, 0, self._PANEL_X, self._SIM_H))
+        for seg in glbs.table.segmentList:
+            for i, c in enumerate(seg.getLEDvalues()):
+                key = (seg.name, i)
+                if key in self._led_pos:
+                    x, y = self._led_pos[key]
+                    glbs.pygame.draw.circle(
+                        self.screen, (c[0], c[1], c[2]), (x, y), self._LED_R)
+
+        # Button markers
+        for name, angle_deg in _BUTTON_ANGLES.items():
+            rad = math.radians(angle_deg)
+            bx = int(self._RING_CX + self._R_BTN * math.cos(rad))
+            by = int(self._RING_CY - self._R_BTN * math.sin(rad))
+            is_owner = (name == rune.button)
+            circle_color = (200, 200, 60) if is_owner else (60, 60, 30)
+            line_width = 0 if is_owner else 1
+            glbs.pygame.draw.circle(self.screen, circle_color, (bx, by),
+                                    self._R_BTN_HIT, line_width)
+            label_color = (20, 20, 20) if is_owner else (180, 180, 100)
+            label = self._font_sm.render(name[:2].upper(), True, label_color)
+            self.screen.blit(label, (bx - label.get_width() // 2,
+                                     by - label.get_height() // 2))
+
+        # Right panel: catalog info
+        px = self._PANEL_X
+        pw = self._SIM_W - px
+        self.screen.fill((20, 20, 30),
+                         glbs.pygame.Rect(px, 0, pw, self._SIM_H))
+        glbs.pygame.draw.line(self.screen, (60, 60, 80),
+                              (px, 0), (px, self._SIM_H), 1)
+
+        y = 10
+        header = self._font_lg.render("RUNE CATALOG", True, (200, 180, 60))
+        self.screen.blit(header, (px + pw // 2 - header.get_width() // 2, y))
+        y += 26
+
+        counter = self._font_md.render(f"{idx} / {total}", True, (140, 140, 180))
+        self.screen.blit(counter, (px + pw // 2 - counter.get_width() // 2, y))
+        y += 24
+
+        glbs.pygame.draw.line(self.screen, (50, 50, 70), (px + 6, y), (px + pw - 6, y), 1)
+        y += 8
+
+        def _row(label, value, label_col=(120, 120, 120), val_col=(220, 220, 220)):
+            nonlocal y
+            lbl = self._font_sm.render(label, True, label_col)
+            val = self._font_sm.render(value, True, val_col)
+            self.screen.blit(lbl, (px + 8, y))
+            self.screen.blit(val, (px + 8 + lbl.get_width() + 4, y))
+            y += 16
+
+        _row("Name:  ", rune.name)
+        _row("Key:   ", rune.section)
+        _row("Button:", rune.button, val_col=(220, 200, 60))
+        _row("LEDs:  ", str(len(rune.leds)))
+        y += 6
+
+        # List LEDs in the rune
+        glbs.pygame.draw.line(self.screen, (40, 40, 60), (px + 6, y), (px + pw - 6, y), 1)
+        y += 6
+        lbl = self._font_sm.render("LED set:", True, (100, 100, 140))
+        self.screen.blit(lbl, (px + 8, y))
+        y += 14
+        for seg_name, led_idx in rune.leds:
+            entry = self._font_sm.render(f"  {seg_name}:{led_idx}", True,
+                                         (color[0] // 2 + 80, color[1] // 2 + 80,
+                                          color[2] // 2 + 80))
+            self.screen.blit(entry, (px + 8, y))
+            y += 13
+            if y > self._SIM_H - 30:
+                self.screen.blit(
+                    self._font_sm.render("  ...", True, (80, 80, 80)),
+                    (px + 8, y))
+                break
+
+        # Footer instructions
+        instr = self._font_sm.render(
+            "L/R: prev/next   UP/ESC: exit", True, (60, 60, 80))
+        self.screen.blit(instr, (px + pw // 2 - instr.get_width() // 2,
+                                 self._SIM_H - 14))
+
+        glbs.pygame.display.flip()
+
+    # ------------------------------------------------------------------ #
     # GM tag assignment display                                            #
     # ------------------------------------------------------------------ #
     def draw_gm_assign(self, entries, sel_idx, updated):

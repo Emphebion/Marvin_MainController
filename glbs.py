@@ -32,6 +32,7 @@ from _Devices import _Devices
 from _Table import _Table
 from _Players import _Players
 from _LineGame import LineGame
+from _RuneGame import RuneGame
 from _GameContext import GameContext
 import configparser
 import time
@@ -56,7 +57,10 @@ devices  = _Devices(config_file)               # must be before _Display (sim-mo
 table    = _Table(table_file)                  # must be before _Display (LED positions)
 players  = _Players(player_file)
 display  = _Display(config_file)               # last: can see all objects
-game     = LineGame(table)                     # active game mode instance
+rune_config_file = 'runeconfig.txt'
+snake_game = LineGame(table)                   # snake game instance
+rune_game  = RuneGame(table, config_file, rune_config_file)  # rune game instance
+game       = snake_game                        # active game mode (switched by S9)
 
 # Round state — all mutable per-round variables live here
 ctx = GameContext()

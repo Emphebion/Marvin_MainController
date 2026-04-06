@@ -27,16 +27,22 @@ class S11_AwaitInput():
     def _setState(self):
         # Statement used to determine game speed:
         if (self.loopTimeout > (glbs.time.time()-self.loopStartTime)):
-            #print("Remaining time S11 = {} seconds".format(self.loopTimeout - (glbs.time.time()-self.loopStartTime)))
             self.state = self.states.S11
         else:
-            # Check if the snake is done
-            if(not self.routeDone) & (not glbs.ctx.currentGameRoute):
-                self.state = self.states.S10
-            # Check if the game is finished
+            if glbs.game.mode == 'runes':
+                # Rune mode: check if sequence is complete
+                if glbs.game.is_complete():
+                    self.state = self.states.S10
+                else:
+                    self.loopStartTime = glbs.time.time()
+                    self.state = self.states.S12
             else:
-                self.loopStartTime = glbs.time.time()
-                self.state = self.states.S12
+                # Snake mode: check if the snake is done
+                if(not self.routeDone) & (not glbs.ctx.currentGameRoute):
+                    self.state = self.states.S10
+                else:
+                    self.loopStartTime = glbs.time.time()
+                    self.state = self.states.S12
 
         #reset state machine if no input has been provided for 15 minutes   CAN BE MOVED TO OTHER STATES NOW THAT FAILURES ARE HANDLED
         # This is a safety net to prevent the game from being stuck in an infinite loop
@@ -70,9 +76,11 @@ class S11_AwaitInput():
                 if new_input["data"] in glbs.table.gameButtons:
                     glbs.ctx.currentRoundInputs.append(new_input["data"])
 
-    #Future: Move to better location and generalise over functions
-    #Future: Re-factoring needed
     def _setLEDOutput(self):
+        if glbs.game.mode == 'runes':
+            glbs.game.update()
+            return
+        # Snake mode: advance snake animation by one LED
         if glbs.ctx.currentGameRoute:
             glbs.ctx.snakeCounter = glbs.ctx.snakeCounter + 1
             if self.setLEDinSnake(glbs.ctx.currentGameRoute[-1], glbs.table.colorsLED["black"], glbs.table.colorsLED["turquoise"]):

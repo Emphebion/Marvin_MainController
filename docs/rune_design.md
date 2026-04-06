@@ -93,7 +93,7 @@ Phase 1 — Reveal (no input expected)
 
 Phase 2 — Input (response timer starts)
   3. Wait for player input (one button press per rune in the sequence)
-  4. Response timer: 2 seconds per rune in the sequence (e.g. 6s for L2, 10s for L3)
+  4. Response timer: 3 seconds per rune in the sequence (e.g. 9s for L2, 15s for L3)
   5. Score: all correct in order = success, any wrong = failure, response time exceeded = failure.
 ```
 
@@ -105,7 +105,7 @@ Each rune grows outward from a **random starting LED** within its definition, fl
 
 - **Colour:** Each difficulty level uses a distinct colour, defined in `tableconfig.txt` (e.g. `runeL1`, `runeL2`, `runeL3`). This gives an immediate visual cue of the current difficulty.
 - **Hold time:** Configurable per level. Longer at L1, shorter at L3.
-- **Fade:** Fast reverse fade — LEDs turn off in reverse reveal order (energy draining away), played at double the reveal speed.
+- **Fade:** Simultaneous brightness fade — all rune LEDs dim together in 8 equal steps at reveal-speed intervals, as if the energy sinks uniformly back into the table.
 
 ---
 
@@ -117,7 +117,7 @@ The same structure as the snake game: the game is **time-based**, using `gameTim
 |-----------|--------|
 | Player presses the correct button(s) in order | Success for this sequence, game continues |
 | Player presses a wrong button or out of order | Failure recorded |
-| Response time exceeded (>2s per rune after reveal) | Failure recorded |
+| Response time exceeded (>3s per rune after reveal) | Failure recorded |
 | Failures reach `failuresPerLevel[level]` | Game over (failure) |
 | Game time expires and failures below limit | Game over (success) |
 
@@ -238,7 +238,7 @@ runeL3 = 220, 50, 50    ; red
 
 | Question | Decision |
 |----------|----------|
-| Fade animation | Fast reverse fade — LEDs turn off in reverse reveal order at double speed |
+| Fade animation | Simultaneous brightness fade — all LEDs dim together in 8 steps, energy sinks uniformly |
 | Rune colour per level | Distinct colour per level: blue (L1), purple (L2), red (L3) |
 | Symbol indicator design | Simple geometric icons at each button position in simulation |
 | Rune definitions | Separate design step (see below) |

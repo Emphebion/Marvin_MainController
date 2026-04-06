@@ -118,6 +118,27 @@ name=TableBroken
 [StateT4]
 name=TableOverload
 
+[GameModes]
+level1 = snake
+level2 = runes
+level3 = runes
+
+[RuneGame]
+revealSpeedL1 = 150
+revealSpeedL2 = 100
+revealSpeedL3 = 60
+holdTimeL1 = 1500
+holdTimeL2 = 1000
+holdTimeL3 = 600
+pauseBetween = 500
+responseTimeout = 3000
+runesPerLevelL1 = 1
+runesPerLevelL2 = 3
+runesPerLevelL3 = 5
+runeColorL1 = runeL1
+runeColorL2 = runeL2
+runeColorL3 = runeL3
+
 [StateX]
 name=Quit
 folder=menu
