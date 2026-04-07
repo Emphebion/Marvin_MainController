@@ -168,26 +168,28 @@ class TestBFSOrder:
         game, _ = make_game(table_config_file, marvin_config_file,
                             rune_config_file, monkeypatch)
         rune = game._runes_by_button['east'][0]  # 5 consecutive LEDs
-        order = game._bfs_order(rune)
-        assert len(order) == len(rune.leds)
-        assert set(order) == set(rune.leds)
+        layers = game._bfs_order(rune)
+        flat = [led for layer in layers for led in layer]
+        assert len(flat) == len(rune.leds)
+        assert set(flat) == set(rune.leds)
 
     def test_bfs_order_is_connected(self, table_config_file, marvin_config_file,
                                      rune_config_file, monkeypatch):
-        """Each step in BFS should be adjacent to at least one previous step."""
+        """Each layer must have at least one LED physically adjacent to layer N-1."""
         game, _ = make_game(table_config_file, marvin_config_file,
                             rune_config_file, monkeypatch)
         rune = game._runes_by_button['east'][0]
-        order = game._bfs_order(rune)
-        for i in range(1, len(order)):
-            seg_a, idx_a = order[i]
-            has_neighbor = False
-            for j in range(i):
-                seg_b, idx_b = order[j]
-                if seg_a == seg_b and abs(idx_a - idx_b) == 1:
-                    has_neighbor = True
-                    break
-            assert has_neighbor, f"LED {order[i]} has no adjacent predecessor"
+        layers = game._bfs_order(rune)
+        for i in range(1, len(layers)):
+            for node in layers[i]:
+                nx, ny = game._led_xy(*node)
+                found = False
+                for prev in layers[i - 1]:
+                    px, py = game._led_xy(*prev)
+                    if (nx - px) ** 2 + (ny - py) ** 2 <= game._ADJ_DIST_SQ + 1:
+                        found = True
+                        break
+                assert found, f"LED {node} in layer {i} has no physical neighbour in layer {i - 1}"
 
 
 # ---------------------------------------------------------------------------
@@ -360,9 +362,9 @@ class TestAnimationPhases:
                             rune_config_file, monkeypatch)
         game.start(None)
 
-        # Advance reveal to completion
+        # Advance reveal to completion (one tick per layer)
         game._phase = game._REVEAL
-        for _ in range(len(game._reveal_order) + 5):
+        for _ in range(len(game._reveal_layers) + 5):
             game._phase_time = time.time() - 1
             game.update()
             if game._phase != game._REVEAL:

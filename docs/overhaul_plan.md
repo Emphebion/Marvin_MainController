@@ -252,30 +252,146 @@ As an alternative to RuneGame for level 2 and 3 items, a `MultiSnakeGame` extend
 
 ## Phase 4 — MQTT Connection
 
-**Goal:** Connect the Raspberry Pi to an MQTT broker and publish game state events matching the empnode protocol style.
+**Goal:** Connect MARVIN to the empnode MQTT broker and publish game state events so EDD/GMControl can react to player actions, item changes, and game outcomes.
 
-### Research needed (before implementation)
-- Read `https://github.com/oderooij/empnode` documentation and source for:
-  - Broker address/port convention
-  - Topic naming scheme
-  - Message format (JSON? raw bytes?)
-  - Authentication (if any)
+**empnode reference:** `C:\Users\Edwin\Documents\Vincent Personal\Creatief\Emphebion\Techniek\empnode`
 
-### Planned publish topics (draft — to be confirmed after empnode review)
-| Topic | Payload | Trigger |
+### Protocol conventions (from empnode docs)
+
+- **Broker:** configurable host:port; default `localhost:1883`; no authentication
+- **All payloads:** JSON
+- **Topic base:** empnode nodes use `empnode/<node-id>/state/...`. MARVIN uses its own `marvin/<node-id>/state/...` namespace — it is not an ESP32 node and does not go through the discovery/assign flow
+- **Retained messages:** use `retain=True` for state that EDD needs to reconstruct after reconnect (item connected state, well level, table status). Use `retain=False` for event-style messages (RFID scans, game events)
+- **QoS:** 0 for all publishes (fire-and-forget matches game loop's real-time nature)
+
+### Topic and payload specification
+
+**MARVIN → broker (publish):**
+
+| Topic | Retained | Trigger | Payload |
+|---|---|---|---|
+| `marvin/<id>/state/rfid` | No | Player or item RFID tag scanned | see below |
+| `marvin/<id>/state/item/<name>` | Yes | Item connected or disconnected | `{"name": <str>, "connected": <bool>, "level": <int>}` |
+| `marvin/<id>/state/well` | Yes | Any connect/disconnect or overflow | `{"use": <int>, "capacity": <int>, "pct": <float>}` |
+| `marvin/<id>/state/game` | No | Game lifecycle event | see below |
+| `marvin/<id>/state/table` | Yes | Table status changes (Active/Broken) | `{"status": "active" \| "broken"}` |
+| `marvin/<id>/state/heartbeat` | No | Every 30 s while running | `{"uptime": <int>}` (seconds since start) |
+
+**RFID payload variants:**
+```json
+// Player tag scanned (known or unknown)
+{"action": "detected", "type": "player", "name": "Aldric", "id": 4}
+
+// Player tag unrecognised
+{"action": "detected", "type": "player", "name": null, "id": 0}
+
+// Item tag scanned
+{"action": "detected", "type": "item", "name": "Staff of Power", "id": 12}
+```
+
+**Game event payload variants:**
+```json
+{"event": "started",  "mode": "snake", "level": 1, "item": "Staff of Power"}
+{"event": "failure",  "failures": 1, "limit": 3}
+{"event": "success",  "elapsed_s": 45.2}
+{"event": "timeout"}
+```
+
+**broker → MARVIN (subscribe — Phase 4 deferred, scaffolding only):**
+
+No inbound command handling is implemented in Phase 4. `_MQTT` subscribes to `marvin/<id>/cmd/#` and logs received messages for future use.
+
+### `_MQTT.py` module design
+
+```python
+class _MQTT:
+    def __init__(self, config_file):
+        # Load [MQTT] section: broker, port, node_id, enabled
+        # Create paho.mqtt.client.Client
+        # Set on_connect / on_disconnect callbacks (log only)
+        # Set on_message callback (log unknown cmds for future use)
+        # Call client.loop_start() — background network thread, non-blocking
+        # client.connect_async() — does not block if broker is unreachable
+
+    def publish(self, subtopic, payload_dict, retain=False):
+        # Full topic = f"marvin/{self._node_id}/{subtopic}"
+        # client.publish(full_topic, json.dumps(payload_dict), qos=0, retain=retain)
+        # No-op if disabled or client not connected — never raises
+
+    def disconnect(self):
+        # client.loop_stop()
+        # client.disconnect()
+```
+
+Key properties:
+- `loop_start()` spawns a single background thread; the game loop never blocks on MQTT
+- `connect_async()` returns immediately; `on_connect` callback logs connection when it succeeds
+- All `publish()` calls are wrapped in try/except so a broker failure never crashes the game loop
+- `enabled = false` in config completely disables MQTT with zero overhead
+
+### Configuration — add to `marvinconfig.txt`
+
+```ini
+[MQTT]
+enabled  = true
+broker   = localhost
+port     = 1883
+node_id  = marvin-001
+```
+
+### Integration points in state files
+
+No MQTT logic lives inside individual state files. Each state calls `glbs.mqtt.publish(...)` at the relevant moment:
+
+| State | Event | Call |
 |---|---|---|
-| `marvin/rfid/player` | `{"id": <int>, "name": <str>}` | Player tag scanned |
-| `marvin/rfid/item` | `{"id": <int>, "name": <str>, "connected": <bool>}` | Item tag scanned |
-| `marvin/item/<name>/state` | `{"connected": <bool>}` | Item connect/disconnect |
-| `marvin/well/level` | `{"use": <int>, "capacity": <int>, "pct": <float>}` | Any connect/disconnect |
-| `marvin/well/overflow` | `{"items_disconnected": <list>}` | Overload → all disconnect |
+| `S2_Scan_Player.py` | Player tag recognised or unknown | `glbs.mqtt.publish("state/rfid", {...})` |
+| `S5_Scan_Item.py` | Item tag scanned | `glbs.mqtt.publish("state/rfid", {...})` |
+| `S7_Connect_Item.py` | Item successfully connected | `glbs.mqtt.publish("state/item/<name>", {...}, retain=True)` + well |
+| `S4_Disconnect_Item.py` | Item disconnected | same as above |
+| `S3_Disconnect_All.py` | Overload — all items cleared | publish all items + well |
+| `S9_StartGame.py` | Game sequence begins | `glbs.mqtt.publish("state/game", {"event":"started",...})` |
+| `S11_AwaitInput.py` | Failure registered | `glbs.mqtt.publish("state/game", {"event":"failure",...})` |
+| `S13_FinishGame.py` | Game ends | `glbs.mqtt.publish("state/game", {"event":"success"/"timeout",...})` |
+| `S1_Reset.py` | Heartbeat timer fires | `glbs.mqtt.publish("state/heartbeat", {"uptime":...})` |
+| `S1_Reset.py` | Table status changes | `glbs.mqtt.publish("state/table", {...}, retain=True)` |
 
-### Implementation
-- New module `_MQTT.py` wrapping `paho-mqtt` (add to `requirements.txt`).
-- `_MQTT` is instantiated in `glbs.py` alongside other devices.
-- States call `glbs.mqtt.publish(topic, payload)` at relevant transitions — no MQTT logic embedded in individual states.
-- Desktop simulation mode: MQTT connect is optional (skip gracefully if broker unreachable).
-- **Detailed topic/payload format deferred until empnode docs are reviewed.**
+### Critical files
+
+| File | Action |
+|---|---|
+| `_MQTT.py` | New. Full `_MQTT` class. |
+| `glbs.py` | Instantiate `_MQTT` alongside `_Devices` and `_Display`. |
+| `marvinconfig.txt` | Add `[MQTT]` section. |
+| `requirements.txt` | Add `paho-mqtt>=2.0`. |
+| `S2_Scan_Player.py` | Add RFID publish call. |
+| `S5_Scan_Item.py` | Add RFID publish call. |
+| `S7_Connect_Item.py` | Add item + well publish. |
+| `S4_Disconnect_Item.py` | Add item + well publish. |
+| `S3_Disconnect_All.py` | Add all-items + well overflow publish. |
+| `S9_StartGame.py` | Add game started publish. |
+| `S11_AwaitInput.py` | Add game failure publish. |
+| `S13_FinishGame.py` | Add game result publish. |
+| `S1_Reset.py` | Add heartbeat timer + table status publish. |
+
+### Verification
+
+```bash
+# Start broker (or use empnode built-in)
+cd "C:\Users\Edwin\Documents\Vincent Personal\Creatief\Emphebion\Techniek\empnode\tools"
+uv run empnode-tools --internal-broker server
+
+# Subscribe to all MARVIN topics in a second terminal
+mosquitto_sub -h localhost -t "marvin/#" -v
+
+# Run MARVIN in simulation and exercise each event:
+# - Scan a player tag → marvin/.../state/rfid
+# - Connect an item   → marvin/.../state/item/<name> + state/well
+# - Start a game      → marvin/.../state/game started
+# - Fail an input     → marvin/.../state/game failure
+# - Win the game      → marvin/.../state/game success
+# - Trigger overload  → all item states + well
+```
 
 ---
 
@@ -299,6 +415,7 @@ As an alternative to RuneGame for level 2 and 3 items, a `MultiSnakeGame` extend
 | `_LineGame.py` (new, extracted from `_Table.py`) | 2, 3 |
 | `_RuneGame.py` (new) | 3 |
 | `_MQTT.py` (new) | 4 |
+| `requirements.txt` | 4 |
 | `_MultiSnakeGame.py` (new) | 5 |
 
 ---
@@ -399,3 +516,25 @@ level3 = multisnake
 5. **Phase 3b** — Dead code & unused parameter cleanup (audit + remove stale config keys, fix docs)
 6. **Phase 4** — MQTT (empnode docs reviewed before implementation starts)
 7. **Phase 5** — MultiSnakeGame mode (design question resolved before implementation starts)
+8. **Phase 6** — Post-hardware-test fixes (see below)
+
+---
+
+## Phase 6 — Post-Hardware-Test Fixes
+
+**Goal:** Address issues that require comparison between the simulation and the physical prop before a correct fix can be designed.
+
+### Known issue: RuneGame reveal — reversed section flow
+
+**Symptom:** In the simulation, some rune sections (segments) reveal in the wrong direction — LEDs light up from the far end of a segment back toward the junction, instead of from the junction outward.
+
+**Root cause (suspected):** The segment-directed BFS in `_RuneGame._bfs_order()` determines traversal direction based on whether `entry_b == leds_b[0]` or `entry_b == leds_b[-1]`. For segments whose flow/counter junction is NOT at LED 0 or LED n-1 in the rune's LED list, the direction logic may pick the wrong end.
+
+**Why deferred:** The simulation and the physical prop may render segment direction differently (the physical LED order is hardware-wired; the simulation uses the geometry from `_Display`). Hardware testing is needed to determine whether the issue exists on the prop, and if so, in which specific segments and rune shapes.
+
+**Fix approach (to design after hardware test):**
+- Run a set of known rune shapes on the hardware and compare reveal direction to simulation.
+- If directions differ: check the `flowSegments`/`counterSegments` wiring for the affected segments in `tableconfig.txt` and confirm whether LED 0 is the flow end or the counter end.
+- If directions agree but are wrong: review the reverse-edge addition logic in `_bfs_order` to ensure the entry LED is correctly identified when traversal is initiated from a reverse connection.
+
+**Files to change:** `_RuneGame.py` (`_bfs_order`) — no other files expected.

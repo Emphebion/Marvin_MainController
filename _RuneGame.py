@@ -23,9 +23,9 @@ Integration:
 """
 
 import configparser
+import math
 import random
 import time
-from collections import deque
 from _LineGame import BaseGame
 
 
@@ -48,6 +48,19 @@ class RuneGame(BaseGame):
     """
 
     mode = 'runes'
+
+    # Physical geometry constants (match _Display ring layout exactly)
+    _R_INNER     = 90
+    _R_MID       = 175
+    _R_OUTER     = 260
+    _CX          = 340   # _Display._RING_CX — ring centre x in simulation
+    _CY          = 350   # _Display._RING_CY — ring centre y
+    # Bridge r offsets match _Display._place_radial calls:
+    #   inner–middle: r_start = R_MID-8 = 167  (LED 0 = middle-ring end)
+    #                 r_end   = R_INNER+8 = 98  (LED n-1 = inner-ring end)
+    #   middle–outer: r_start = R_MID+8  = 183  (LED 0 = middle-ring end)
+    #                 r_end   = R_OUTER-8 = 252  (LED n-1 = outer-ring end)
+    _ADJ_DIST_SQ = 256   # 16px² — used only for test connectivity verification
 
     # Internal animation phases
     _IDLE = 0
@@ -79,7 +92,8 @@ class RuneGame(BaseGame):
         self._sequence = []           # _Rune objects for this sequence
         self._expected_buttons = []   # correct button names in order
         self._seq_idx = 0             # which rune we're revealing
-        self._reveal_order = []       # BFS order [(seg_name, led_idx), ...]
+        self._reveal_layers = []      # BFS layers: list[list[tuple]] — one layer per tick
+        self._reveal_order = []       # flat BFS order — used by fade only
         self._reveal_step = 0
         self._fade_step = 0
         self._phase_time = 0.0        # timestamp when current phase started
@@ -226,6 +240,7 @@ class RuneGame(BaseGame):
         self._sequence = []
         self._expected_buttons = []
         self._inputs = []
+        self._reveal_layers = []
         self._reveal_order = []
 
     # ------------------------------------------------------------------ #
@@ -235,21 +250,22 @@ class RuneGame(BaseGame):
     def _start_reveal_rune(self):
         """Begin BFS reveal of the current rune in the sequence."""
         rune = self._sequence[self._seq_idx]
-        self._reveal_order = self._bfs_order(rune)
+        self._reveal_layers = self._bfs_order(rune)
+        self._reveal_order = [led for layer in self._reveal_layers for led in layer]
         self._reveal_step = 0
         self._phase = self._REVEAL
         self._phase_time = time.time()
 
     def _step_reveal(self):
-        """Light up the next LED in the BFS reveal order."""
-        if self._reveal_step < len(self._reveal_order):
-            seg_name, led_idx = self._reveal_order[self._reveal_step]
-            seg = self._table.getSegment(seg_name)
-            if seg:
-                seg.setLEDValue(led_idx, list(self._color))
+        """Light up all LEDs in the current BFS layer simultaneously."""
+        if self._reveal_step < len(self._reveal_layers):
+            for seg_name, led_idx in self._reveal_layers[self._reveal_step]:
+                seg = self._table.getSegment(seg_name)
+                if seg:
+                    seg.setLEDValue(led_idx, list(self._color))
             self._reveal_step += 1
 
-        if self._reveal_step >= len(self._reveal_order):
+        if self._reveal_step >= len(self._reveal_layers):
             self._phase = self._HOLD
             self._phase_time = time.time()
 
@@ -334,72 +350,179 @@ class RuneGame(BaseGame):
             self._phase = self._COMPLETE
 
     # ------------------------------------------------------------------ #
+    # Physical geometry helpers                                           #
+    # ------------------------------------------------------------------ #
+
+    def _led_xy(self, seg_name, led_idx):
+        """Return screen pixel (x, y) for a single LED — mirrors _Display geometry.
+
+        Segment ranges:
+            segm0–15   inner arc   (R=90)
+            segm16–23  inner→middle bridge  (angle = k×45°,  k = seg−16)
+            segm24–39  middle arc  (R=175)
+            segm40–47  middle→outer bridge  (angle = k×45°−22.5°,  k = seg−40)
+            segm48–63  outer arc   (R=260)
+        """
+        seg_num = int(seg_name.replace('segm', ''))
+        seg = self._table.getSegment(seg_name)
+        n = seg.nrLEDs if seg else 1
+
+        if seg_num <= 15:
+            return self._xy_arc(led_idx, n, seg_num, self._R_INNER)
+        elif seg_num <= 23:
+            return self._xy_radial(led_idx, n, (seg_num - 16) * 45.0,
+                                   self._R_MID - 8, self._R_INNER + 8)
+        elif seg_num <= 39:
+            return self._xy_arc(led_idx, n, seg_num - 24, self._R_MID)
+        elif seg_num <= 47:
+            return self._xy_radial(led_idx, n, (seg_num - 40) * 45.0 - 22.5,
+                                   self._R_MID + 8, self._R_OUTER - 8)
+        else:
+            return self._xy_arc(led_idx, n, seg_num - 48, self._R_OUTER)
+
+    def _xy_arc(self, led_idx, n, ring_idx, radius):
+        """Pixel position — east-based CCW, matching _Display._place_arc."""
+        centre_deg = ring_idx * 22.5 - 11.25
+        t = (led_idx + 0.5) / n
+        angle_rad = math.radians(centre_deg - 11.25 + t * 22.5)
+        return (self._CX + radius * math.cos(angle_rad),
+                self._CY - radius * math.sin(angle_rad))
+
+    def _xy_radial(self, led_idx, n, angle_deg, r_start, r_end):
+        """Pixel position — east-based CCW, matching _Display._place_radial."""
+        t = (led_idx + 0.5) / n
+        r = r_start + t * (r_end - r_start)
+        angle_rad = math.radians(angle_deg)
+        return (self._CX + r * math.cos(angle_rad),
+                self._CY - r * math.sin(angle_rad))
+
+    # ------------------------------------------------------------------ #
     # BFS reveal order                                                     #
     # ------------------------------------------------------------------ #
 
     def _bfs_order(self, rune):
-        """Compute BFS reveal order from a random start LED in the rune.
+        """Compute segment-directed reveal layers for a rune.
 
-        Adjacency rules:
-            - Same segment, LED indices differ by 1
-            - Cross-segment: last LED of seg connects to first LED of flow
-              neighbour; first LED of seg connects to last LED of counter
-              neighbour (matching the snake traversal convention).
+        Returns list[list[tuple]] — one layer per tick.
+
+        Inspired by LineGame's segment flow model:
+          - The start segment expands from the random start LED outward in
+            both directions simultaneously (one LED per direction per tick),
+            matching the symmetric expansion the player expects.
+          - Every other segment is entered at its junction LED (the endpoint
+            shared with its predecessor) and traverses linearly toward its
+            opposite end — direction set by the predecessor, not fixed flow.
+          - A new segment's first LED only lights up on the tick AFTER the
+            connecting junction LED of its predecessor has been revealed.
+
+        Cross-segment connections are determined from the flow/counter segment
+        graph (same topology LineGame uses for routing), which correctly encodes
+        which endpoints are physically adjacent at each ring junction.
         """
         if not rune.leds:
             return []
 
-        led_set = set(rune.leds)
-        adj = {led: [] for led in rune.leds}
-
+        # Group LEDs by segment, sorted by index
+        seg_leds = {}
         for seg_name, idx in rune.leds:
-            # Same-segment neighbours
-            if (seg_name, idx - 1) in led_set:
-                adj[(seg_name, idx)].append((seg_name, idx - 1))
-            if (seg_name, idx + 1) in led_set:
-                adj[(seg_name, idx)].append((seg_name, idx + 1))
+            seg_leds.setdefault(seg_name, []).append(idx)
+        for s in seg_leds:
+            seg_leds[s].sort()
 
-            # Cross-segment neighbours
+        # Build directed segment connection graph from flow/counter topology.
+        # seg_connections[seg_a] = [(seg_b, junction_led_of_a, entry_led_of_b), ...]
+        # junction_led_of_a : LED of seg_a at the shared boundary (last LED lit before seg_b starts)
+        # entry_led_of_b    : LED of seg_b at the shared boundary (first LED lit in seg_b)
+        seg_connections = {s: [] for s in seg_leds}
+        for seg_name in seg_leds:
             seg = self._table.getSegment(seg_name)
             if not seg:
                 continue
-            # Flow direction: last LED → first LED of flow neighbour
-            if idx == seg.nrLEDs - 1:
-                for nbr_name in seg.flowSegments:
-                    if (nbr_name, 0) in led_set:
-                        adj[(seg_name, idx)].append((nbr_name, 0))
-            # Counter direction: first LED → last LED of counter neighbour
-            if idx == 0:
-                for nbr_name in seg.counterSegments:
-                    nbr_seg = self._table.getSegment(nbr_name)
-                    if nbr_seg and (nbr_name, nbr_seg.nrLEDs - 1) in led_set:
-                        adj[(seg_name, idx)].append((nbr_name, nbr_seg.nrLEDs - 1))
+            my_leds = set(seg_leds[seg_name])
+            # Flow direction: seg's last LED → first LED of each flow neighbour
+            if (seg.nrLEDs - 1) in my_leds:
+                for nbr in seg.flowSegments:
+                    if nbr in seg_leds and 0 in set(seg_leds[nbr]):
+                        seg_connections[seg_name].append((nbr, seg.nrLEDs - 1, 0))
+            # Counter direction: seg's first LED → last LED of each counter neighbour
+            if 0 in my_leds:
+                for nbr in seg.counterSegments:
+                    nbr_seg = self._table.getSegment(nbr)
+                    if nbr_seg and nbr in seg_leds:
+                        nbr_last = nbr_seg.nrLEDs - 1
+                        if nbr_last in set(seg_leds[nbr]):
+                            seg_connections[seg_name].append((nbr, 0, nbr_last))
 
-        # Add reverse edges so BFS can traverse junctions in both directions.
-        # The flow/counter rules are one-directional by construction; without
-        # reverse edges a rune that starts on the "receiving" side of a junction
-        # (e.g. FA:0 when the bridge only records BCW:last → FA:0) would be
-        # stranded and not reach the bridge LEDs.
-        for node in list(adj.keys()):
-            for nbr in adj[node]:
-                if nbr in adj and node not in adj[nbr]:
-                    adj[nbr].append(node)
+        # Add reverse edges so traversal works in both directions of each junction.
+        # If A→B exists (A exits at junc_a, B enters at entry_b) but B→A does not,
+        # add B→A: B exits at entry_b, A enters at junc_a.
+        existing = {(a, b) for a, conns in seg_connections.items()
+                    for b, _, _ in conns}
+        to_add = []
+        for seg_a, conns in seg_connections.items():
+            for seg_b, junc_a, entry_b in conns:
+                if (seg_b, seg_a) not in existing:
+                    to_add.append((seg_b, seg_a, entry_b, junc_a))
+        for seg_b, seg_a, junc_b, entry_a in to_add:
+            seg_connections[seg_b].append((seg_a, junc_b, entry_a))
 
-        # BFS from random start
-        start = random.choice(rune.leds)
-        visited = {start}
-        order = []
-        queue = deque([start])
+        # --- Assign reveal tick to every LED ---
+        led_tick = {}   # (seg_name, led_idx) → tick number
+
+        # Start segment: bidirectional expansion from the random start LED.
+        # Both arms advance simultaneously (one LED per tick per arm).
+        start_led = random.choice(rune.leds)
+        start_seg, start_idx = start_led
+        start_sorted = seg_leds[start_seg]
+        pos = start_sorted.index(start_idx)
+
+        led_tick[(start_seg, start_idx)] = 0
+        for k, idx in enumerate(reversed(start_sorted[:pos]), 1):
+            led_tick[(start_seg, idx)] = k
+        for k, idx in enumerate(start_sorted[pos + 1:], 1):
+            led_tick[(start_seg, idx)] = k
+
+        # BFS through the segment graph.
+        # Queue entries: (seg_b, entry_led_of_b, tick_at_which_entry_led_lights)
+        visited = {start_seg}
+        queue = []
+        for seg_b, junc_a, entry_b in seg_connections[start_seg]:
+            junc_tick = led_tick.get((start_seg, junc_a))
+            if junc_tick is not None and seg_b not in visited:
+                queue.append((seg_b, entry_b, junc_tick + 1))
 
         while queue:
-            current = queue.popleft()
-            order.append(current)
-            for neighbour in adj.get(current, []):
-                if neighbour not in visited:
-                    visited.add(neighbour)
-                    queue.append(neighbour)
+            seg_b, entry_b, start_tick = queue.pop(0)
+            if seg_b in visited:
+                continue
+            visited.add(seg_b)
 
-        return order
+            leds_b = seg_leds[seg_b]
+            # Traverse from entry_b toward the opposite end (linear, one direction)
+            if entry_b == leds_b[0]:
+                ordered = leds_b           # ascending
+            else:
+                ordered = list(reversed(leds_b))   # descending
+
+            for k, idx in enumerate(ordered):
+                led_tick[(seg_b, idx)] = start_tick + k
+
+            for seg_c, junc_b, entry_c in seg_connections[seg_b]:
+                if seg_c not in visited:
+                    junc_tick = led_tick.get((seg_b, junc_b))
+                    if junc_tick is not None:
+                        queue.append((seg_c, entry_c, junc_tick + 1))
+
+        # --- Build layer list ---
+        if not led_tick:
+            return []
+
+        max_tick = max(led_tick.values())
+        layers = [[] for _ in range(max_tick + 1)]
+        for (seg_name, idx), tick in led_tick.items():
+            layers[tick].append((seg_name, idx))
+
+        return [layer for layer in layers if layer]
 
     # ------------------------------------------------------------------ #
     # Helpers                                                              #
@@ -419,9 +542,10 @@ class RuneGame(BaseGame):
         level_idx = self._level - 1
         count = self._runes_per_level[level_idx]
 
-        # Estimate time per rune: reveal + hold + fade (8 simultaneous steps) + pause
-        avg_leds = 8
-        reveal_ms = avg_leds * self._reveal_speed[level_idx]
+        # Estimate time per rune: reveal layers + hold + fade + pause
+        # avg_layers ≈ avg_leds / 2 (branching runes have fewer layers than LEDs)
+        avg_layers = 4
+        reveal_ms = avg_layers * self._reveal_speed[level_idx]
         fade_ms = self._FADE_STEPS * self._reveal_speed[level_idx]
         hold_ms = self._hold_time[level_idx]
         per_rune_ms = reveal_ms + hold_ms + fade_ms + self._pause_between
