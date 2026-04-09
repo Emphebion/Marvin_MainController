@@ -266,40 +266,89 @@ As an alternative to RuneGame for level 2 and 3 items, a `MultiSnakeGame` extend
 
 ### Topic and payload specification
 
+All `rfid` fields carry the **raw RFID tag number** (integer) as read by the scanner — the same value stored in `playerconfig.txt` and `itemconfig.txt`.
+
 **MARVIN → broker (publish):**
 
 | Topic | Retained | Trigger | Payload |
 |---|---|---|---|
-| `marvin/<id>/state/rfid` | No | Player or item RFID tag scanned | see below |
-| `marvin/<id>/state/item/<name>` | Yes | Item connected or disconnected | `{"name": <str>, "connected": <bool>, "level": <int>}` |
-| `marvin/<id>/state/well` | Yes | Any connect/disconnect or overflow | `{"use": <int>, "capacity": <int>, "pct": <float>}` |
+| `marvin/<id>/state/rfid` | No | Any RFID tag scanned | see below |
+| `marvin/<id>/state/items` | Yes | Item connected, disconnected, cleared (game), or overloaded | see below |
 | `marvin/<id>/state/game` | No | Game lifecycle event | see below |
 | `marvin/<id>/state/table` | Yes | Table status changes (Active/Broken) | `{"status": "active" \| "broken"}` |
 | `marvin/<id>/state/heartbeat` | No | Every 30 s while running | `{"uptime": <int>}` (seconds since start) |
 
 **RFID payload variants:**
 ```json
-// Player tag scanned (known or unknown)
-{"action": "detected", "type": "player", "name": "Aldric", "id": 4}
+// Known player tag
+{"action": "detected", "type": "player", "name": "Aldric", "rfid": 4}
 
-// Player tag unrecognised
-{"action": "detected", "type": "player", "name": null, "id": 0}
+// Known item tag
+{"action": "detected", "type": "item", "name": "Staff of Power", "rfid": 12}
 
-// Item tag scanned
-{"action": "detected", "type": "item", "name": "Staff of Power", "id": 12}
+// Unrecognised tag — type unknown, published for any scanner (player or item context)
+{"action": "unknown", "rfid": 99999}
+```
+
+**Items payload variants:**
+
+All variants include the full `connected` list (current connected items) and the current `well` state so receivers never need to track intermediate state.
+
+```json
+// Single item connected
+{
+  "action": "connected",
+  "changed": {"name": "Staff of Power", "rfid": 12},
+  "connected": [{"name": "Staff of Power", "rfid": 12}, {"name": "Crystal Orb", "rfid": 7}],
+  "well": {"use": 2, "capacity": 3, "pct": 0.67}
+}
+
+// Single item disconnected
+{
+  "action": "disconnected",
+  "changed": {"name": "Crystal Orb", "rfid": 7},
+  "connected": [{"name": "Staff of Power", "rfid": 12}],
+  "well": {"use": 1, "capacity": 3, "pct": 0.33}
+}
+
+// All items disconnected at end of game round (normal flow)
+{
+  "action": "cleared",
+  "connected": [],
+  "well": {"use": 0, "capacity": 3, "pct": 0.0}
+}
+
+// All items disconnected due to well overload
+{
+  "action": "overload",
+  "connected": [],
+  "well": {"use": 0, "capacity": 3, "pct": 0.0}
+}
 ```
 
 **Game event payload variants:**
 ```json
-{"event": "started",  "mode": "snake", "level": 1, "item": "Staff of Power"}
-{"event": "failure",  "failures": 1, "limit": 3}
-{"event": "success",  "elapsed_s": 45.2}
-{"event": "timeout"}
+{"event": "failure", "failures": 1, "limit": 3}
+{"event": "success", "elapsed_s": 45.2}
 ```
 
-**broker → MARVIN (subscribe — Phase 4 deferred, scaffolding only):**
+**broker → MARVIN (subscribe — active in Phase 4):**
 
-No inbound command handling is implemented in Phase 4. `_MQTT` subscribes to `marvin/<id>/cmd/#` and logs received messages for future use.
+| Topic | Direction | Purpose | Payload |
+|---|---|---|---|
+| `marvin/<id>/cmd/rfid/register` | broker → MARVIN | Create a new player or item for an unknown RFID tag | see below |
+| `marvin/<id>/cmd/#` (catch-all) | broker → MARVIN | All other commands — logged, not acted upon yet | any |
+
+**`cmd/rfid/register` payload variants:**
+```json
+// Register new player
+{"rfid": 99999, "type": "player", "name": "Seraphina", "section": "P5"}
+
+// Register new item
+{"rfid": 99999, "type": "item", "name": "Amulet of Flame", "level": 2, "skill": "fire"}
+```
+
+MARVIN calls `_Players.write_tag()` or `_Items.write_tag()` accordingly, which hot-reloads the config. The next scan of that tag will be recognised. `section` identifies which config entry to update (player sections like `P5`; for new items a new section is appended).
 
 ### `_MQTT.py` module design
 
@@ -345,16 +394,19 @@ No MQTT logic lives inside individual state files. Each state calls `glbs.mqtt.p
 
 | State | Event | Call |
 |---|---|---|
-| `S2_Scan_Player.py` | Player tag recognised or unknown | `glbs.mqtt.publish("state/rfid", {...})` |
-| `S5_Scan_Item.py` | Item tag scanned | `glbs.mqtt.publish("state/rfid", {...})` |
-| `S7_Connect_Item.py` | Item successfully connected | `glbs.mqtt.publish("state/item/<name>", {...}, retain=True)` + well |
-| `S4_Disconnect_Item.py` | Item disconnected | same as above |
-| `S3_Disconnect_All.py` | Overload — all items cleared | publish all items + well |
-| `S9_StartGame.py` | Game sequence begins | `glbs.mqtt.publish("state/game", {"event":"started",...})` |
+| `S2_Scan_Player.py` | Known player tag scanned | `glbs.mqtt.publish("state/rfid", {"action":"detected","type":"player",...})` |
+| `S2_Scan_Player.py` | Unknown tag scanned | `glbs.mqtt.publish("state/rfid", {"action":"unknown","rfid":...})` |
+| `S5_Scan_Item.py` | Known item tag scanned | `glbs.mqtt.publish("state/rfid", {"action":"detected","type":"item",...})` |
+| `S5_Scan_Item.py` | Unknown tag scanned | `glbs.mqtt.publish("state/rfid", {"action":"unknown","rfid":...})` |
+| `S7_Connect_Item.py` | Item successfully connected | `glbs.mqtt.publish("state/items", {"action":"connected",...}, retain=True)` |
+| `S4_Disconnect_Item.py` | Item disconnected | `glbs.mqtt.publish("state/items", {"action":"disconnected",...}, retain=True)` |
+| `S3_Disconnect_All.py` | All items cleared after game | `glbs.mqtt.publish("state/items", {"action":"cleared",...}, retain=True)` |
+| `S3_Disconnect_All.py` | Overload — all items cleared | `glbs.mqtt.publish("state/items", {"action":"overload",...}, retain=True)` |
 | `S11_AwaitInput.py` | Failure registered | `glbs.mqtt.publish("state/game", {"event":"failure",...})` |
-| `S13_FinishGame.py` | Game ends | `glbs.mqtt.publish("state/game", {"event":"success"/"timeout",...})` |
+| `S13_FinishGame.py` | Game ends in success | `glbs.mqtt.publish("state/game", {"event":"success",...})` |
 | `S1_Reset.py` | Heartbeat timer fires | `glbs.mqtt.publish("state/heartbeat", {"uptime":...})` |
 | `S1_Reset.py` | Table status changes | `glbs.mqtt.publish("state/table", {...}, retain=True)` |
+| `_MQTT.py` on_message | `cmd/rfid/register` received | call `_Players.write_tag()` or `_Items.write_tag()` + hot-reload |
 
 ### Critical files
 
@@ -366,12 +418,11 @@ No MQTT logic lives inside individual state files. Each state calls `glbs.mqtt.p
 | `requirements.txt` | Add `paho-mqtt>=2.0`. |
 | `S2_Scan_Player.py` | Add RFID publish call. |
 | `S5_Scan_Item.py` | Add RFID publish call. |
-| `S7_Connect_Item.py` | Add item + well publish. |
-| `S4_Disconnect_Item.py` | Add item + well publish. |
-| `S3_Disconnect_All.py` | Add all-items + well overflow publish. |
-| `S9_StartGame.py` | Add game started publish. |
+| `S7_Connect_Item.py` | Add items publish (action: connected). |
+| `S4_Disconnect_Item.py` | Add items publish (action: disconnected). |
+| `S3_Disconnect_All.py` | Add items publish (action: cleared or overload). |
 | `S11_AwaitInput.py` | Add game failure publish. |
-| `S13_FinishGame.py` | Add game result publish. |
+| `S13_FinishGame.py` | Add game success publish. |
 | `S1_Reset.py` | Add heartbeat timer + table status publish. |
 
 ### Verification
@@ -385,12 +436,21 @@ uv run empnode-tools --internal-broker server
 mosquitto_sub -h localhost -t "marvin/#" -v
 
 # Run MARVIN in simulation and exercise each event:
-# - Scan a player tag → marvin/.../state/rfid
-# - Connect an item   → marvin/.../state/item/<name> + state/well
-# - Start a game      → marvin/.../state/game started
-# - Fail an input     → marvin/.../state/game failure
-# - Win the game      → marvin/.../state/game success
-# - Trigger overload  → all item states + well
+# - Scan a known player tag   → state/rfid  action:detected type:player
+# - Scan a known item tag     → state/rfid  action:detected type:item
+# - Scan an unknown tag       → state/rfid  action:unknown
+# - Connect an item           → state/items action:connected  (includes connected list + well)
+# - Disconnect one item       → state/items action:disconnected
+# - Trigger overload          → state/items action:overload   (connected:[], well:0)
+# - End game round (S3 path)  → state/items action:cleared
+# - Fail an input             → state/game  event:failure
+# - Win the game              → state/game  event:success
+
+# Test inbound register command (publish to broker, verify MARVIN hot-reloads):
+mosquitto_pub -h localhost \
+  -t "marvin/marvin-001/cmd/rfid/register" \
+  -m '{"rfid":99999,"type":"player","name":"Seraphina","section":"P5"}'
+# Expected: next scan of tag 99999 resolves to "Seraphina"
 ```
 
 ---
