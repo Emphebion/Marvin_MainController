@@ -1,6 +1,12 @@
 # MARVIN — Configuration Reference
 
+<!-- MAINTENANCE: Update this document after any phase that adds, removes, or changes
+     config keys. Cross-check every key listed here against the code that reads it.
+     Mark dead keys explicitly rather than silently leaving them. -->
+
 All configuration files use Python's `configparser` INI format. Keys are case-insensitive. Lists are comma-separated strings.
+
+**Last updated:** Phase 3 complete. Known pending: `[State6] source` in marvinconfig.txt is dead config (Phase 3b).
 
 ---
 
@@ -81,7 +87,7 @@ One section per device listed in `[common] devices`.
 
 | Key | Type | Example | Description |
 |-----|------|---------|-------------|
-| `source` | int | `100` | Overrides power source capacity for the visual display (not used for actual calculations — those use `itemconfig.txt [items] source`). |
+| ~~`source`~~ | int | `100` | **Dead config — remove from `marvinconfig.txt`.** The read is commented out in `S6_Well_Size.py`; the capacity display uses `itemconfig.txt [items] source` directly. |
 
 ### [State7] — S7_Connect_Item
 

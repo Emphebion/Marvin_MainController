@@ -1,5 +1,12 @@
 # MARVIN — Game Rules & Player Flow
 
+<!-- MAINTENANCE: Update this document after any phase that changes game flow,
+     win/fail conditions, skill requirements, or available game modes.
+     Verify that win conditions described here match S10_IdleGame.py exactly. -->
+
+<!-- Last updated: Phase 3 complete. Pending (Phase 3b): remove successPerLevel
+     reference on line ~92 — win condition is time-based only (gameTimeout). -->
+
 ## The Well
 
 The **well** (put) is the magical energy source that powers connected items. It has a fixed capacity (default: 70 units). Each connected item draws a certain load from the well. If the total load of all connected items exceeds the capacity, an **overload** occurs: all items are instantly disconnected.
@@ -85,19 +92,23 @@ The game consists of multiple rounds. The difficulty depends on the item's level
 
 | Condition | Result |
 |-----------|--------|
-| Player presses the correct button | Success for this round; progress toward win |
+| Player presses the correct button | Success for this round |
 | Player presses the wrong button | Failure recorded |
 | Multiple buttons pressed at once | Failure recorded |
 | Failures reach `failuresPerLevel` limit | Game over (failure) |
-| Success count reaches `successPerLevel` threshold | Game over (success) |
+| `gameTimeout` elapses | Game over (success) |
+
+The win condition is purely time-based: survive the full `gameTimeout` without exceeding the failure limit. `gameTimeout` is set in S7/S8 from `[State7] gameTime` / `[State8] gameTime` (default: 300 s).
 
 #### Difficulty by item level
 
-| Level | Successes to win | Max failures | Goals per round |
-|-------|-----------------|--------------|-----------------|
-| 1 | 6 | 4 | 1 button |
-| 2 | 12 | 3 | 2 buttons |
-| 3 | 18 | 2 | 3 buttons |
+| Level | Game timer | Max failures | Snake goals/round | Rune sequence length |
+|-------|------------|--------------|-------------------|----------------------|
+| 1 | `gameTime` (300 s) | 4 (`failuresPerLevel[0]`) | 1 button | 1 rune |
+| 2 | `gameTime` (300 s) | 4 (`failuresPerLevel[0]`) | 1 button | 3 runes |
+| 3 | `gameTime` (300 s) | 4 (`failuresPerLevel[0]`) | 1 button | 5 runes |
+
+> **Note:** `failuresPerLevel` in `marvinconfig.txt [State10]` is defined as `4,3,2` (comma-separated per level) but S10 currently reads only index `[0]` for all levels. Level-based failure scaling is not yet active.
 
 ### 13. Finish (S13)
 Result (success or failure) is displayed on screen for 3 seconds. The item's connection state is updated. The player can then connect another item (→ S7) or the session ends (→ S2 / S1).

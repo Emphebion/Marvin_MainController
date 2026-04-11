@@ -57,7 +57,6 @@ skills=wellsize
 name=achtergrond
 folder=menu
 location=0,0
-source=100
 
 [State7]
 name=connect

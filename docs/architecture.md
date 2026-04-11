@@ -1,10 +1,16 @@
 # MARVIN MainController — Architecture
 
+<!-- MAINTENANCE: Update this document after every phase that changes architecture,
+     module structure, hardware connections, or startup sequence. Check the diff
+     against the phase plan doc and mark the completed phase in that file. -->
+
 ## Overview
 
-MARVIN (Magical Arcane Repository Via Interactive Node) is a Python application running on a Raspberry Pi 4. It controls a physical octagonal gaming table equipped with ~494 NeoPixel LEDs, 8 game buttons, a RFID scanner, and a 480×320 display. The system implements a 13-state state machine that manages player interactions, item connections, and LED-driven mini-games.
+MARVIN (Magical Arcane Repository Via Interactive Node) is a Python application running on a Raspberry Pi 4. It controls a physical octagonal gaming table equipped with ~400 NeoPixel LEDs across 64 segments, 8 game buttons, a RFID scanner, and a display screen. The system implements a 13-state state machine that manages player interactions, item connections, and LED-driven mini-games.
 
 Desktop simulation is supported: without hardware attached the keyboard replaces buttons/RFID and pygame renders the screen.
+
+**Last updated:** Phase 3 complete (Phases 1, 1b, 2, 3 done; Phases 4–6 not yet implemented).
 
 ---
 
@@ -23,6 +29,7 @@ MARVIN.py  (entry point)
 │   ├── _Table.py          # LED segment graph, spark/energy-flow effects
 │   ├── _Players.py        # Player registry & skill lookup
 │   ├── _LineGame.py       # BaseGame ABC + LineGame (snake) implementation
+│   ├── _RuneGame.py       # RuneGame (rune/symbol recognition) implementation
 │   └── _GameContext.py    # Round-state dataclass (glbs.ctx)
 │
 ├── S1_Reset.py            # (all state modules import glbs)
@@ -155,7 +162,9 @@ Placeholder device. Not yet used in active game logic.
    - `_Table(table_file)` — reads `tableconfig.txt` with its own parser. **Must be before `_Display`** (LED positions).
    - `_Players(player_file)` — reads `playerconfig.txt` with its own parser; starts hot-reload watcher.
    - `_Display(config_file)` — last; detects sim vs hardware by checking `_Devices.get_device("RFID_LED")`.
-   - `LineGame(table)` — bound to the table graph; assigned to `glbs.game`.
+   - `LineGame(table)` — bound to the table graph; assigned to `glbs.snake_game`.
+   - `RuneGame(table, config_file, rune_config_file)` — loads runeconfig.txt; assigned to `glbs.rune_game`.
+   - `glbs.game` defaults to `glbs.snake_game`; S9 switches it to `glbs.rune_game` based on `[GameModes]` config.
    - `GameContext()` — round-state dataclass; assigned to `glbs.ctx`.
 3. `main()` instantiates all 13 state objects.
 4. Main loop starts at `S1_Reset`.
@@ -217,12 +226,24 @@ The last-pressed outer button is highlighted with a filled circle until the next
 
 ## Game Mode Architecture
 
-The snake game logic is extracted from `_Table.py` into `_LineGame.py`:
+Game modes are implemented as `BaseGame` subclasses in `_LineGame.py` and `_RuneGame.py`:
 
-- **`BaseGame`** (abstract) — defines the interface `start(goal)`, `update()`, `is_complete()`, `clear()`.
-- **`LineGame`** (concrete) — builds snake routes through the segment graph; implements `BaseGame`.
-- **`glbs.game`** — the active `BaseGame` instance. Swap `LineGame` for `RuneGame` (Phase 3) without touching any state module.
-- `_Table.createCurrentSnake()` is a backward-compatible wrapper that delegates to `glbs.game.start()`.
+- **`BaseGame`** (abstract, in `_LineGame.py`) — defines the interface `start(goal)`, `update()`, `is_complete()`, `clear()`.
+- **`LineGame`** (concrete) — builds snake routes through the segment graph. `mode = 'snake'`.
+- **`RuneGame`** (concrete, `_RuneGame.py`) — reveals geometric rune symbols via BFS animation; player identifies the owning button. `mode = 'runes'`.
+- **`glbs.game`** — the active `BaseGame` instance. S9 switches it based on `[GameModes] levelN` in `marvinconfig.txt`. S10/S11/S12/S13 use only the `BaseGame` interface.
+- **`[GameModes]` config** (in `marvinconfig.txt`):
+  ```ini
+  [GameModes]
+  level1 = snake
+  level2 = runes
+  level3 = runes
+  ```
+- **S1 rune catalog browser:** pressing `right` in S1 idle (simulation only) enters a rune catalog sub-loop showing all 48 rune definitions with their LED shapes rendered on the ring.
+
+<!-- Phase 5 will add MultiSnakeGame (mode = 'multisnake') here. -->
+
+**Rune config:** `runeconfig.txt` holds 48 rune definitions — 6 per button × 8 buttons. Each section has `name`, `button`, and `leds` (comma-separated `segmentname:led_index` pairs). Currently placeholder content — LED definitions to be filled in before hardware testing.
 
 ---
 
