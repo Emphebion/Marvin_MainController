@@ -27,7 +27,7 @@ item_location = 0,0
 [widget]
 name = Widget
 function = Test widget
-id = 1001
+id = 000003E9
 level = 1
 load = 5
 connected = 0
@@ -35,7 +35,7 @@ connected = 0
 [gadget]
 name = Gadget
 function = Test gadget
-id = 1002
+id = 000003EA
 level = 2
 load = 8
 connected = 1
@@ -47,17 +47,17 @@ players = hero,boss,unknown_player
 
 [hero]
 name = Hero
-id = 2001
+id = 000007D1
 skills = connect1,wellsize
 
 [boss]
 name = Boss
-id = 10
+id = 0000000A
 skills = disconnectall,disconnect1item,connect1,connect2,connect3,wellsize,SL
 
 [unknown_player]
 name = Unknown
-id = 0
+id = 00000000
 skills = None
 """
 
@@ -119,4 +119,55 @@ def table_config_file(tmp_path):
     """Write minimal tableconfig to a temp file and return its path."""
     p = tmp_path / "tableconfig.txt"
     p.write_text(TABLE_CONFIG)
+    return str(p)
+
+
+# ---------------------------------------------------------------------------
+# MQTT config fixtures
+# ---------------------------------------------------------------------------
+
+MQTT_CONFIG_DISABLED = """
+[MQTT]
+enabled  = false
+broker   = localhost
+port     = 1883
+node_id  = test-001
+
+[LineGame]
+snakeColor = turquoise
+"""
+
+MQTT_CONFIG_ENABLED = """
+[MQTT]
+enabled  = true
+broker   = localhost
+port     = 1883
+node_id  = test-001
+
+[State1]
+energyFlowColor = amethist
+
+[RuneGame]
+runeColorL1 = runeL1
+runeColorL2 = runeL2
+runeColorL3 = runeL3
+
+[LineGame]
+snakeColor = turquoise
+"""
+
+
+@pytest.fixture
+def mqtt_config_disabled(tmp_path):
+    """Write a marvinconfig with MQTT disabled and return its path."""
+    p = tmp_path / "marvinconfig.txt"
+    p.write_text(MQTT_CONFIG_DISABLED)
+    return str(p)
+
+
+@pytest.fixture
+def mqtt_config_enabled(tmp_path):
+    """Write a marvinconfig with MQTT enabled and return its path."""
+    p = tmp_path / "marvinconfig.txt"
+    p.write_text(MQTT_CONFIG_ENABLED)
     return str(p)

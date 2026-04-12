@@ -38,6 +38,7 @@ class S3_Disconnect_All(object):
                 elif new_input["data"] == "down":  # Dummy
                     if glbs.players.activePlayer.isGM:
                         glbs.items.disconnectAll()
+                        glbs.mqtt.publish_items_cleared()
                         # improve return state (to S2?) Maybe this is the best return state for all except sleep
                         self.state = self.states.S3
                     else:

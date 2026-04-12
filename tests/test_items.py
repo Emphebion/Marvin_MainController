@@ -102,7 +102,7 @@ class TestConnection:
         items = make_items(item_config_file)
         items.currentItemName = 'widget'
         items.connectItem()
-        assert items.itemsIDs[1001].connected is True
+        assert items.itemsIDs["000003E9"].connected is True
 
 
 # ---------------------------------------------------------------------------
@@ -112,12 +112,12 @@ class TestConnection:
 class TestLookup:
     def test_get_item_by_id(self, item_config_file):
         items = make_items(item_config_file)
-        item = items.getItemByID(1001)
+        item = items.getItemByID("000003E9")
         assert item.name == 'widget'
 
     def test_get_item_by_unknown_id_returns_none(self, item_config_file):
         items = make_items(item_config_file)
-        assert items.getItemByID(9999) is None
+        assert items.getItemByID("0000270F") is None
 
 
 # ---------------------------------------------------------------------------
@@ -127,16 +127,16 @@ class TestLookup:
 class TestWriteTag:
     def test_write_tag_updates_memory(self, item_config_file):
         items = make_items(item_config_file)
-        items.write_tag('widget', 5555)
-        assert items.items['widget'].ID == 5555
-        assert 5555 in items.itemsIDs
+        items.write_tag('widget', '000015B3')
+        assert items.items['widget'].ID == '000015B3'
+        assert '000015B3' in items.itemsIDs
 
     def test_write_tag_persists_to_file(self, item_config_file):
         items = make_items(item_config_file)
-        items.write_tag('widget', 5555)
+        items.write_tag('widget', '000015B3')
         parser = configparser.ConfigParser()
         parser.read(item_config_file)
-        assert parser.getint('widget', 'id') == 5555
+        assert parser.get('widget', 'id') == '000015B3'
 
     def test_reload_preserves_connected_state(self, item_config_file):
         items = make_items(item_config_file)

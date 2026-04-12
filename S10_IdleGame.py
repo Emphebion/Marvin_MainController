@@ -13,6 +13,13 @@ class S10_IdleGame():        #S10_GameMaster
 
 
     def run(self):
+        # Resolve failure limit for the current item's level
+        level = 1
+        if glbs.items.currentItemName and glbs.items.currentItemName in glbs.items.items:
+            level = glbs.items.items[glbs.items.currentItemName].level
+        level_idx = min(level - 1, len(self.failuresPerLevel) - 1)
+        self._max_failures = self.failuresPerLevel[level_idx]
+
         # Wait between rounds (snake only)
         if self.state == self.states.S10 and glbs.game.mode == 'snake':
             self.idleTime = glbs.random.randint(3,5) + glbs.time.time()
@@ -45,8 +52,8 @@ class S10_IdleGame():        #S10_GameMaster
         # 1. check if the player did not exceed the maximum number of failures
         # 2. Check if game time is exceeded
         # 3. wait for idle time (snake) or go directly to S11 (runes)
-        if (self.failuresPerLevel[0] >= glbs.ctx.gameFailures):
-            print("Currently " + str(glbs.ctx.gameFailures) + " of " + str(self.failuresPerLevel[0]) + " failures")
+        if (self._max_failures >= glbs.ctx.gameFailures):
+            print("Currently " + str(glbs.ctx.gameFailures) + " of " + str(self._max_failures) + " failures")
             # Check if game time is exceeded
             if self.checkGameTime():
                 print("Game time exceeded, game is finished")
@@ -85,6 +92,7 @@ class S10_IdleGame():        #S10_GameMaster
             glbs.systemWakeTime = glbs.time.time()
         if not((self.currentGoal in inputs) and (len(inputs) == 1)):
             glbs.ctx.gameFailures = glbs.ctx.gameFailures + 1
+            glbs.mqtt.publish_game_failure(glbs.ctx.gameFailures, self._max_failures)
 
     def checkGameTime(self):
         gameComplete = False

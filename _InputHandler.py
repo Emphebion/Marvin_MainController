@@ -11,7 +11,7 @@ Serial message types handled:
 
 All input is normalised into event dicts and appended to self.elist:
     {"event": "keydown", "data": "left"|"right"|"up"|"down"|"east"|...}
-    {"event": "rfid",    "data": <int tag ID>}
+    {"event": "rfid",    "data": <8-char uppercase hex tag ID string, e.g. "00CCA97F">}
     {"event": "serial",  "data": <raw bytes>}
 
 The 1 ms pygame.time.wait(1) at the end of event_handler() is intentional:
@@ -94,10 +94,8 @@ class _InputHandler(object):
                         glbs.pygame.quit()
 
         elif chr(data[0]) == 'T':
-            IDtag = 0
-            for index,IDsnip in enumerate(data):
-                IDtag = int.from_bytes(data[1:], "big")
-            self.elist.append({"event": "rfid", "data": IDtag})
+            IDtag = int.from_bytes(data[1:], "big")
+            self.elist.append({"event": "rfid", "data": f"{IDtag:08X}"})
         elif "quit" in str(data):
             os.system("sudo shutdown -h now")
         else:

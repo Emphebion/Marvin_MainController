@@ -4,7 +4,23 @@
 **Depends on:** [Phase 3](phase3_runegame.md) — requires `_RuneGame` and `_LineGame` in place
 **Followed by:** [Phase 5](phase5_multisnake.md)
 **Note:** Review empnode docs before implementation starts.
-**Status: NOT STARTED** — `_MQTT.py` does not exist; no `requirements.txt`; paho-mqtt not installed.
+**Status: DONE** — `_MQTT.py` implemented; `requirements.txt` updated; all state-file integration points wired.
+
+### Completion Notes
+- RFID hex conversion completed before MQTT start: all IDs now 8-char uppercase hex strings in configs and in-memory
+- `_MQTT.py` uses `import glbs` inside methods (standard pattern) to avoid circular imports at module level
+- `connectItem()` now returns `bool` (True = overload) — needed for MQTT overload detection in S13/S7
+- S7 GM direct-connect path had a latent bug (`connectItem(newItem)` passing arg to a no-arg method); fixed by setting `currentItemName` before calling `connectItem()`
+- S4 GM direct-disconnect path had the same bug (`disconnectItem(newItem)`); fixed identically
+- `config_version` stored in `itemconfig.txt [items]`; bumped on every registration or well-size change
+- All MQTT publish calls are silent no-ops when paho-mqtt is not installed or `enabled = false` in config
+- `[LineGame] snakeColor` added to `marvinconfig.txt`; S11 now reads it instead of hardcoding `"turquoise"`
+- `Disabled` table status added: blocks RFID in S1 `_setState`, shows LEDs off in `_setIdleLightBehaviour`
+- Heartbeat fires every 30 s from the S1 run loop via `glbs.mqtt.tick_heartbeat()`
+- `_Items.py` mtime sentinel fix: `connectItem()`, `disconnectItem()`, and `disconnectAll()` now advance `self._mtime` after writing config, preventing the hot-reload watcher from triggering a redundant `reload()` (which re-created all Item objects and spammed terminal output)
+- `S1_Reset._build_gm_entries` hex string fix: GM/unknown player filter changed from `player.ID in (0, 10)` to `player.ID in ("00000000", "0000000A")` to match hex ID format
+- `test_dependencies.py` added: parametrized test that reads `requirements.txt` and verifies every package is importable — catches missing dependencies at test time rather than at runtime
+- paho-mqtt v2 API: uses `CallbackAPIVersion.VERSION2` with 5-arg callbacks (`client, userdata, flags, reason_code, properties`)
 
 **empnode reference:** `C:\Users\Edwin\Documents\Vincent Personal\Creatief\Emphebion\Techniek\empnode`
 
@@ -335,27 +351,27 @@ No MQTT logic lives inside individual state files. Each state calls `glbs.mqtt.p
 
 ## Test Implementation Plan
 
-> **⚠ REVIEW NOTE:** Intent documentation only. Review and validate test structure against existing `tests/` patterns before implementation begins. Do not implement until the `_MQTT.py` module skeleton is functional.
+All 49 tests implemented in `tests/test_mqtt.py` — all passing. Additional dependency coverage in `tests/test_dependencies.py` (4 tests).
 
-| ID | Test | Description |
-|---|---|---|
-| T4.1 | MQTT connection | Mock paho Client; verify `connect_async` + `loop_start` called; verify all `cmd/` subscriptions registered in `on_connect` |
-| T4.2 | Heartbeat publish | Advance time mock 30 s; verify `state/heartbeat` published with valid `uptime` |
-| T4.3 | Player RFID → state/rfid | Inject known player RFID; verify payload `type:"player"`, correct `rfid` int |
-| T4.4 | Unknown RFID → state/rfid | Inject unknown RFID; verify `action:"unknown"`, correct `rfid` int |
-| T4.5 | Item connect → state/items | Simulate item scan; verify `action:"connected"`, `connected` list, `well` values correct |
-| T4.6 | Item disconnect → state/items | Remove item; verify `action:"disconnected"`, updated list and well |
-| T4.7 | Overload → state/items | Fill well past capacity; verify `action:"overload"`, `connected:[]` |
-| T4.8 | Game events | Trigger failure and success; verify correct payloads; verify `started`/`timeout` NOT published |
-| T4.9 | Register player | Publish register cmd; verify player in `_Players` dict; verify `playerconfig.txt` updated with skills |
-| T4.10 | Register item | Publish register cmd; verify item in `_Items` dict; verify `itemconfig.txt` updated with `load` and `function` |
-| T4.11 | Config persistence across restart | Register player + item; re-init `_Players` and `_Items` from file only; verify all fields including `skills`, `load`, `function` |
-| T4.12 | Old config format compatibility | Read pre-Phase-4 config (missing new fields); verify graceful defaults, no crash |
-| T4.13 | `cmd/well/size` | Set size; verify `_Items.source` updated, `itemconfig.txt` written, `state/items` republished |
-| T4.14 | `cmd/table/status` + Disabled | Set `disabled`; verify `glbs.table.status`; verify RFID scan does not advance to S2 |
-| T4.15 | `cmd/game/color` | Publish linegame and runegame colour cmds; verify `colorsLED` updated, `tableconfig.txt` written |
-| T4.16 | Sync — EDD newer | Simulate MARVIN v5, EDD v8; verify MARVIN accepts EDD data and overwrites config |
-| T4.17 | Sync — MARVIN newer | Simulate MARVIN v10, EDD v8; verify MARVIN publishes `state/sync/push` |
+| ID | Test | Status | Test class(es) |
+|---|---|---|---|
+| T4.1 | MQTT connection | ✅ | `TestImportChain` (3), `TestDisabledMode` (3), `TestEnabledMode` (5) |
+| T4.2 | Heartbeat publish | ✅ | `TestHeartbeatTimer` (3) |
+| T4.3 | Player RFID → state/rfid | ✅ | `TestPublishHelpers::test_rfid_player_payload` |
+| T4.4 | Unknown RFID → state/rfid | ✅ | `TestPublishHelpers::test_rfid_unknown_payload` |
+| T4.5 | Item connect → state/items | ✅ | `TestItemsPayload::test_connected_*` (3) |
+| T4.6 | Item disconnect → state/items | ✅ | `TestItemsPayload::test_disconnected_payload` |
+| T4.7 | Overload → state/items | ✅ | `TestItemsPayload::test_overload_*`, `test_cleared_payload` |
+| T4.8 | Game events | ✅ | `TestPublishHelpers::test_game_failure_payload`, `test_game_success_payload` |
+| T4.9 | Register player | ✅ | `TestCommandHandlers::test_cmd_register_player_persists` |
+| T4.10 | Register item | ✅ | `TestCommandHandlers::test_cmd_register_item_persists` |
+| T4.11 | Config persistence across restart | ✅ | `TestConfigPersistence` (2) |
+| T4.12 | Old config format compatibility | ✅ | `TestOldConfigCompat` (1) |
+| T4.13 | `cmd/well/size` | ✅ | `TestCommandHandlers::test_cmd_well_size_*` (2) |
+| T4.14 | `cmd/table/status` + Disabled | ✅ | `TestCommandHandlers::test_cmd_table_status_*` |
+| T4.15 | `cmd/game/color` | ✅ | `TestColorCommands` (5) |
+| T4.16 | Sync — EDD newer | ✅ | `TestSync::test_edd_newer_*` (2) |
+| T4.17 | Sync — MARVIN newer | ✅ | `TestSync::test_marvin_newer_*`, `test_equal_versions_*` |
 
 ---
 

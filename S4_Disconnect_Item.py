@@ -35,11 +35,15 @@ class S4_Disconnect_Item(object):
 
             # CHECK if an RFID tag has been presented
             if new_input["event"] == "rfid":
-                newItem = glbs.items.getItemByID(new_input["data"])
+                rfid_hex = new_input["data"]
+                newItem = glbs.items.getItemByID(rfid_hex)
                 playerIsGM = glbs.players.activePlayer.isGM
                 if newItem:
                     if playerIsGM and newItem.connected:
-                        glbs.items.disconnectItem(newItem)
+                        item_before = newItem
+                        glbs.items.currentItemName = newItem.name
+                        glbs.items.disconnectItem()
+                        glbs.mqtt.publish_item_disconnected(item_before)
                         glbs.items.currentItemName = ""
                         self.state = self.states.S1
                     elif glbs.items.currentItemName != newItem.name and newItem.connected:

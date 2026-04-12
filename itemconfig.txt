@@ -3,11 +3,12 @@ names = item1,item2,item3,item4,item5,item6,item7,item8,item9,item10,item11,item
 folder = items
 source = 70
 item_location = 120,80
+config_version = 0
 
 [item1]
 name = Zuiver geweten
 function = Onbekend in de pilaar
-id = 14531606
+id = 00DDBC16
 level = 2
 load = 30
 connected = 0
@@ -15,7 +16,7 @@ connected = 0
 [item2]
 name = Mini Verzamel Golem
 function = Zoekt een gebied af naar grondstoffen. Een keer per dag deel moet de grondstof opgehaal worden. (aangepaste ruling!)
-id = 14494164
+id = 00DD29D4
 level = 2
 load = 25
 connected = 0
@@ -23,15 +24,15 @@ connected = 0
 [item3]
 name = Inspiratie Amulet
 function = Wijst naar de put waar op dit construct is aangesloten. Als dit wordt gebruikt om te woudlopen verliest de groep items, 1 LP en komt uitgeput aan.
-id = 14500535
+id = 00DD42B7
 level = 1
 load = 5
-connected = 0
+connected = 1
 
 [item4]
 name = Zelfreparerend Pantser
 function = Repareert met X punten per Y tijd
-id = 14525725
+id = 00DDA51D
 level = 2
 load = 21
 connected = 0
@@ -39,7 +40,7 @@ connected = 0
 [item5]
 name = Zegel van Intentie
 function = Tijdens het verzegelen van een brief kan met dit zegel 1 aspect van de brief feilloos worden overgebracht op de persoon die het zegel breekt. Voorbeelden: Emotie tijdens verzegelen, Leest zig zelf voor, Vertaald naar andere taal, etc
-id = 14495391
+id = 00DD2E9F
 level = 1
 load = 7
 connected = 0
@@ -47,7 +48,7 @@ connected = 0
 [item6]
 name = Vitalizer
 function = Na 2 keer draaien van de sleutel gaat het kistje open. Is het kistje leeg neemt het direct 2 LP op als energie. Als er al energie in zit kan dit er uitgehaald worden per LP.
-id = 14560095
+id = 00DE2B5F
 level = 1
 load = 10
 connected = 0
@@ -55,7 +56,7 @@ connected = 0
 [item7]
 name = Kristallen feest glas met licht
 function = Onbekend in pilaar
-id = 14502092
+id = 00DD48CC
 level = 1
 load = 5
 connected = 0
@@ -63,7 +64,7 @@ connected = 0
 [item8]
 name = Dryade diadeem
 function = Onbekend in pilaar
-id = 14537768
+id = 00DDD428
 level = 2
 load = 30
 connected = 0
@@ -71,7 +72,7 @@ connected = 0
 [item9]
 name = Vloeislag de 1ste
 function = Onbekend in pilaar
-id = 14303860
+id = 00DA4274
 level = 1
 load = 10
 connected = 0
@@ -79,7 +80,7 @@ connected = 0
 [item10]
 name = Drakenklauw ketting
 function = Kan met de schaduwen van de drakenklauw communiceren
-id = 14294007
+id = 00DA1BF7
 level = 1
 load = 8
 connected = 0
@@ -87,7 +88,7 @@ connected = 0
 [item11]
 name = Landkaart
 function = Laat op een landkaart zien waar iets van belang gebeurd voor de kijker
-id = 14540039
+id = 00DDDD07
 level = 1
 load = 10
 connected = 1
@@ -95,7 +96,7 @@ connected = 1
 [item12]
 name = Herhaal paal
 function = Communiceerd tot 2x met zijn tegenpool
-id = 14553988
+id = 00DE1384
 level = 1
 load = 12
 connected = 1
@@ -103,7 +104,7 @@ connected = 1
 [item13]
 name = Spintol Vonne TEMP
 function = Spintol Vonne TEMP function tbd
-id = 14466855
+id = 00DCBF27
 level = 0
 load = 0
 connected = 0

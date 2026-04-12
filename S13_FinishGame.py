@@ -12,16 +12,27 @@ class S13_FinishGame():
         print("current state is {}".format(self.state))
 
         #Handle the consequences of the game
+        elapsed_s = glbs.time.time() - glbs.ctx.gameStartTime
         if glbs.ctx.gameSuccess:
             print("Game finished successfully")
+            glbs.mqtt.publish_game_success(elapsed_s)
             glbs.table.setAllTableLEDs(glbs.table.colorsLED["emerald"])
             glbs.devices.transmitLED(glbs.table.getLEDData())
             if glbs.ctx.returnState.value is self.states.S8.value or glbs.ctx.returnState.value is self.states.S7.value:
-                glbs.items.connectItem()
+                item_before = glbs.items.items.get(glbs.items.currentItemName)
+                overloaded = glbs.items.connectItem()
+                if overloaded:
+                    glbs.mqtt.publish_items_overload()
+                elif item_before is not None:
+                    glbs.mqtt.publish_item_connected(item_before)
             elif glbs.ctx.returnState.value is self.states.S4.value:
+                item_before = glbs.items.items.get(glbs.items.currentItemName)
                 glbs.items.disconnectItem()
+                if item_before is not None:
+                    glbs.mqtt.publish_item_disconnected(item_before)
             elif glbs.ctx.returnState.value is self.states.S3.value:
                 glbs.items.disconnectAll()
+                glbs.mqtt.publish_items_cleared()
         else:
             print("Game failed")
             glbs.table.setAllTableLEDs(glbs.table.colorsLED["red"])

@@ -7,6 +7,7 @@ class S11_AwaitInput():
         self.states = states_enum.get_states_s11()
         self.loopTimeout = float(glbs.parser.getint('State11', 'looptimeout'))/1000
         self.snakeLength = glbs.parser.getint('State11', 'snakeLength')
+        self._snake_color_name = glbs.parser.get('LineGame', 'snakeColor', fallback='turquoise')
         self.loopStartTime = 0
         self.routeDone = []
 
@@ -80,10 +81,10 @@ class S11_AwaitInput():
         # Snake mode: advance snake animation by one LED
         if glbs.ctx.currentGameRoute:
             glbs.ctx.snakeCounter = glbs.ctx.snakeCounter + 1
-            if self.setLEDinSnake(glbs.ctx.currentGameRoute[-1], glbs.table.colorsLED["black"], glbs.table.colorsLED["turquoise"]):
+            if self.setLEDinSnake(glbs.ctx.currentGameRoute[-1], glbs.table.colorsLED["black"], glbs.table.colorsLED[self._snake_color_name]):
                 self.routeDone.append(glbs.ctx.currentGameRoute.pop())
         if (glbs.ctx.snakeCounter > self.snakeLength) & (len(self.routeDone) > 0):
-            if (self.setLEDinSnake(self.routeDone[0], glbs.table.colorsLED["turquoise"], glbs.table.colorsLED["black"])):
+            if (self.setLEDinSnake(self.routeDone[0], glbs.table.colorsLED[self._snake_color_name], glbs.table.colorsLED["black"])):
                 oldSegment = self.routeDone.pop(0)
                 oldSegment.flow.pop()
 

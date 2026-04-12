@@ -11,7 +11,7 @@ occurs and all items are disconnected.
 
 Two parallel dicts are maintained:
     items    -- name  → Item  (for menu navigation by name)
-    itemsIDs -- int ID → Item (for RFID lookup by tag ID)
+    itemsIDs -- hex ID string → Item (for RFID lookup by tag ID, e.g. "00DDBC16")
 """
 import configparser
 import os
@@ -42,7 +42,7 @@ class _Items(object):
         print("itemnames = " + str(self.itemnames))
         for name in self.itemnames:
             function = self.parser.get(name, 'function')
-            ID = self.parser.getint(name, 'ID')
+            ID = self.parser.get(name, 'id').strip().upper()
             level = self.parser.getint(name, 'level')
             activationSkill = f"connect{level}"
             load = self.parser.getint(name, 'load')
@@ -84,7 +84,7 @@ class _Items(object):
         for name in itemnames:
             try:
                 function = parser.get(name, 'function')
-                ID = parser.getint(name, 'ID')
+                ID = parser.get(name, 'id').strip().upper()
                 level = parser.getint(name, 'level')
                 activationSkill = f"connect{level}"
                 load = parser.getint(name, 'load')
@@ -111,7 +111,7 @@ class _Items(object):
 
         Args:
             item_name -- config section / item name key (e.g. 'item3')
-            new_id    -- new integer tag ID
+            new_id    -- new hex string tag ID (e.g. '00DDBC16')
         """
         self.parser.read(self.config_file)
         old_id = None
@@ -221,7 +221,7 @@ class _Items(object):
         return self.currentItemName
     
     def getItemByID(self, foundID):
-        """Look up an Item by its integer RFID tag ID.
+        """Look up an Item by its hex string RFID tag ID (e.g. "00DDBC16").
 
         Returns:
             Item object, or None if not found.
@@ -276,10 +276,19 @@ class _Items(object):
         with open(self.config_file,'w') as file:
             self.parser.write(file)
 
+        try:
+            self._mtime = os.path.getmtime(self.config_file)
+        except OSError:
+            pass
+
         self.currentItemName = self.itemnames[0]
 
     def connectItem(self):
-        """Connect currentItem and persist. Triggers disconnectAll() on overload."""
+        """Connect currentItem and persist. Triggers disconnectAll() on overload.
+
+        Returns:
+            True if an overload occurred (all items disconnected), False otherwise.
+        """
         item = self.items[self.currentItemName]
         item.connectItem()
         self.parser[item.name]['connected'] = '1'
@@ -287,10 +296,18 @@ class _Items(object):
         with open(self.config_file,'w') as file:
             self.parser.write(file)
 
+        try:
+            self._mtime = os.path.getmtime(self.config_file)
+        except OSError:
+            pass
+
+        overloaded = False
         if self.calculateNodeUse() > self.source:
             self.disconnectAll()
+            overloaded = True
 
         self.setCurrentItemToLowestInactiveItem()
+        return overloaded
 
 
 
@@ -302,6 +319,11 @@ class _Items(object):
 
         with open(self.config_file,'w') as file:
             self.parser.write(file)
+
+        try:
+            self._mtime = os.path.getmtime(self.config_file)
+        except OSError:
+            pass
 
         self.setCurrentItemToLowestActiveItem()
 

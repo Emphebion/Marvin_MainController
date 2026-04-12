@@ -39,13 +39,21 @@ class S7_Connect_Item():
             new_input = input_list.pop()
             # CHECK if an RFID tag has been presented
             if new_input["event"] == "rfid":
-                newItem = glbs.items.getItemByID(new_input["data"])
+                rfid_hex = new_input["data"]
+                newItem = glbs.items.getItemByID(rfid_hex)
                 if newItem:
+                    glbs.mqtt.publish_rfid_item(rfid_hex, newItem.name)
                     playerIsGM = glbs.players.activePlayer.isGM
                     playerCanActivate = glbs.players.activePlayer.hasSkill(newItem.activationSkill)
                     # TODO: give feedback if item was invalid, already connected or level is insufficient!
                     if playerIsGM and not(newItem.connected):
-                        glbs.items.connectItem(newItem)
+                        item_before = newItem
+                        glbs.items.currentItemName = newItem.name
+                        overloaded = glbs.items.connectItem()
+                        if overloaded:
+                            glbs.mqtt.publish_items_overload()
+                        else:
+                            glbs.mqtt.publish_item_connected(item_before)
                         glbs.items.currentItemName = ""
                         self.state = self.states.S1
                     elif playerCanActivate and (glbs.items.currentItemName != newItem.name) and not(newItem.connected):
@@ -60,6 +68,8 @@ class S7_Connect_Item():
                         self.state = self.states.S7
                     else:
                         self.state = self.states.S7
+                else:
+                    glbs.mqtt.publish_rfid_unknown(rfid_hex)
             
             # Handle the menu input buttons for this state
             elif new_input["event"] == "keydown":

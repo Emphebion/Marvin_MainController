@@ -5,9 +5,9 @@ Loads player definitions (name, RFID ID, skills) from playerconfig.txt
 at startup. Provides skill-checking helpers used by state modules to
 gate access to menu options and item interactions.
 
-Special IDs:
-    0   -- PlayerUnknown (no card / unrecognised tag)
-    10  -- GM override card (all skills, bypasses checks)
+Special IDs (stored as 8-char uppercase hex strings):
+    "00000000"  -- PlayerUnknown (no card / unrecognised tag); excluded from playerDict
+    "0000000A"  -- GM override card (ID 10 decimal)
 
 Skills are stored as comma-separated strings and compared with hasSkill().
 A player with skill 'SL' is flagged as isGM which enables force-connect.
@@ -47,13 +47,13 @@ class _Players(object):
         for section in playerList:
             section = section.strip()
             try:
-                ID = int(parser.get(section, 'ID'))
+                ID = parser.get(section, 'id').strip().upper()
             except Exception:
-                ID = 0
+                ID = '00000000'
             name = parser.get(section, 'name')
             skills = parser.get(section, 'skills').split(',')
             player = _Player(name, ID, skills, section)
-            if ID != 0:
+            if ID != '00000000':
                 self.playerDict[ID] = player
             self._player_sections[section] = player
 
@@ -80,13 +80,13 @@ class _Players(object):
         for section in playerList:
             section = section.strip()
             try:
-                ID = int(parser.get(section, 'ID'))
+                ID = parser.get(section, 'id').strip().upper()
             except Exception:
-                ID = 0
+                ID = '00000000'
             name = parser.get(section, 'name')
             skills = parser.get(section, 'skills').split(',')
             player = _Player(name, ID, skills, section)
-            if ID != 0:
+            if ID != '00000000':
                 new_dict[ID] = player
             new_sections[section] = player
 
@@ -111,11 +111,12 @@ class _Players(object):
 
         Args:
             section -- config section name (e.g. 'SL1')
-            new_id  -- new integer tag ID
+            new_id  -- new hex string tag ID (e.g. '00CCA97F')
         """
         parser = _cp.ConfigParser()
         parser.read(self.config_file)
-        old_id_str = parser.get(section, 'id', fallback=None)
+        old_id_raw = parser.get(section, 'id', fallback=None)
+        old_id = old_id_raw.strip().upper() if old_id_raw else None
         parser.set(section, 'id', str(new_id))
         with open(self.config_file, 'w') as f:
             parser.write(f)
@@ -127,10 +128,6 @@ class _Players(object):
             pass
 
         # Update in-memory immediately
-        try:
-            old_id = int(old_id_str)
-        except (TypeError, ValueError):
-            old_id = None
         if old_id is not None and old_id in self.playerDict:
             player = self.playerDict.pop(old_id)
             player.ID = new_id

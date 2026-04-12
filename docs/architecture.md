@@ -10,7 +10,7 @@ MARVIN (Magical Arcane Repository Via Interactive Node) is a Python application 
 
 Desktop simulation is supported: without hardware attached the keyboard replaces buttons/RFID and pygame renders the screen.
 
-**Last updated:** Phase 3 complete (Phases 1, 1b, 2, 3 done; Phases 4–6 not yet implemented).
+**Last updated:** Phase 4 complete (Phases 1, 1b, 2, 3, 4 done; Phases 5–6 not yet implemented).
 
 ---
 
@@ -28,6 +28,7 @@ MARVIN.py  (entry point)
 │   ├── _Devices.py        # Serial communication to Arduino(s) + reconnect
 │   ├── _Table.py          # LED segment graph, spark/energy-flow effects
 │   ├── _Players.py        # Player registry & skill lookup
+│   ├── _MQTT.py           # MQTT client: publish game events, accept EDD commands
 │   ├── _LineGame.py       # BaseGame ABC + LineGame (snake) implementation
 │   ├── _RuneGame.py       # RuneGame (rune/symbol recognition) implementation
 │   └── _GameContext.py    # Round-state dataclass (glbs.ctx)
@@ -106,7 +107,7 @@ stateDiagram-v2
 
 | # | Name | Purpose |
 |---|------|---------|
-| S1 | Reset | Idle state. **Active** status: soft glowing EnergyFlow animation. **Broken**: random spark flashes. Wakes on RFID scan. `down` key enters GM tag-assign sub-loop. |
+| S1 | Reset | Idle state. **Active** status: soft glowing EnergyFlow animation. **Broken**: random spark flashes. **Disabled**: LEDs off, RFID blocked (EDD-commanded). Wakes on RFID scan (publishes `state/rfid` via MQTT). Fires heartbeat every 30 s. `down` key enters GM tag-assign sub-loop. |
 | S2 | Welcome | Shows the active player's name. Any input advances to S3. |
 | S3 | Disconnect All | Menu to disconnect all connected items. Requires `disconnectall` skill. |
 | S4 | Disconnect Item | Disconnect a single item via RFID scan. Requires `disconnect1item` skill. |
@@ -162,6 +163,7 @@ Placeholder device. Not yet used in active game logic.
    - `_Table(table_file)` — reads `tableconfig.txt` with its own parser. **Must be before `_Display`** (LED positions).
    - `_Players(player_file)` — reads `playerconfig.txt` with its own parser; starts hot-reload watcher.
    - `_Display(config_file)` — last; detects sim vs hardware by checking `_Devices.get_device("RFID_LED")`.
+   - `_MQTT(config_file)` — reads `[MQTT]` from `marvinconfig.txt`; connects to broker (non-blocking). Assigned to `glbs.mqtt`.
    - `LineGame(table)` — bound to the table graph; assigned to `glbs.snake_game`.
    - `RuneGame(table, config_file, rune_config_file)` — loads runeconfig.txt; assigned to `glbs.rune_game`.
    - `glbs.game` defaults to `glbs.snake_game`; S9 switches it to `glbs.rune_game` based on `[GameModes]` config.
@@ -247,6 +249,22 @@ Game modes are implemented as `BaseGame` subclasses in `_LineGame.py` and `_Rune
 
 ---
 
+## MQTT Subsystem (`glbs.mqtt`)
+
+`_MQTT.py` connects MARVIN to an MQTT broker (default `localhost:1883`) for two-way communication with EDD/GMControl. Requires `paho-mqtt>=2.0`.
+
+**Publish (state events):** RFID scans, item connect/disconnect/overload/cleared, game failure/success, table status, heartbeat, config version. State files call convenience methods like `glbs.mqtt.publish_rfid_player(...)` at the relevant moment — no MQTT logic lives inside state files.
+
+**Subscribe (commands):** Register new players/items, set table status (including `Disabled`), change well capacity, update LED colours, config sync with EDD. All command handlers live in `_MQTT.py`.
+
+**Graceful degradation:** If `[MQTT] enabled = false` or `paho-mqtt` is not installed, the module initialises as a no-op — all publish calls silently return. The game runs identically without a broker.
+
+**Config sync:** On connect, MARVIN publishes its `config_version` (monotonically incrementing integer in `itemconfig.txt [items]`). EDD responds with a `cmd/sync/offer`. If EDD's version is higher, MARVIN accepts EDD data and overwrites local config. If MARVIN's version is higher, it publishes `state/sync/push` so EDD can update.
+
+See [phase4_mqtt.md](phase4_mqtt.md) for full topic/payload specification.
+
+---
+
 ## Round State (`glbs.ctx`)
 
 All mutable per-round variables live in a `GameContext` dataclass at `glbs.ctx`:
@@ -286,4 +304,6 @@ up           →  exit, return to S1 idle
 
 Entries updated in the current session show `✓ <name> [<new_id>]`. On hardware the full screen is used; in simulation the right panel shows the assign list.
 
-**Scope:** Tag reassignment only. Adding new player names, changing skills, or adding items requires editing the config file externally (SSH or USB).
+**MQTT registration:** EDD can register new players and items via `cmd/rfid/register` — the RFID ID, name, skills (player) or level/load/function (item) are written to the config file and `reload()` is called automatically.
+
+**Scope:** GM scan-to-assign handles tag reassignment only. Adding new player names, changing skills, or adding items requires either MQTT registration from EDD or editing the config file externally (SSH or USB).

@@ -32,6 +32,7 @@ class S1_Reset():
 
         self.sparklist = []
         self._flows = []
+        self._heartbeat_interval = 30
 
     # ------------------------------------------------------------------ #
     # Main entry point                                                     #
@@ -64,6 +65,7 @@ class S1_Reset():
                     self.idleStartTime = now
                     self.idleTimeout = glbs.random.uniform(1, self.idleMaxTimeout)
 
+            glbs.mqtt.tick_heartbeat()
             self._setState()
 
         return self.state.value
@@ -73,7 +75,7 @@ class S1_Reset():
     # ------------------------------------------------------------------ #
     def _setState(self):
         self._checkInput()
-        if glbs.table.status != 'Broken':
+        if glbs.table.status not in ('Broken', 'Disabled'):
             if glbs.players.activePlayer:
                 self.state = self.states.S2
 
@@ -85,7 +87,11 @@ class S1_Reset():
                 ID = new_input["data"]
                 print("Received ID: {}".format(ID))
                 if ID in glbs.players.playerDict:
+                    player = glbs.players.playerDict[ID]
                     glbs.players.setActivePlayer(ID)
+                    glbs.mqtt.publish_rfid_player(ID, player.name)
+                else:
+                    glbs.mqtt.publish_rfid_unknown(ID)
             elif new_input["event"] == "keydown":
                 if new_input["data"] == "down":
                     self._run_gm_assign()  # GM mode: assign RFID tags
@@ -152,7 +158,7 @@ class S1_Reset():
         """
         entries = []
         for section, player in glbs.players._player_sections.items():
-            if player.ID in (0, 10):
+            if player.ID in ("00000000", "0000000A"):
                 continue
             entries.append({
                 'type': 'player',
@@ -230,7 +236,7 @@ class S1_Reset():
         """Initialise animation objects based on current table status."""
         print("Table status is: {}".format(glbs.table.status))
 
-        if glbs.table.status == "Off":
+        if glbs.table.status in ("Off", "Disabled"):
             glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
             glbs.devices.transmitLED(glbs.table.getLEDData())
 

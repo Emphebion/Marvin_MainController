@@ -124,3 +124,12 @@ runeColorL3 = runeL3
 name=Quit
 folder=menu
 location=0,0
+
+[MQTT]
+enabled  = true
+broker   = localhost
+port     = 1883
+node_id  = marvin-001
+
+[LineGame]
+snakeColor = turquoise

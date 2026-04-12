@@ -104,11 +104,11 @@ The win condition is purely time-based: survive the full `gameTimeout` without e
 
 | Level | Game timer | Max failures | Snake goals/round | Rune sequence length |
 |-------|------------|--------------|-------------------|----------------------|
-| 1 | `gameTime` (300 s) | 4 (`failuresPerLevel[0]`) | 1 button | 1 rune |
-| 2 | `gameTime` (300 s) | 4 (`failuresPerLevel[0]`) | 1 button | 3 runes |
-| 3 | `gameTime` (300 s) | 4 (`failuresPerLevel[0]`) | 1 button | 5 runes |
+| 1 | `gameTime` (300 s) | 4 | 1 button | 1 rune |
+| 2 | `gameTime` (300 s) | 3 | 1 button | 3 runes |
+| 3 | `gameTime` (300 s) | 2 | 1 button | 5 runes |
 
-> **Note:** `failuresPerLevel` in `marvinconfig.txt [State10]` is defined as `4,3,2` (comma-separated per level) but S10 currently reads only index `[0]` for all levels. Level-based failure scaling is not yet active.
+Failure limits from `marvinconfig.txt [State10] failuresPerLevel = 4,3,2` (indexed by item level).
 
 ### 13. Finish (S13)
 Result (success or failure) is displayed on screen for 3 seconds. The item's connection state is updated. The player can then connect another item (→ S7) or the session ends (→ S2 / S1).

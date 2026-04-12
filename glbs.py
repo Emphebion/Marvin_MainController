@@ -13,6 +13,7 @@ Subsystem objects (read-only after init):
     table     -- LED segment graph and animation engine
     players   -- player registry and active-player tracker
     game      -- active game mode instance (LineGame by default; swap for RuneGame)
+    mqtt      -- MQTT client (no-op when disabled or paho-mqtt not installed)
 
 Round variables (grouped in ctx — mutated by state modules):
     ctx.gameStartTime, ctx.gameTimeout, ctx.currentInput, ctx.currentGameRoute,
@@ -34,7 +35,9 @@ from _Players import _Players
 from _LineGame import LineGame
 from _RuneGame import RuneGame
 from _GameContext import GameContext
+from _MQTT import _MQTT
 import configparser
+
 import time
 import random
 
@@ -61,6 +64,7 @@ rune_config_file = 'runeconfig.txt'
 snake_game = LineGame(table)                   # snake game instance
 rune_game  = RuneGame(table, config_file, rune_config_file)  # rune game instance
 game       = snake_game                        # active game mode (switched by S9)
+mqtt       = _MQTT(config_file)                # MQTT client (no-op if disabled)
 
 # Round state — all mutable per-round variables live here
 ctx = GameContext()
