@@ -440,7 +440,7 @@ class _Display(object):
         # Players section
         _section("── Players ──")
         for pid, player in glbs.players.playerDict.items():
-            if pid == 0:
+            if pid == "00000000":
                 continue  # skip PlayerUnknown
             _button(player.name, {"event": "rfid", "data": pid})
             if y > self._SIM_H - 120:

@@ -15,6 +15,8 @@ import configparser
 import pytest
 from unittest.mock import MagicMock, patch, call
 
+from conftest import MQTT_CONFIG_ENABLED, MQTT_CONFIG_DISABLED
+
 
 # ---------------------------------------------------------------------------
 # Import-chain smoke tests
@@ -863,3 +865,326 @@ skills = connect1,wellsize
         # No publish, no reload
         client.publish.assert_not_called()
         glbs_stub.players.reload.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Item display_name — verify MQTT payloads use display names, not section keys
+# ---------------------------------------------------------------------------
+
+class TestItemDisplayName:
+    def test_display_name_set_from_config(self, item_config_file):
+        from _Items import _Items
+        items = _Items(item_config_file)
+        widget = items.items["widget"]
+        assert widget.name == "widget"            # section key
+        assert widget.display_name == "Widget"    # config 'name' field
+
+    def test_display_name_defaults_to_section_key(self):
+        from _Items import Item
+        item = Item("item3", "func", "AABBCCDD", 1, "connect1")
+        assert item.display_name == "item3"
+
+    def test_items_payload_uses_display_name(self, tmp_path, monkeypatch):
+        """MQTT items payload must send display names, not section keys."""
+        from _MQTT import _MQTT
+        from _Items import Item
+
+        mqtt_cfg = tmp_path / "marvinconfig.txt"
+        mqtt_cfg.write_text(MQTT_CONFIG_ENABLED)
+
+        widget = Item("widget", "func", "000003E9", 1, "connect1", 5, True, "Widget")
+        gadget = Item("gadget", "func", "000003EA", 2, "connect2", 8, False, "Gadget")
+
+        glbs_stub = types.SimpleNamespace(
+            item_file=str(tmp_path / "dummy.txt"),
+            player_file=str(tmp_path / "dummy2.txt"),
+            table_file=str(tmp_path / "dummy3.txt"),
+            table=types.SimpleNamespace(status="Active", colorsLED={}),
+            items=types.SimpleNamespace(
+                source=70, calculateNodeUse=lambda: 5,
+                items={"widget": widget, "gadget": gadget},
+            ),
+            players=types.SimpleNamespace(playerDict={}),
+            parser=configparser.ConfigParser(),
+        )
+        glbs_stub.parser.read(str(mqtt_cfg))
+        monkeypatch.setitem(sys.modules, 'glbs', glbs_stub)
+
+        with patch('_MQTT._mqtt_client') as mock_paho:
+            mock_client = MagicMock()
+            mock_paho.Client.return_value = mock_client
+            mock_paho.CallbackAPIVersion.VERSION2 = 2
+            mqtt = _MQTT(str(mqtt_cfg))
+        mqtt._client = mock_client
+
+        payload = mqtt._items_payload("connected", widget)
+        assert payload["changed"]["name"] == "Widget"
+        assert payload["connected"][0]["name"] == "Widget"
+
+
+# ---------------------------------------------------------------------------
+# Robustness / misuse — malformed inputs, missing fields, invalid values
+# ---------------------------------------------------------------------------
+
+class TestMisuseRegister:
+    """Verify _cmd_rfid_register handles bad input gracefully."""
+
+    def _setup(self, tmp_path, monkeypatch):
+        from _MQTT import _MQTT
+
+        mqtt_cfg = tmp_path / "marvinconfig.txt"
+        mqtt_cfg.write_text(MQTT_CONFIG_ENABLED)
+        item_cfg = tmp_path / "itemconfig.txt"
+        item_cfg.write_text("""
+[items]
+names = widget
+source = 70
+folder = items
+item_location = 0,0
+config_version = 0
+
+[widget]
+name = Widget
+function = Test widget
+id = 000003E9
+level = 1
+load = 5
+connected = 0
+""")
+        player_cfg = tmp_path / "playerconfig.txt"
+        player_cfg.write_text("""
+[common]
+players = hero
+
+[hero]
+name = Hero
+id = 000007D1
+skills = connect1,wellsize
+""")
+
+        glbs_stub = types.SimpleNamespace(
+            item_file=str(item_cfg),
+            player_file=str(player_cfg),
+            table_file="dummy",
+            table=types.SimpleNamespace(status="Active", colorsLED={}),
+            items=types.SimpleNamespace(
+                source=70, calculateNodeUse=lambda: 0,
+                items={}, reload=MagicMock(),
+            ),
+            players=types.SimpleNamespace(
+                playerDict={}, reload=MagicMock(),
+            ),
+            parser=configparser.ConfigParser(),
+        )
+        glbs_stub.parser.read(str(mqtt_cfg))
+        monkeypatch.setitem(sys.modules, 'glbs', glbs_stub)
+
+        with patch('_MQTT._mqtt_client') as mock_paho:
+            mock_client = MagicMock()
+            mock_paho.Client.return_value = mock_client
+            mock_paho.CallbackAPIVersion.VERSION2 = 2
+            mqtt = _MQTT(str(mqtt_cfg))
+        mqtt._client = mock_client
+        return mqtt, glbs_stub
+
+    def test_missing_rfid_ignored(self, tmp_path, monkeypatch):
+        """Register with no 'rfid' field should be silently rejected."""
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        mqtt._cmd_rfid_register({"type": "player", "name": "Ghost"})
+        # No reload called — registration was rejected
+        glbs_stub.players.reload.assert_not_called()
+
+    def test_missing_type_ignored(self, tmp_path, monkeypatch):
+        """Register with no 'type' field should be silently rejected."""
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        mqtt._cmd_rfid_register({"rfid": 12345, "name": "Ghost"})
+        glbs_stub.players.reload.assert_not_called()
+        glbs_stub.items.reload.assert_not_called()
+
+    def test_duplicate_player_rfid_updates_existing(self, tmp_path, monkeypatch):
+        """Registering a player with an RFID that already exists updates, not duplicates."""
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        # hero has id 000007D1 = 2001
+        mqtt._cmd_rfid_register({
+            "type": "player", "rfid": 2001,
+            "name": "Hero Reborn", "skills": ["connect2", "wellsize"],
+        })
+        # Verify config was updated, not duplicated
+        parser = configparser.ConfigParser()
+        parser.read(glbs_stub.player_file)
+        players_list = parser.get("common", "players").split(",")
+        # Only one entry for this RFID — no new section appended
+        assert players_list.count("hero") == 1
+        assert "PC1" not in players_list  # no new PC section created
+        # Existing section updated
+        assert parser.get("hero", "name") == "Hero Reborn"
+        assert "connect2" in parser.get("hero", "skills")
+
+    def test_duplicate_item_rfid_updates_existing(self, tmp_path, monkeypatch):
+        """Registering an item with an RFID that already exists updates, not duplicates."""
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        # widget has id 000003E9 = 1001
+        mqtt._cmd_rfid_register({
+            "type": "item", "rfid": 1001,
+            "name": "Super Widget", "level": 3, "load": 99,
+            "function": "Does everything",
+        })
+        parser = configparser.ConfigParser()
+        parser.read(glbs_stub.item_file)
+        names_list = parser.get("items", "names").split(",")
+        assert names_list.count("widget") == 1
+        assert "item1" not in names_list
+        assert parser.get("widget", "name") == "Super Widget"
+        assert parser.getint("widget", "load") == 99
+
+
+class TestMisuseWellSize:
+    """Verify _cmd_well_size rejects invalid values."""
+
+    def _setup(self, tmp_path, monkeypatch):
+        from _MQTT import _MQTT
+
+        mqtt_cfg = tmp_path / "marvinconfig.txt"
+        mqtt_cfg.write_text(MQTT_CONFIG_ENABLED)
+        item_cfg = tmp_path / "itemconfig.txt"
+        item_cfg.write_text("[items]\nnames = w\nsource = 70\nfolder = items\nitem_location = 0,0\nconfig_version = 0\n")
+
+        glbs_stub = types.SimpleNamespace(
+            item_file=str(item_cfg),
+            player_file="dummy",
+            table_file="dummy",
+            table=types.SimpleNamespace(status="Active", colorsLED={}),
+            items=types.SimpleNamespace(
+                source=70, calculateNodeUse=lambda: 0, items={},
+            ),
+            players=types.SimpleNamespace(playerDict={}),
+            parser=configparser.ConfigParser(),
+        )
+        glbs_stub.parser.read(str(mqtt_cfg))
+        monkeypatch.setitem(sys.modules, 'glbs', glbs_stub)
+
+        with patch('_MQTT._mqtt_client') as mock_paho:
+            mock_client = MagicMock()
+            mock_paho.Client.return_value = mock_client
+            mock_paho.CallbackAPIVersion.VERSION2 = 2
+            mqtt = _MQTT(str(mqtt_cfg))
+        mqtt._client = mock_client
+        return mqtt, glbs_stub
+
+    def test_negative_size_rejected(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        mqtt._cmd_well_size({"size": -10})
+        assert glbs_stub.items.source == 70  # unchanged
+
+    def test_zero_size_rejected(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        mqtt._cmd_well_size({"size": 0})
+        assert glbs_stub.items.source == 70
+
+    def test_non_numeric_size_rejected(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        mqtt._cmd_well_size({"size": "abc"})
+        assert glbs_stub.items.source == 70
+
+    def test_valid_size_accepted(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        mqtt._cmd_well_size({"size": 100})
+        assert glbs_stub.items.source == 100
+
+
+class TestMisuseTableStatus:
+    """Verify _cmd_table_status rejects invalid values."""
+
+    def _setup(self, tmp_path, monkeypatch):
+        from _MQTT import _MQTT
+
+        mqtt_cfg = tmp_path / "marvinconfig.txt"
+        mqtt_cfg.write_text(MQTT_CONFIG_ENABLED)
+        table_cfg = tmp_path / "tableconfig.txt"
+        table_cfg.write_text("[common]\nstatus = Active\n")
+
+        glbs_stub = types.SimpleNamespace(
+            item_file="dummy",
+            player_file="dummy",
+            table_file=str(table_cfg),
+            table=types.SimpleNamespace(status="Active", colorsLED={}),
+            items=types.SimpleNamespace(source=70, calculateNodeUse=lambda: 0, items={}),
+            players=types.SimpleNamespace(playerDict={}),
+            parser=configparser.ConfigParser(),
+        )
+        glbs_stub.parser.read(str(mqtt_cfg))
+        monkeypatch.setitem(sys.modules, 'glbs', glbs_stub)
+
+        with patch('_MQTT._mqtt_client') as mock_paho:
+            mock_client = MagicMock()
+            mock_paho.Client.return_value = mock_client
+            mock_paho.CallbackAPIVersion.VERSION2 = 2
+            mqtt = _MQTT(str(mqtt_cfg))
+        mqtt._client = mock_client
+        return mqtt, glbs_stub
+
+    def test_invalid_status_rejected(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        mqtt._cmd_table_status({"status": "exploding"})
+        assert glbs_stub.table.status == "Active"  # unchanged
+
+    def test_empty_status_rejected(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        mqtt._cmd_table_status({"status": ""})
+        assert glbs_stub.table.status == "Active"
+
+    def test_missing_status_rejected(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        mqtt._cmd_table_status({})
+        assert glbs_stub.table.status == "Active"
+
+
+class TestMalformedMessage:
+    """Verify _on_message handles corrupt payloads."""
+
+    def _setup(self, tmp_path, monkeypatch):
+        from _MQTT import _MQTT
+
+        mqtt_cfg = tmp_path / "marvinconfig.txt"
+        mqtt_cfg.write_text(MQTT_CONFIG_ENABLED)
+
+        glbs_stub = types.SimpleNamespace(
+            item_file="dummy", player_file="dummy", table_file="dummy",
+            table=types.SimpleNamespace(status="Active", colorsLED={}),
+            items=types.SimpleNamespace(source=70, calculateNodeUse=lambda: 0, items={}),
+            players=types.SimpleNamespace(playerDict={}),
+            parser=configparser.ConfigParser(),
+        )
+        glbs_stub.parser.read(str(mqtt_cfg))
+        monkeypatch.setitem(sys.modules, 'glbs', glbs_stub)
+
+        with patch('_MQTT._mqtt_client') as mock_paho:
+            mock_client = MagicMock()
+            mock_paho.Client.return_value = mock_client
+            mock_paho.CallbackAPIVersion.VERSION2 = 2
+            mqtt = _MQTT(str(mqtt_cfg))
+        mqtt._client = mock_client
+        return mqtt
+
+    def test_non_json_payload_does_not_crash(self, tmp_path, monkeypatch):
+        mqtt = self._setup(tmp_path, monkeypatch)
+        msg = MagicMock()
+        msg.topic = "marvin/test-001/cmd/table/status"
+        msg.payload = b"this is not json"
+        # Should not raise
+        mqtt._on_message(None, None, msg)
+
+    def test_unknown_subtopic_does_not_crash(self, tmp_path, monkeypatch):
+        mqtt = self._setup(tmp_path, monkeypatch)
+        msg = MagicMock()
+        msg.topic = "marvin/test-001/cmd/nonexistent/command"
+        msg.payload = json.dumps({"foo": "bar"}).encode()
+        mqtt._on_message(None, None, msg)
+
+    def test_wrong_topic_prefix_ignored(self, tmp_path, monkeypatch):
+        mqtt = self._setup(tmp_path, monkeypatch)
+        msg = MagicMock()
+        msg.topic = "empnode/other-node/cmd/table/status"
+        msg.payload = json.dumps({"status": "broken"}).encode()
+        # Should return silently — not our namespace
+        mqtt._on_message(None, None, msg)

@@ -41,6 +41,7 @@ class _Items(object):
         self.itemnames = [x.strip() for x in self.parser.get('items', 'names').split(',')]
         print("itemnames = " + str(self.itemnames))
         for name in self.itemnames:
+            display_name = self.parser.get(name, 'name', fallback=name)
             function = self.parser.get(name, 'function')
             ID = self.parser.get(name, 'id').strip().upper()
             level = self.parser.getint(name, 'level')
@@ -51,7 +52,7 @@ class _Items(object):
             else:
                 connected = False
             self.currentItemName = name
-            item = Item(name, function, ID, level, activationSkill, load, connected)
+            item = Item(name, function, ID, level, activationSkill, load, connected, display_name)
             self.items[name]   = item
             self.itemsIDs[ID]  = item
         try:
@@ -83,6 +84,7 @@ class _Items(object):
         new_itemsIDs = {}
         for name in itemnames:
             try:
+                display_name = parser.get(name, 'name', fallback=name)
                 function = parser.get(name, 'function')
                 ID = parser.get(name, 'id').strip().upper()
                 level = parser.getint(name, 'level')
@@ -91,7 +93,7 @@ class _Items(object):
                 # Preserve in-memory connected state; fall back to config value
                 connected = connected_state.get(
                     name, parser.getint(name, 'connected') > 0)
-                item = Item(name, function, ID, level, activationSkill, load, connected)
+                item = Item(name, function, ID, level, activationSkill, load, connected, display_name)
                 new_items[name] = item
                 new_itemsIDs[ID] = item
             except Exception as e:
@@ -333,8 +335,9 @@ class _Items(object):
 
 
 class Item(object):
-    def __init__(self, name, function, ID, level, activationSkill, load=1, connected=False):
+    def __init__(self, name, function, ID, level, activationSkill, load=1, connected=False, display_name=None):
         self.name = name
+        self.display_name = display_name if display_name is not None else name
         self.function = function
         self.ID = ID
         self.level = level

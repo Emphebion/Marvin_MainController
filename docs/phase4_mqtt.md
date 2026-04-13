@@ -21,6 +21,10 @@
 - `S1_Reset._build_gm_entries` hex string fix: GM/unknown player filter changed from `player.ID in (0, 10)` to `player.ID in ("00000000", "0000000A")` to match hex ID format
 - `test_dependencies.py` added: parametrized test that reads `requirements.txt` and verifies every package is importable — catches missing dependencies at test time rather than at runtime
 - paho-mqtt v2 API: uses `CallbackAPIVersion.VERSION2` with 5-arg callbacks (`client, userdata, flags, reason_code, properties`)
+- Input validation added to command handlers: `_cmd_rfid_register` rejects missing `rfid` field; `_cmd_well_size` rejects negative/zero/non-numeric values; `_cmd_table_status` rejects unknown status strings
+- Duplicate RFID registration: `_cmd_rfid_register` now checks for existing RFID via `_find_section_by_id` — updates the existing entry instead of creating a duplicate section
+- `Item.display_name` attribute added: reads the `name` field from config sections (e.g. "Zuiver geweten"); `Item.name` remains the section key (e.g. "item1") for dict lookups. MQTT payloads (`_items_payload`, `_build_sync_push`) use `display_name` so EDD sees human-readable names
+- Architecture note: MARVIN and empnode never communicate directly — they share a broker but use separate topic namespaces (`marvin/` vs `empnode/`). EDD bridges both.
 
 **empnode reference:** `C:\Users\Edwin\Documents\Vincent Personal\Creatief\Emphebion\Techniek\empnode`
 
@@ -351,7 +355,7 @@ No MQTT logic lives inside individual state files. Each state calls `glbs.mqtt.p
 
 ## Test Implementation Plan
 
-All 49 tests implemented in `tests/test_mqtt.py` — all passing. Additional dependency coverage in `tests/test_dependencies.py` (4 tests).
+66 tests implemented in `tests/test_mqtt.py` — all passing. Additional dependency coverage in `tests/test_dependencies.py` (4 tests).
 
 | ID | Test | Status | Test class(es) |
 |---|---|---|---|
@@ -372,32 +376,60 @@ All 49 tests implemented in `tests/test_mqtt.py` — all passing. Additional dep
 | T4.15 | `cmd/game/color` | ✅ | `TestColorCommands` (5) |
 | T4.16 | Sync — EDD newer | ✅ | `TestSync::test_edd_newer_*` (2) |
 | T4.17 | Sync — MARVIN newer | ✅ | `TestSync::test_marvin_newer_*`, `test_equal_versions_*` |
+| T4.18 | Item display_name in payloads | ✅ | `TestItemDisplayName` (3) |
+| T4.19 | Misuse: register (missing rfid, dup, bad type) | ✅ | `TestMisuseRegister` (4) |
+| T4.20 | Misuse: well size (negative, zero, non-numeric) | ✅ | `TestMisuseWellSize` (4) |
+| T4.21 | Misuse: table status (invalid, empty, missing) | ✅ | `TestMisuseTableStatus` (3) |
+| T4.22 | Misuse: malformed messages (bad JSON, wrong prefix, unknown cmd) | ✅ | `TestMalformedMessage` (3) |
 
 ---
 
 ## Simulation Extension Plan
 
-> **⚠ REVIEW NOTE:** Review against the existing empnode `tools/` simulator pattern before implementation. Confirm whether the EDD stub should be a standalone script or integrated into the existing simulation entry point.
+**Reviewed against empnode `tools/` patterns** (2026-04-12). Key architectural constraint: MARVIN and empnode never communicate directly — they share a broker but use separate topic namespaces (`marvin/` vs `empnode/`). EDD is the only system that bridges both.
 
-- **S4.1 — MockMARVIN class:** subscribes to all `marvin/<id>/cmd/` topics; maintains in-memory player/item lists; publishes correct `state/` responses; accepts keyboard-injected RFID and item events.
-- **S4.2 — EDD stub script:** subscribes to `marvin/<id>/state/#`; prints received messages with timestamps; accepts CLI commands to send `cmd/` messages (register player/item, set well size, set colours, set table status, trigger sync offer).
-- **S4.3 — Sync scenario:** demonstrates full sync exchange (MARVIN v5, EDD v8 → MARVIN accepts; re-run MARVIN v10, EDD v8 → MARVIN pushes).
-- **S4.4 — Full RFID lifecycle demo:** unknown tag → register via EDD stub → tag recognised → item connect → well update → overload.
-- **S4.5 — Automated end-to-end (`test_mqtt_marvin.py`):** uses internal broker, runs T4.1–T4.17 without hardware, same pattern as empnode `test_protocol.py`.
+- **S4.1 — MARVIN simulation mode + MQTT:** MARVIN already runs without hardware (pygame simulation). With `[MQTT] enabled = true` in `marvinconfig.txt` and a broker running, the full MQTT stack operates live. No separate MockMARVIN is needed — the simulation IS the mock. Verify: start broker, start MARVIN in sim mode, subscribe to `marvin/#`, use mouse clicks to trigger RFID scans and game events.
+- **S4.2 — EDD stub script (`tools/edd_stub.py`):** Standalone Python script (not part of empnode). Subscribes to `marvin/<id>/state/#`; prints received messages with timestamps. Accepts CLI commands: `register-player`, `register-item`, `set-well`, `set-status`, `set-color`, `sync-offer`. Modeled after empnode's `server.py` CLI prompt pattern but limited to MARVIN's `cmd/` topics. Must also implement the sync exchange: subscribe to `state/config_version`, respond with `cmd/sync/offer`.
+- **S4.3 — Sync scenario:** EDD stub starts with config version 8. MARVIN starts with version 5. On connect MARVIN publishes `state/config_version: 5`. EDD stub sends `cmd/sync/offer` with version 8 + full player/item lists. Verify MARVIN accepts and config files update. Then restart MARVIN (now at version 8) and send `sync/offer` with version 3. Verify MARVIN publishes `state/sync/push`. Also test equal versions (no action).
+- **S4.4 — Full RFID lifecycle demo:** Unknown tag scan → `state/rfid action:unknown` → EDD stub sends `cmd/rfid/register` → tag now recognised → item connect → `state/items action:connected` → connect enough to overload → `state/items action:overload`.
+- **S4.5 — Integration test (`test_mqtt_integration.py`):** Spawns an `amqtt` broker in a daemon thread (same pattern as empnode `test_protocol.py`), creates a real `_MQTT` instance (not mocked), and an EDD stub subscriber. Tests real MQTT message flow: retained messages, reconnect + re-publish of `config_version`, sync exchange, heartbeat arrival over 30s. Scoped to MQTT layer only — does not require pygame or the game loop.
+
+### Known Limitations
+
+| Scenario | Status | Notes |
+|---|---|---|
+| Concurrent config writes (rapid-fire commands) | Not protected | All handlers write full config via `configparser`. Concurrent writes from the paho thread could interleave. Acceptable for LARP use case (commands are infrequent). If needed, add a threading.Lock around config writes. |
+| Broker disconnect / reconnect | Handled by paho | `loop_start()` auto-reconnects. `on_connect` re-subscribes and re-publishes `config_version`. Not yet tested in integration. |
+| Large sync payloads | Not bounded | A sync offer with thousands of players/items would work but is slow. Not a realistic scenario. |
 
 ---
 
 ## Verification
 
-```bash
-# Start broker (or use empnode built-in)
-cd "C:\Users\Edwin\Documents\Vincent Personal\Creatief\Emphebion\Techniek\empnode\tools"
-uv run empnode-tools --internal-broker server
+### Broker setup
 
-# Subscribe to all MARVIN topics in a second terminal
+MARVIN needs a plain MQTT broker — **not** the empnode server (which runs discovery/assign logic for empnode nodes, irrelevant to MARVIN).
+
+```bash
+# Option A: standalone Mosquitto
+mosquitto -p 1883
+
+# Option B: Python amqtt (same broker empnode uses internally)
+py -3 -m amqtt
+```
+
+### Happy-path verification (manual)
+
+```bash
+# Terminal 1: start broker (see above)
+# Terminal 2: subscribe to all MARVIN topics
 mosquitto_sub -h localhost -t "marvin/#" -v
 
-# Exercise each event in simulation:
+# Terminal 3: start MARVIN in simulation mode with MQTT enabled
+# (ensure marvinconfig.txt has [MQTT] enabled = true, broker = localhost)
+cd Marvin_MainController && py -3 MARVIN.py
+
+# Exercise each event via simulation mouse/keyboard clicks:
 # - Scan a known player tag     → state/rfid  action:detected type:player
 # - Scan an unknown tag         → state/rfid  action:unknown
 # - Connect item via RFID       → state/rfid  action:detected type:item  +  state/items action:connected
@@ -413,6 +445,12 @@ mosquitto_pub -h localhost \
   -m '{"rfid":99999,"type":"player","name":"Seraphina","level":3,"skills":["connect1","disconnectall"]}'
 # Expected: next scan of tag 99999 resolves to "Seraphina"
 
+# Test register duplicate player (should update, not create second entry):
+mosquitto_pub -h localhost \
+  -t "marvin/marvin-001/cmd/rfid/register" \
+  -m '{"rfid":99999,"type":"player","name":"Seraphina the Bold","skills":["connect1","connect2","disconnectall"]}'
+# Expected: existing entry updated, no new section in playerconfig.txt
+
 # Test well size:
 mosquitto_pub -h localhost \
   -t "marvin/marvin-001/cmd/well/size" \
@@ -424,4 +462,78 @@ mosquitto_pub -h localhost \
   -t "marvin/marvin-001/cmd/table/status" \
   -m '{"status": "disabled"}'
 # Expected: all LEDs off; RFID scan does not advance to S2
+
+# Test idle colour change:
+mosquitto_pub -h localhost \
+  -t "marvin/marvin-001/cmd/table/color/idle" \
+  -m '{"color": [255, 0, 128]}'
+# Expected: idle animation colour changes on next tick
+
+# Test sync (EDD newer):
+mosquitto_pub -h localhost \
+  -t "marvin/marvin-001/cmd/sync/offer" \
+  -m '{"version":999,"players":[{"rfid":88888,"name":"TestSync","skills":["connect1"]}],"items":[]}'
+# Expected: MARVIN accepts, playerconfig.txt updated, config_version set to 999
+```
+
+### Misuse / robustness verification (manual)
+
+```bash
+# Malformed JSON — should log error, not crash:
+mosquitto_pub -h localhost \
+  -t "marvin/marvin-001/cmd/table/status" \
+  -m 'not-json'
+
+# Unknown command subtopic — should log, not crash:
+mosquitto_pub -h localhost \
+  -t "marvin/marvin-001/cmd/nonexistent/thing" \
+  -m '{"foo":"bar"}'
+
+# Register with missing rfid — should reject:
+mosquitto_pub -h localhost \
+  -t "marvin/marvin-001/cmd/rfid/register" \
+  -m '{"type":"player","name":"Ghost"}'
+
+# Invalid table status — should reject:
+mosquitto_pub -h localhost \
+  -t "marvin/marvin-001/cmd/table/status" \
+  -m '{"status": "exploding"}'
+
+# Negative well size — should reject:
+mosquitto_pub -h localhost \
+  -t "marvin/marvin-001/cmd/well/size" \
+  -m '{"size": -10}'
+
+# Invalid colour (wrong length) — should reject:
+mosquitto_pub -h localhost \
+  -t "marvin/marvin-001/cmd/table/color/idle" \
+  -m '{"color": [255]}'
+
+# Wrong topic prefix (empnode namespace) — should be silently ignored:
+mosquitto_pub -h localhost \
+  -t "empnode/other-node/cmd/table/status" \
+  -m '{"status": "broken"}'
+```
+
+### Retained message verification
+
+```bash
+# 1. Start broker + MARVIN + subscriber (as above)
+# 2. Connect an item via simulation → observe state/items on subscriber
+# 3. Kill subscriber (Ctrl+C)
+# 4. Restart subscriber: mosquitto_sub -h localhost -t "marvin/#" -v
+# Expected: last retained state/items and state/table messages arrive immediately
+```
+
+### Reconnect verification
+
+```bash
+# 1. Start MARVIN with MQTT enabled (no broker running)
+# Expected: "_MQTT: connect_async failed" or silent retry
+# 2. Start broker: mosquitto -p 1883
+# Expected: MARVIN auto-connects within seconds, publishes state/config_version
+# 3. Kill broker (Ctrl+C)
+# Expected: "_MQTT: disconnected" in MARVIN terminal
+# 4. Restart broker
+# Expected: MARVIN auto-reconnects, re-subscribes cmd/#, re-publishes config_version
 ```

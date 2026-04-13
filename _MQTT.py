@@ -220,22 +220,52 @@ class _MQTT:
         name      = payload.get("name", "Unknown")
         level     = int(payload.get("level", 1))
 
+        if rfid_raw is None:
+            print("_MQTT register: missing 'rfid' field — ignoring")
+            return
         rfid = _int_to_hex(rfid_raw) if isinstance(rfid_raw, int) else str(rfid_raw).strip().upper()
 
         if rfid_type == "player":
-            skills = payload.get("skills", [])
-            _KNOWN_SKILLS = {"connect1","connect2","connect3","disconnectall",
-                             "disconnect1item","wellsize","SL"}
-            for s in skills:
-                if s not in _KNOWN_SKILLS:
-                    print(f"_MQTT register: unknown skill token '{s}' — writing anyway")
-            self._write_new_player(rfid, name, skills)
+            # Check for duplicate — update existing rather than creating a new entry
+            parser = configparser.ConfigParser()
+            parser.read(glbs.player_file)
+            existing = _find_section_by_id(parser, rfid)
+            if existing:
+                print(f"_MQTT register: player RFID {rfid} already exists in [{existing}] — updating")
+                skills = payload.get("skills", [])
+                parser.set(existing, "name", name)
+                parser.set(existing, "skills", ",".join(skills))
+                with open(glbs.player_file, "w") as f:
+                    parser.write(f)
+            else:
+                skills = payload.get("skills", [])
+                _KNOWN_SKILLS = {"connect1","connect2","connect3","disconnectall",
+                                 "disconnect1item","wellsize","SL"}
+                for s in skills:
+                    if s not in _KNOWN_SKILLS:
+                        print(f"_MQTT register: unknown skill token '{s}' — writing anyway")
+                self._write_new_player(rfid, name, skills)
             glbs.players.reload()
 
         elif rfid_type == "item":
-            load     = int(payload.get("load", 1))
-            function = payload.get("function", "")
-            self._write_new_item(rfid, name, level, load, function)
+            # Check for duplicate — update existing rather than creating a new entry
+            parser = configparser.ConfigParser()
+            parser.read(glbs.item_file)
+            existing = _find_section_by_id(parser, rfid)
+            if existing:
+                print(f"_MQTT register: item RFID {rfid} already exists in [{existing}] — updating")
+                parser.set(existing, "name", name)
+                parser.set(existing, "level", str(level))
+                load     = int(payload.get("load", 1))
+                function = payload.get("function", "")
+                parser.set(existing, "load", str(load))
+                parser.set(existing, "function", function)
+                with open(glbs.item_file, "w") as f:
+                    parser.write(f)
+            else:
+                load     = int(payload.get("load", 1))
+                function = payload.get("function", "")
+                self._write_new_item(rfid, name, level, load, function)
             glbs.items.reload()
 
         else:
@@ -267,7 +297,14 @@ class _MQTT:
 
     def _cmd_well_size(self, payload):
         import glbs
-        size = int(payload.get("size", 70))
+        try:
+            size = int(payload.get("size", 70))
+        except (ValueError, TypeError):
+            print(f"_MQTT well/size: invalid size value '{payload.get('size')}'")
+            return
+        if size <= 0:
+            print(f"_MQTT well/size: size must be positive, got {size}")
+            return
         glbs.items.source = size
 
         parser = configparser.ConfigParser()
@@ -357,14 +394,14 @@ class _MQTT:
         pct      = round(use / capacity, 2) if capacity > 0 else 0.0
 
         connected = [
-            {"name": item.name, "rfid": _hex_to_int(item.ID)}
+            {"name": item.display_name, "rfid": _hex_to_int(item.ID)}
             for item in glbs.items.items.values()
             if item.connected
         ]
         well = {"use": use, "capacity": capacity, "pct": pct}
         result = {"action": action, "connected": connected, "well": well}
         if changed_item is not None:
-            result["changed"] = {"name": changed_item.name, "rfid": _hex_to_int(changed_item.ID)}
+            result["changed"] = {"name": changed_item.display_name, "rfid": _hex_to_int(changed_item.ID)}
         return result
 
     # ------------------------------------------------------------------ #
@@ -446,7 +483,7 @@ class _MQTT:
         items = [
             {
                 "rfid": _hex_to_int(item.ID),
-                "name": item.name,
+                "name": item.display_name,
                 "level": item.level,
                 "load": item.load,
                 "function": item.function,
