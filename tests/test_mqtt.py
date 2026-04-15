@@ -522,7 +522,7 @@ runeColorL2 = runeL2
 runeColorL3 = runeL3
 
 [LineGame]
-snakeColor = turquoise
+lineColor = turquoise
 """)
         item_cfg = tmp_path / "itemconfig.txt"
         item_cfg.write_text("""
@@ -730,7 +730,7 @@ runeColorL2 = runeL2
 runeColorL3 = runeL3
 
 [LineGame]
-snakeColor = turquoise
+lineColor = turquoise
 """)
         item_cfg = tmp_path / "itemconfig.txt"
         item_cfg.write_text("""

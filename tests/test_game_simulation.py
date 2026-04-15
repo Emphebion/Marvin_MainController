@@ -6,7 +6,7 @@ and GameContext directly, without instantiating state classes (which would
 drag in glbs and pygame).
 
 What each test maps to in the real state machine:
-  S9  — game.start(goal)  sets ctx.currentGameRoute and ctx.snakeCounter
+  S9  — game.start(goal)  sets ctx.currentGameRoute and ctx.lineCounter
   S10 — checks is_complete() and failure/timeout conditions
   S11 — consumes ctx.currentGameRoute one segment per tick
   S13 — game.clear(), ctx.reset() wipe all round state
@@ -88,11 +88,11 @@ class TestGameContext:
         ctx.reset()
         assert ctx.gameSuccess is False
 
-    def test_reset_clears_snake_counter(self):
+    def test_reset_clears_line_counter(self):
         ctx = make_ctx()
-        ctx.snakeCounter = 42
+        ctx.lineCounter = 42
         ctx.reset()
-        assert ctx.snakeCounter == 0
+        assert ctx.lineCounter == 0
 
 
 # ---------------------------------------------------------------------------
@@ -108,14 +108,14 @@ class TestS9Start:
         game.start('east')
         assert len(ctx.currentGameRoute) > 0
 
-    def test_start_resets_snake_counter(self, table, monkeypatch):
-        """S9: start() zeros ctx.snakeCounter regardless of prior value."""
+    def test_start_resets_line_counter(self, table, monkeypatch):
+        """S9: start() zeros ctx.lineCounter regardless of prior value."""
         ctx = make_ctx()
-        ctx.snakeCounter = 99
+        ctx.lineCounter = 99
         monkeypatch.setitem(sys.modules, 'glbs', make_glbs_stub(ctx))
         game = LineGame(table)
         game.start('east')
-        assert ctx.snakeCounter == 0
+        assert ctx.lineCounter == 0
 
     def test_start_after_previous_round_replaces_route(self, table, monkeypatch):
         """Calling start() again (new round) overwrites the old route."""
@@ -248,7 +248,7 @@ class TestFullRound:
     def test_mode_attribute_identifies_game_type(self, table):
         """S9 uses game.mode to log/branch on game type."""
         game = LineGame(table)
-        assert game.mode == 'snake'
+        assert game.mode == 'line'
 
     def test_linegame_is_basegame_instance(self, table):
         """States use isinstance(glbs.game, BaseGame) to call the interface safely."""

@@ -37,6 +37,21 @@ Address issues that require comparison between the desktop simulation and the ph
 
 ---
 
+## Known Issue: Flow Parameter Interpretation — Affects RuneGame and MultiLineGame
+
+**Context:** The `flowSegments` and `counterSegments` defined per segment in `tableconfig.txt` encode the physical NeoPixel strip wiring direction: `flowSegments` lists neighbours aligned with the segment's LED index order (0→N), `counterSegments` lists those against it (N→0). Both LineGame and RuneGame use this to determine which end of a segment's LED sub-array to start colouring from.
+
+**Current status:** LineGame's single-line animation works correctly on hardware — the flow/counter definitions produce the expected visual result for the line mechanic. RuneGame's BFS reveal does not — some segments light up in the wrong direction (see the RuneGame section above). This confirms the `tableconfig.txt` wiring definitions are correct for the strip hardware, but RuneGame's `_bfs_order()` interprets them differently and gets the traversal direction wrong for some segments.
+
+**Action during hardware test:** Evaluate both game modes against the same flow parameter understanding:
+
+1. **RuneGame** — the `_bfs_order()` entry-LED comparison (`entry_b == leds_b[0]` vs `leds_b[-1]`) must derive traversal direction from the flow/counter neighbour relationship, the same way LineGame's `_set_route_flow()` does. The current approach infers direction from LED index positions within the rune definition, which can disagree with the physical strip order. This is the likely root cause of the reversed reveals.
+2. **MultiLineGame** — Phase 5 refactors the flow parameter from a shared segment stack to per-route `(segment, direction)` tuples (see [phase5_multiline.md](phase5_multiline.md#shared-segment-handling)). Validate that the per-route direction logic produces correct traversal on hardware, especially for shared segments where two lines enter from opposite sides.
+
+**Key insight:** LineGame proves the `tableconfig.txt` flow/counter definitions are correct. RuneGame should derive its traversal direction from those same definitions rather than from rune LED index positions.
+
+---
+
 ## Verification
 
 1. Hardware test confirms rune reveal directions match expected behaviour on the physical table.

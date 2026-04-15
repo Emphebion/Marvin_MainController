@@ -17,7 +17,7 @@ Subsystem objects (read-only after init):
 
 Round variables (grouped in ctx — mutated by state modules):
     ctx.gameStartTime, ctx.gameTimeout, ctx.currentInput, ctx.currentGameRoute,
-    ctx.currentRoundInputs, ctx.gameSuccess, ctx.gameFailures, ctx.snakeCounter,
+    ctx.currentRoundInputs, ctx.gameSuccess, ctx.gameFailures, ctx.lineCounter,
     ctx.returnState, ctx.prevStateName
 
 Sleep variables:
@@ -61,9 +61,9 @@ table    = _Table(table_file)                  # must be before _Display (LED po
 characters = _Characters(character_file)
 display  = _Display(config_file)               # last: can see all objects
 rune_config_file = 'runeconfig.txt'
-snake_game = LineGame(table)                   # snake game instance
+line_game  = LineGame(table)                    # line game instance
 rune_game  = RuneGame(table, config_file, rune_config_file)  # rune game instance
-game       = snake_game                        # active game mode (switched by S9)
+game       = line_game                         # active game mode (switched by S9)
 mqtt       = _MQTT(config_file)                # MQTT client (no-op if disabled)
 
 # Round state — all mutable per-round variables live here

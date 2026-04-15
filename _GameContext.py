@@ -12,11 +12,11 @@ Attributes:
     gameStartTime      -- time.time() when the current round started
     gameTimeout        -- duration (seconds) allowed for the round
     currentInput       -- last raw input string (currently unused)
-    currentGameRoute   -- list of _Segment objects for the active snake
+    currentGameRoute   -- list of _Segment objects for the active line
     currentRoundInputs -- button inputs recorded in the current round
     gameSuccess        -- True if the round was completed successfully
     gameFailures       -- failure count (-1 at start to compensate S10 logic)
-    snakeCounter       -- LED-step counter used by the S11 animation loop
+    lineCounter       -- LED-step counter used by the S11 animation loop
     returnState        -- states_enum value to return to after S9/S13
     prevStateName      -- name of the previous menu state (for skip logic)
 """
@@ -34,7 +34,7 @@ class GameContext:
     currentRoundInputs: List = field(default_factory=list)
     gameSuccess: bool = False
     gameFailures: int = -1      # starts at -1 to compensate first S10 failure
-    snakeCounter: int = 0
+    lineCounter: int = 0
     returnState: Any = None
     prevStateName: Any = None
 
@@ -50,6 +50,6 @@ class GameContext:
         self.currentRoundInputs.clear()
         self.gameSuccess = False
         self.gameFailures = -1
-        self.snakeCounter = 0
+        self.lineCounter = 0
         self.returnState = None
         self.prevStateName = None

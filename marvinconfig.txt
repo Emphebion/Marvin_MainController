@@ -80,7 +80,7 @@ failuresPerLevel=4,3,2
 
 [State11]
 looptimeout=80
-snakeLength=28
+lineLength=28
 
 [State12]
 
@@ -100,7 +100,7 @@ name=TableBroken
 name=TableOverload
 
 [GameModes]
-level1 = snake
+level1 = line
 level2 = runes
 level3 = runes
 
@@ -132,4 +132,4 @@ port     = 1883
 node_id  = marvin-001
 
 [LineGame]
-snakeColor = turquoise
+lineColor = turquoise

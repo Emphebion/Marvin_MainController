@@ -486,7 +486,7 @@ class _Display(object):
                 (px + 8, by))
         by += 14
 
-        # Snake route remaining
+        # Line route remaining
         route_len = len(glbs.ctx.currentGameRoute)
         route_txt = f"Route  : {route_len} seg remaining"
         self.screen.blit(

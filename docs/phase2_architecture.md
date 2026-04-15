@@ -31,15 +31,15 @@ Refactor towards a cleaner, testable architecture without changing external beha
 ### Game mode selector + BaseGame base class
 
 - Introduce a `BaseGame` abstract class (`_LineGame.py`) with interface: `start()`, `update()`, `is_complete()`, `clear()`.
-- `LineGame` (current snake, extracted from `_Table.py`) extends `BaseGame`.
-- `RuneGame` (Phase 3) and `MultiSnakeGame` (Phase 5) also extend `BaseGame`.
+- `LineGame` (extracted from `_Table.py`) extends `BaseGame`.
+- `RuneGame` (Phase 3) and `MultiLineGame` (Phase 5) also extend `BaseGame`.
 - A `[GameModes]` section in `marvinconfig.txt` selects the active `BaseGame` subclass per item level in S9/S10:
 
 ```ini
 [GameModes]
-level1 = snake
-level2 = runes    ; or multisnake (Phase 5)
-level3 = runes    ; or multisnake (Phase 5)
+level1 = line
+level2 = runes    ; or multiline (Phase 5)
+level3 = runes    ; or multiline (Phase 5)
 ```
 
 - S10 and S11 operate against the `BaseGame` interface — no new states required.
@@ -149,4 +149,4 @@ UP           →  exit, return to S1 idle
 
 **Architecture doc:** updated to Phase 3 state — see [architecture.md](architecture.md).
 
-<!-- MAINTENANCE: After Phase 4, update architecture.md for MQTT module. After Phase 5, add MultiSnakeGame entry to Game Mode Architecture section. -->
+<!-- MAINTENANCE: After Phase 4, update architecture.md for MQTT module. After Phase 5, add MultiLineGame entry to Game Mode Architecture section. -->

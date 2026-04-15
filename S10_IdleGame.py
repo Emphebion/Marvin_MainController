@@ -20,13 +20,13 @@ class S10_IdleGame():        #S10_GameMaster
         level_idx = min(level - 1, len(self.failuresPerLevel) - 1)
         self._max_failures = self.failuresPerLevel[level_idx]
 
-        # Wait between rounds (snake only)
-        if self.state == self.states.S10 and glbs.game.mode == 'snake':
+        # Wait between rounds (line only)
+        if self.state == self.states.S10 and glbs.game.mode == 'line':
             self.idleTime = glbs.random.randint(3,5) + glbs.time.time()
         self.state = self.states.S10
         print("current state is {}".format(self.state))
 
-        if glbs.game.mode == 'snake':
+        if glbs.game.mode == 'line':
             self.checkForFailures()
             print("failures: %s" % glbs.ctx.gameFailures)
             # Reset game variables
@@ -34,9 +34,9 @@ class S10_IdleGame():        #S10_GameMaster
             glbs.ctx.currentRoundInputs.clear()
             # Create route for current round
             self.setCurrentGoal()
-            glbs.ctx.currentGameRoute = glbs.table.createCurrentSnake(self.currentGoal)
+            glbs.ctx.currentGameRoute = glbs.table.createCurrentLine(self.currentGoal)
             print("current input required: " + str(self.currentGoal))
-            glbs.ctx.snakeCounter = 0
+            glbs.ctx.lineCounter = 0
         else:
             # Rune mode: RuneGame handles sequences internally
             print("failures: %s" % glbs.ctx.gameFailures)
@@ -51,7 +51,7 @@ class S10_IdleGame():        #S10_GameMaster
     def _setState(self):
         # 1. check if the player did not exceed the maximum number of failures
         # 2. Check if game time is exceeded
-        # 3. wait for idle time (snake) or go directly to S11 (runes)
+        # 3. wait for idle time (line) or go directly to S11 (runes)
         if (self._max_failures >= glbs.ctx.gameFailures):
             print("Currently " + str(glbs.ctx.gameFailures) + " of " + str(self._max_failures) + " failures")
             # Check if game time is exceeded
@@ -66,8 +66,8 @@ class S10_IdleGame():        #S10_GameMaster
                     self.state = self.states.S13
                 else:
                     self.state = self.states.S11
-            # Snake mode: wait between rounds
-            elif glbs.game.mode == 'snake' and (self.idleTime - glbs.time.time() > 0):
+            # Line mode: wait between rounds
+            elif glbs.game.mode == 'line' and (self.idleTime - glbs.time.time() > 0):
                 self.state = self.states.S10
             # Start next round/sequence
             else:

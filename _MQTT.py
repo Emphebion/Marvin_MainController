@@ -337,7 +337,7 @@ class _MQTT:
             print(f"_MQTT game/color: invalid color {color}")
             return
         if game == "linegame":
-            color_name = glbs.parser.get("LineGame", "snakeColor", fallback="turquoise")
+            color_name = glbs.parser.get("LineGame", "lineColor", fallback="turquoise")
             self._update_color(color_name, color)
         elif game == "runegame":
             for lvl in ("L1", "L2", "L3"):

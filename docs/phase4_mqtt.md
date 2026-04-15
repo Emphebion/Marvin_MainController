@@ -2,7 +2,7 @@
 
 **Overview:** [overhaul_plan.md](overhaul_plan.md)
 **Depends on:** [Phase 3](phase3_runegame.md) — requires `_RuneGame` and `_LineGame` in place
-**Followed by:** [Phase 5](phase5_multisnake.md)
+**Followed by:** [Phase 5](phase5_multiline.md)
 **Note:** Review empnode docs before implementation starts.
 **Status: DONE** — `_MQTT.py` implemented; `requirements.txt` updated; all state-file integration points wired.
 **Extension:** [Phase 4b — EDD Alignment](phase4b_edd_alignment.md) — rename players→characters, RFID 8→10 char, skill mapping docs
@@ -15,7 +15,7 @@
 - S4 GM direct-disconnect path had the same bug (`disconnectItem(newItem)`); fixed identically
 - `config_version` stored in `itemconfig.txt [items]`; bumped on every registration or well-size change
 - All MQTT publish calls are silent no-ops when paho-mqtt is not installed or `enabled = false` in config
-- `[LineGame] snakeColor` added to `marvinconfig.txt`; S11 now reads it instead of hardcoding `"turquoise"`
+- `[LineGame] lineColor` added to `marvinconfig.txt`; S11 now reads it instead of hardcoding `"turquoise"`
 - `Disabled` table status added: blocks RFID in S1 `_setState`, shows LEDs off in `_setIdleLightBehaviour`
 - Heartbeat fires every 30 s from the S1 run loop via `glbs.mqtt.tick_heartbeat()`
 - `_Items.py` mtime sentinel fix: `connectItem()`, `disconnectItem()`, and `disconnectAll()` now advance `self._mtime` after writing config, preventing the hot-reload watcher from triggering a redundant `reload()` (which re-created all Item objects and spammed terminal output)
@@ -219,9 +219,9 @@ All three colour types (idle, line game, rune game) use the same mechanism — n
 - **Line game colour:** Currently hardcoded as `colorsLED["turquoise"]` in `S11_AwaitInput`. To make it MQTT-settable, add to `marvinconfig.txt`:
   ```ini
   [LineGame]
-  snakeColor = turquoise
+  lineColor = turquoise
   ```
-  Read in `S11_AwaitInput.__init__`: `self._snake_color_name = glbs.parser.get('LineGame', 'snakeColor', fallback='turquoise')`. MQTT updates the RGB of that named colour.
+  Read in `S11_AwaitInput.__init__`: `self._line_color_name = glbs.parser.get('LineGame', 'lineColor', fallback='turquoise')`. MQTT updates the RGB of that named colour.
 
 ---
 
@@ -251,7 +251,7 @@ All writes use `configparser` consistently with the existing file format.
 | `cmd/well/size.size` | `cmd/well/size` | `_Items.source` | `itemconfig.txt [items] source` | Writes to config on receipt |
 | `cmd/table/status.status` | `cmd/table/status` | `glbs.table.status` | `tableconfig.txt [common] status` | Writes to config on receipt |
 | idle colour RGB | `cmd/table/color/idle` | `colorsLED[name]` where name = `[State1] energyFlowColor` | `tableconfig.txt [<colorname>] rgb` | Updates named colour entry |
-| linegame colour RGB | `cmd/game/color` game=linegame | `colorsLED[name]` where name = `[LineGame] snakeColor` (to add) | `tableconfig.txt [<colorname>] rgb` | Updates named colour entry |
+| linegame colour RGB | `cmd/game/color` game=linegame | `colorsLED[name]` where name = `[LineGame] lineColor` (to add) | `tableconfig.txt [<colorname>] rgb` | Updates named colour entry |
 | runegame colour RGB | `cmd/game/color` game=runegame | `colorsLED[name]` where name = `[RuneGame] runeColorL1/L2/L3` | `tableconfig.txt [<colorname>] rgb` | Per-level; updates named colour entry |
 | `item.load` | `cmd/rfid/register` | `item.load` / `itemconfig.txt [itemN] load` | `itemconfig.txt` | Written on registration |
 | `item.function` | `cmd/rfid/register` | `item.function` / `itemconfig.txt [itemN] function` | `itemconfig.txt` | Written on registration |
@@ -301,7 +301,7 @@ port     = 1883
 node_id  = marvin-001
 
 [LineGame]
-snakeColor = turquoise
+lineColor = turquoise
 ```
 
 Also remove the dead `source = 100` line from `[State6]` in `marvinconfig.txt` (if not already done in Phase 3b).
@@ -350,7 +350,7 @@ No MQTT logic lives inside individual state files. Each state calls `glbs.mqtt.p
 | `S7_Connect_Item.py` | Add RFID publish calls (known item + unknown tag); add item connect publish |
 | `S4_Disconnect_Item.py` | Add items publish (action: disconnected) |
 | `S3_Disconnect_All.py` | Add items publish (action: cleared or overload) |
-| `S11_AwaitInput.py` | Add game failure publish; read `snakeColor` from `[LineGame]` config instead of hardcoded `turquoise` |
+| `S11_AwaitInput.py` | Add game failure publish; read `lineColor` from `[LineGame]` config instead of hardcoded `turquoise` |
 | `S13_FinishGame.py` | Add game success publish |
 | `_Items.py` | Add write method for new item registration; add `config_version` bump |
 | `_Players.py` | Add write method for new player registration; add `config_version` bump |

@@ -27,9 +27,9 @@ MARVIN.py  (entry point)
 │   ├── _Items.py          # Item inventory & power node
 │   ├── _Devices.py        # Serial communication to Arduino(s) + reconnect
 │   ├── _Table.py          # LED segment graph, spark/energy-flow effects
-│   ├── _Players.py        # Player registry & skill lookup
+│   ├── _Characters.py     # Character registry & skill lookup
 │   ├── _MQTT.py           # MQTT client: publish game events, accept EDD commands
-│   ├── _LineGame.py       # BaseGame ABC + LineGame (snake) implementation
+│   ├── _LineGame.py       # BaseGame ABC + LineGame implementation
 │   ├── _RuneGame.py       # RuneGame (rune/symbol recognition) implementation
 │   └── _GameContext.py    # Round-state dataclass (glbs.ctx)
 │
@@ -116,8 +116,8 @@ stateDiagram-v2
 | S7 | Connect Item | Connect an item via RFID scan. Validates player skill against item level. |
 | S8 | Items | Scrollable item menu for manual selection (GM override path). |
 | S9 | StartGame | Sets `glbs.ctx.gameStartTime` and `glbs.ctx.gameTimeout`; transitions immediately to S10. |
-| S10 | IdleGame | Picks a random goal button, builds the LED snake route, checks win/fail conditions. |
-| S11 | AwaitInput | Animates the snake (one LED per loop) and reads button input. |
+| S10 | IdleGame | Picks a random goal button, builds the LED line route, checks win/fail conditions. |
+| S11 | AwaitInput | Animates the line (one LED per loop) and reads button input. |
 | S12 | ChangeGame | Transmits the updated LED array to the Arduino and returns to S11. |
 | S13 | FinishGame | Displays result, updates item state, calls `glbs.ctx.reset()` to clear all round variables. |
 
@@ -164,9 +164,9 @@ Placeholder device. Not yet used in active game logic.
    - `_Players(player_file)` — reads `playerconfig.txt` with its own parser; starts hot-reload watcher.
    - `_Display(config_file)` — last; detects sim vs hardware by checking `_Devices.get_device("RFID_LED")`.
    - `_MQTT(config_file)` — reads `[MQTT]` from `marvinconfig.txt`; connects to broker (non-blocking). Assigned to `glbs.mqtt`.
-   - `LineGame(table)` — bound to the table graph; assigned to `glbs.snake_game`.
+   - `LineGame(table)` — bound to the table graph; assigned to `glbs.line_game`.
    - `RuneGame(table, config_file, rune_config_file)` — loads runeconfig.txt; assigned to `glbs.rune_game`.
-   - `glbs.game` defaults to `glbs.snake_game`; S9 switches it to `glbs.rune_game` based on `[GameModes]` config.
+   - `glbs.game` defaults to `glbs.line_game`; S9 switches it to `glbs.rune_game` based on `[GameModes]` config.
    - `GameContext()` — round-state dataclass; assigned to `glbs.ctx`.
 3. `main()` instantiates all 13 state objects.
 4. Main loop starts at `S1_Reset`.
@@ -231,19 +231,19 @@ The last-pressed outer button is highlighted with a filled circle until the next
 Game modes are implemented as `BaseGame` subclasses in `_LineGame.py` and `_RuneGame.py`:
 
 - **`BaseGame`** (abstract, in `_LineGame.py`) — defines the interface `start(goal)`, `update()`, `is_complete()`, `clear()`.
-- **`LineGame`** (concrete) — builds snake routes through the segment graph. `mode = 'snake'`.
+- **`LineGame`** (concrete) — builds line routes through the segment graph. `mode = 'line'`.
 - **`RuneGame`** (concrete, `_RuneGame.py`) — reveals geometric rune symbols via BFS animation; player identifies the owning button. `mode = 'runes'`.
 - **`glbs.game`** — the active `BaseGame` instance. S9 switches it based on `[GameModes] levelN` in `marvinconfig.txt`. S10/S11/S12/S13 use only the `BaseGame` interface.
 - **`[GameModes]` config** (in `marvinconfig.txt`):
   ```ini
   [GameModes]
-  level1 = snake
+  level1 = line
   level2 = runes
   level3 = runes
   ```
 - **S1 rune catalog browser:** pressing `right` in S1 idle (simulation only) enters a rune catalog sub-loop showing all 48 rune definitions with their LED shapes rendered on the ring.
 
-<!-- Phase 5 will add MultiSnakeGame (mode = 'multisnake') here. -->
+<!-- Phase 5 will add MultiLineGame (mode = 'multiline') here. -->
 
 **Rune config:** `runeconfig.txt` holds 48 rune definitions — 6 per button × 8 buttons. Each section has `name`, `button`, and `leds` (comma-separated `segmentname:led_index` pairs). Currently placeholder content — LED definitions to be filled in before hardware testing.
 
@@ -274,11 +274,11 @@ All mutable per-round variables live in a `GameContext` dataclass at `glbs.ctx`:
 | `gameStartTime` | float | `time.time()` when the round started |
 | `gameTimeout` | float | Allowed duration in seconds |
 | `currentInput` | str | Last raw input (currently unused) |
-| `currentGameRoute` | list | `_Segment` objects for the active snake; set by `LineGame.start()` |
+| `currentGameRoute` | list | `_Segment` objects for the active line; set by `LineGame.start()` |
 | `currentRoundInputs` | list | Button inputs recorded this round |
 | `gameSuccess` | bool | True if the round was completed successfully |
 | `gameFailures` | int | Failure count (starts at −1 to compensate S10 first-call logic) |
-| `snakeCounter` | int | LED-step counter for the S11 animation loop |
+| `lineCounter` | int | LED-step counter for the S11 animation loop |
 | `returnState` | any | State to return to after S9/S13 |
 | `prevStateName` | any | Previous menu state name (used by skip logic in S3/S4/S5/S7) |
 

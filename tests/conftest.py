@@ -135,7 +135,7 @@ port     = 1883
 node_id  = test-001
 
 [LineGame]
-snakeColor = turquoise
+lineColor = turquoise
 """
 
 MQTT_CONFIG_ENABLED = """
@@ -154,7 +154,7 @@ runeColorL2 = runeL2
 runeColorL3 = runeL3
 
 [LineGame]
-snakeColor = turquoise
+lineColor = turquoise
 """
 
 

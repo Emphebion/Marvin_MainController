@@ -1,9 +1,9 @@
 """
-_LineGame.py — Snake (line) game mode for MARVIN.
+_LineGame.py — Line game mode for MARVIN.
 
 Defines:
     BaseGame   -- abstract base class for all game modes (LineGame, RuneGame, …)
-    LineGame   -- concrete snake implementation; routes a coloured LED trail
+    LineGame   -- concrete line implementation; routes a coloured LED trail
                   from a random inner-ring start outward to a goal button.
 
 The BaseGame interface decouples S10/S11/S12/S13 from the specific game type.
@@ -13,7 +13,7 @@ Integration with glbs:
     glbs.game          -- the active BaseGame instance (set by S8/S9)
     glbs.currentGameRoute  -- list of _Segment objects owned by the active game;
                               written by LineGame.start() and read by S11 for animation.
-    glbs.snakeCounter  -- LED-step counter used by S11's animation loop.
+    glbs.lineCounter   -- LED-step counter used by S11's animation loop.
 
 Routing algorithm (LineGame):
     1. Pick a random segment adjacent to the goal button.
@@ -65,20 +65,20 @@ class BaseGame(ABC):
 
 
 # ------------------------------------------------------------------ #
-# LineGame (snake)                                                     #
+# LineGame                                                              #
 # ------------------------------------------------------------------ #
 
 class LineGame(BaseGame):
-    """Snake game: a coloured LED trail routes from the inner ring to a goal button.
+    """Line game: a coloured LED trail routes from the inner ring to a goal button.
 
-    The player watches the snake travel outward, then presses the button
+    The player watches the line travel outward, then presses the button
     at the end of the trail before time runs out.
 
     Routing is delegated to the _Table segment graph but the algorithm
     lives here so it can be replaced or tested independently.
     """
 
-    mode = 'snake'
+    mode = 'line'
 
     # Inner-ring segment names used as valid route start/finish points
     _INNER_RING = {f"segm{i}" for i in range(16)}
@@ -97,7 +97,7 @@ class LineGame(BaseGame):
     # ------------------------------------------------------------------ #
 
     def start(self, goal):
-        """Build a new snake route to goal and store it in glbs.currentGameRoute.
+        """Build a new line route to goal and store it in glbs.currentGameRoute.
 
         Args:
             goal -- button name string (e.g. 'northeast')
@@ -105,10 +105,10 @@ class LineGame(BaseGame):
         import glbs
         self.route = self._build_route(goal)
         glbs.ctx.currentGameRoute = self.route
-        glbs.ctx.snakeCounter = 0
+        glbs.ctx.lineCounter = 0
 
     def update(self):
-        """No-op: snake animation is driven directly by S11/S12.
+        """No-op: line animation is driven directly by S11/S12.
 
         Returns False (not complete) — completion is determined by S11
         checking glbs.currentGameRoute directly.
@@ -128,11 +128,11 @@ class LineGame(BaseGame):
         self._table.clearRoute()
 
     # ------------------------------------------------------------------ #
-    # Route building (extracted from _Table.createCurrentSnake)           #
+    # Route building (extracted from _Table.createCurrentLine)            #
     # ------------------------------------------------------------------ #
 
     def _build_route(self, goal):
-        """Build a snake route from the goal button back to the inner ring.
+        """Build a line route from the goal button back to the inner ring.
 
         Algorithm:
             1. Pick a random segment adjacent to the goal button.

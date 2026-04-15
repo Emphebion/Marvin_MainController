@@ -29,13 +29,13 @@ class S9_StartGame(object):
         try:
             mode = glbs.parser.get('GameModes', f'level{level}')
         except Exception:
-            mode = 'snake'
+            mode = 'line'
 
         if mode == 'runes':
             glbs.game = glbs.rune_game
             glbs.ctx.gameFailures = 0  # rune mode doesn't use the -1 compensation
         else:
-            glbs.game = glbs.snake_game
+            glbs.game = glbs.line_game
 
         print(f"S9: game mode = {mode} (item level {level})")
         self.state = self.states.S10

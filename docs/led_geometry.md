@@ -106,7 +106,7 @@ Every segment stores two neighbour lists:
 - **flowSegments**: the "forward" (clockwise / outward) neighbours
 - **counterSegments**: the "reverse" (anti-clockwise / inward) neighbours
 
-When a snake or spark travels through a segment, it records its direction of travel as `+1` (flow) or `-1` (counter). This determines which LED index order to use when animating.
+When a line or spark travels through a segment, it records its direction of travel as `+1` (flow) or `-1` (counter). This determines which LED index order to use when animating.
 
 **Example — segm0:**
 ```

@@ -111,7 +111,7 @@ Each rune grows outward from a **random starting LED** within its definition, fl
 
 ## Win / Fail Conditions
 
-The same structure as the snake game: the game is **time-based**, using `gameTimeout` and `failuresPerLevel` from `marvinconfig.txt`. There is no success counter — surviving until the timer expires without exceeding the failure limit is a win.
+The same structure as the line game: the game is **time-based**, using `gameTimeout` and `failuresPerLevel` from `marvinconfig.txt`. There is no success counter — surviving until the timer expires without exceeding the failure limit is a win.
 
 | Condition | Result |
 |-----------|--------|
@@ -129,11 +129,11 @@ Before starting a new sequence, the game estimates whether there is enough time 
 
 ## Game Selection
 
-Which game mode (snake vs. runes) is selected based on the item level:
+Which game mode (line vs. runes) is selected based on the item level:
 
 | Item level | Game mode |
 |------------|-----------|
-| 1 | **Snake** (LineGame) — the existing LED chase game |
+| 1 | **Line** (LineGame) — the existing LED chase game |
 | 2 | **Runes** (RuneGame) |
 | 3 | **Runes** (RuneGame) |
 
@@ -141,7 +141,7 @@ This mapping is configured in `marvinconfig.txt` so it can be adjusted without c
 
 ```ini
 [GameModes]
-level1 = snake
+level1 = line
 level2 = runes
 level3 = runes
 ```
@@ -169,7 +169,7 @@ S10 calls `start()`, S11 calls `update()` each loop iteration, S12 transmits LED
 
 In desktop simulation mode:
 
-- Rune LEDs render on the existing ring renderer — same as snake LEDs, different colour.
+- Rune LEDs render on the existing ring renderer — same as line LEDs, different colour.
 - Each of the 8 button positions shows small **simple geometric icon** indicators (4 per button) so the player can visually match a displayed rune to its button. These markers are always visible during rune mode.
 - The RFID panel area shows the current sequence number, runes remaining, and failure count.
 
@@ -185,7 +185,7 @@ Contains all 32 rune definitions (8 buttons x 4 runes). See [Definition Format](
 
 ```ini
 [GameModes]
-level1 = snake
+level1 = line
 level2 = runes
 level3 = runes
 
@@ -225,12 +225,12 @@ runeL3 = 220, 50, 50    ; red
 | `_LineGame.py` | No change (already extracted). |
 | `S9_StartGame.py` | Add game mode selection logic based on item level. |
 | `S10_IdleGame.py` | Minor: ensure `glbs.game` interface calls work for both game types. |
-| `S11_AwaitInput.py` | Minor: rune input is button-only (same as snake). |
+| `S11_AwaitInput.py` | Minor: rune input is button-only (same as line game). |
 | `_Display.py` | Add symbol indicator markers at button positions during rune mode. |
 | `marvinconfig.txt` | Add `[GameModes]` and `[RuneGame]` sections. |
 | `tableconfig.txt` | Optionally add `rune` colour. |
 | `docs/architecture.md` | Update game mode architecture section. |
-| `docs/game_rules.md` | Add rune game rules alongside snake rules. |
+| `docs/game_rules.md` | Add rune game rules alongside line game rules. |
 
 ---
 

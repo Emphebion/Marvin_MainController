@@ -20,8 +20,8 @@ rings connected by radial bridges. This module provides:
 
   EnergyFlow   -- softly glowing energy trail for the Active idle state.
 
-Snake routing is handled by LineGame in _LineGame.py.
-_Table.createCurrentSnake() is a backward-compatible wrapper that delegates
+Line routing is handled by LineGame in _LineGame.py.
+_Table.createCurrentLine() is a backward-compatible wrapper that delegates
 to the active glbs.game instance.
 """
 
@@ -86,7 +86,7 @@ class _Table(object):
     def getRandomSegment(self):
         return random.choice(self.segmentList)
 
-    def createCurrentSnake(self, goal):
+    def createCurrentLine(self, goal):
         """Backward-compatible wrapper: delegates to glbs.game (LineGame).
 
         Kept so existing call sites in S10 continue to work unchanged.
@@ -164,7 +164,7 @@ class _Segment(object):
         flow            -- list of direction values recorded during route building
                            (+1 = forward, -1 = reverse)
         LEDvalues       -- list of [R, G, B] triples, one per LED
-        LEDUsers        -- list of owner strings per LED ('Unused', 'snake', 'spark', ...)
+        LEDUsers        -- list of owner strings per LED ('Unused', 'line', 'spark', ...)
         timesInRoute    -- number of times this segment appears in the current route
     """
 

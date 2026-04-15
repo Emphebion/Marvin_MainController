@@ -12,16 +12,16 @@ Two visual artifacts reported during rune reveal animation testing:
 
 ## Root Cause
 
-Both bugs share the same root cause: **`_bfs_order()` uses the tableconfig flow/counter segment connections as its adjacency graph — but those connections define the snake routing topology, not physical LED proximity.**
+Both bugs share the same root cause: **`_bfs_order()` uses the tableconfig flow/counter segment connections as its adjacency graph — but those connections define the line routing topology, not physical LED proximity.**
 
 ### What the flow graph encodes
 
-The `flowSegments` and `counterSegments` keys in `tableconfig.txt` describe which segments are *reachable* by a snake travelling along the ring. The junction rule is:
+The `flowSegments` and `counterSegments` keys in `tableconfig.txt` describe which segments are *reachable* by a line travelling along the ring. The junction rule is:
 
 - **Flow direction:** the last LED of a segment is adjacent to the first LED of each flow neighbour.
 - **Counter direction:** the first LED of a segment is adjacent to the last LED of each counter neighbour.
 
-This is correct for route generation. It is wrong for rune animation because the routing graph intentionally skips physical neighbours that are off the snake path.
+This is correct for route generation. It is wrong for rune animation because the routing graph intentionally skips physical neighbours that are off the line path.
 
 ### The wrong connection causing symptom 2
 

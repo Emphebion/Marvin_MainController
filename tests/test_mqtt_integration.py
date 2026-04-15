@@ -180,7 +180,7 @@ runeColorL2 = runeL2
 runeColorL3 = runeL3
 
 [LineGame]
-snakeColor = turquoise
+lineColor = turquoise
 """)
 
     # Write minimal item / player / table config files

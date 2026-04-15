@@ -34,7 +34,7 @@ MARVIN is a Python-based game controller running on a Raspberry Pi 4. It drives 
 | S8 | `S8_Items.py` | Item browser |
 | S9 | `S9_StartGame.py` | Initialise game round |
 | S10 | `S10_IdleGame.py` | Manage round lifecycle, failure counting |
-| S11 | `S11_AwaitInput.py` | Animate snake/rune; await button press |
+| S11 | `S11_AwaitInput.py` | Animate line/rune; await button press |
 | S12 | `S12_ChangeGame.py` | (Reserved) |
 | S13 | `S13_FinishGame.py` | Handle success/failure outcome |
 
@@ -85,7 +85,7 @@ Player skill tokens are stored comma-separated in `playerconfig.txt` and checked
 4. **[Phase 3](phase3_runegame.md)** — RuneGame mode
 5. **[Phase 3b](phase3_runegame.md#phase-3b--dead-code--unused-parameter-cleanup--performance-optimisation)** — Dead code cleanup + performance optimisation
 6. **[Phase 4](phase4_mqtt.md)** — MQTT connection | **[EDD integration guide](edd_marvin_integration.md)** | **[Phase 4b — EDD alignment](phase4b_edd_alignment.md)**
-7. **[Phase 5](phase5_multisnake.md)** — MultiSnakeGame mode
+7. **[Phase 5](phase5_multiline.md)** — MultiLineGame mode
 8. **[Phase 6](phase6_hardware_fixes.md)** — Post-hardware-test fixes
 
 ---
@@ -111,7 +111,7 @@ Player skill tokens are stored comma-separated in `playerconfig.txt` and checked
 | `_RuneGame.py` (new) | 3 |
 | `_MQTT.py` (new) | 4 |
 | `requirements.txt` | 4 |
-| `_MultiSnakeGame.py` (new) | 5 |
+| `_LineGame.py` (MultiLineGame subclass) | 5 |
 
 ---
 
@@ -135,5 +135,5 @@ Applies to all phases — do not change without hardware testing:
 | 3 | Rune grows LED-by-LED from random start; 8 button markers show correct symbols; correct button press clears rune |
 | 3b | `pytest` all green after cleanup; no config keys loaded but unused; `game_rules.md` matches actual code |
 | 4 | All MQTT payloads published at correct events via `mosquitto_sub`; inbound cmds mutate state and persist to config |
-| 5 | Level 2 and 3 MultiSnakeGame rounds complete in simulation; parallel snakes advance simultaneously; false snake visible; failure/win fire correctly |
+| 5 | Level 2 and 3 MultiLineGame rounds complete in simulation; parallel lines advance simultaneously; false line visible; failure/win fire correctly |
 | 6 | Hardware test confirms rune reveal direction is correct or is fixed and verified on the physical table |

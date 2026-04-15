@@ -51,7 +51,7 @@ runeColorL2 = turquoise
 runeColorL3 = turquoise
 
 [GameModes]
-level1 = snake
+level1 = line
 level2 = runes
 level3 = runes
 """
@@ -80,7 +80,7 @@ def make_game(table_config_file, marvin_config_file, rune_config_file, monkeypat
         ctx=types.SimpleNamespace(
             currentGameRoute=[],
             currentRoundInputs=[],
-            snakeCounter=0,
+            lineCounter=0,
             gameFailures=0,
             gameSuccess=False,
             gameTimeout=600.0,
@@ -404,8 +404,8 @@ class TestAnimationPhases:
 # ---------------------------------------------------------------------------
 
 class TestLineGameMode:
-    def test_linegame_mode_is_snake(self, table_config_file):
+    def test_linegame_mode_is_line(self, table_config_file):
         from _LineGame import LineGame
         table = _Table(table_config_file)
         game = LineGame(table)
-        assert game.mode == 'snake'
+        assert game.mode == 'line'

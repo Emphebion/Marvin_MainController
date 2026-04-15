@@ -749,7 +749,7 @@ This allows MARVIN game events to trigger empnode lighting effects — the core 
 
 ### UC-6: Game Event Monitoring
 
-1. Character starts a game on MARVIN (snake/rune)
+1. Character starts a game on MARVIN (line/rune)
 2. On failure: `state/game` with `{"event": "failure", "failures": 1, "limit": 3}`
 3. On success: `state/game` with `{"event": "success", "elapsed_s": 42.5}`
 4. EDD dashboard can display live game state

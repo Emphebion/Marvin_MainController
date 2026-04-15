@@ -114,8 +114,8 @@ One section per device listed in `[common] devices`.
 
 | Key | Type | Example | Description |
 |-----|------|---------|-------------|
-| `looptimeout` | int (ms) | `80` | Milliseconds between each LED step in the snake animation. Lower = faster snake. |
-| `snakeLength` | int | `28` | Number of lit LEDs in the snake head. |
+| `looptimeout` | int (ms) | `80` | Milliseconds between each LED step in the line animation. Lower = faster line. |
+| `lineLength` | int | `28` | Number of lit LEDs in the line head. |
 
 ### [State13] — S13_FinishGame
 
@@ -149,8 +149,8 @@ LED segment graph, button definitions, colours, and routing constraints.
 | `gamebuttons` | list | `southeast,south,...,east` | Names of the 8 outer game buttons. Order matches the bit order in byte 2 of the Arduino `B` message (bit 7 first). |
 | `screenbuttons` | list | `bottom,right,top,left,null,null,tag,shutdown` | Names of the 8 screen/control buttons. Order matches byte 1 of the `B` message. |
 | `colors` | list | `amethist,emerald,...` | Named colours available for LED use. Each must have a matching `[colorname]` section. |
-| `maxRouteLength` | int | `30` | Maximum number of segments in a generated snake route. Prevents excessive overlap. |
-| `nrOfStartSegments` | int | `3` | Minimum number of inner-ring segments (segm0–segm15) required in a valid snake route. |
+| `maxRouteLength` | int | `30` | Maximum number of segments in a generated line route. Prevents excessive overlap. |
+| `nrOfStartSegments` | int | `3` | Minimum number of inner-ring segments (segm0–segm15) required in a valid line route. |
 
 ### [segmN] — Segment Definition
 
@@ -159,7 +159,7 @@ One section per segment listed in `[common] segments`.
 | Key | Type | Example | Description |
 |-----|------|---------|-------------|
 | `nrLEDs` | int | `5` | Number of physical NeoPixel LEDs in this segment. |
-| `flowSegments` | list | `segm1,segm16` | Neighbours in the "forward" (flow) direction. Used for snake routing and direction tracking. |
+| `flowSegments` | list | `segm1,segm16` | Neighbours in the "forward" (flow) direction. Used for line routing and direction tracking. |
 | `counterSegments` | list | `segm15` | Neighbours in the "reverse" (counter) direction. |
 
 ### [buttonname] — Game Button Definition
@@ -168,7 +168,7 @@ One section per button listed in `[common] gamebuttons`.
 
 | Key | Type | Example | Description |
 |-----|------|---------|-------------|
-| `flowSegments` | list | `segm48` | The outer-ring segment(s) on the flow side of this button. The snake ends here. |
+| `flowSegments` | list | `segm48` | The outer-ring segment(s) on the flow side of this button. The line ends here. |
 | `counterSegments` | list | `segm49` | The outer-ring segment(s) on the counter side. |
 
 ### [colorname] — Colour Definition
@@ -187,7 +187,7 @@ One section per colour listed in `[common] colors`.
 | `emerald` | 50, 200, 75 | General accent |
 | `purple` | 128, 0, 128 | General accent |
 | `red` | 200, 0, 0 | Error / overload |
-| `turquoise` | 64, 224, 208 | Snake animation |
+| `turquoise` | 64, 224, 208 | Line animation |
 | `black` | 0, 0, 0 | Off / background |
 
 ---

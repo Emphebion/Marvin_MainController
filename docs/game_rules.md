@@ -80,12 +80,12 @@ The game consists of multiple rounds. The difficulty depends on the item's level
 
 #### Round setup (S10)
 - A random button (one of 8 directions) is chosen as the **goal**.
-- A **snake route** is created: a path of LED segments from the inner ring to the goal button.
+- A **line route** is created: a path of LED segments from the inner ring to the goal button.
 - The number of goals per round scales with item level (1 / 2 / 3 buttons to find).
 
 #### Gameplay (S11 + S12)
-- The LED snake animates along the route, lighting up turquoise LEDs that travel toward the goal button.
-- The player must press the button that the snake is travelling toward.
+- The LED line animates along the route, lighting up turquoise LEDs that travel toward the goal button.
+- The player must press the button that the line is travelling toward.
 - The LED state is transmitted to the Arduino every step (S12 → S11 loop).
 
 #### Success and failure conditions (S10)
@@ -102,7 +102,7 @@ The win condition is purely time-based: survive the full `gameTimeout` without e
 
 #### Difficulty by item level
 
-| Level | Game timer | Max failures | Snake goals/round | Rune sequence length |
+| Level | Game timer | Max failures | Line goals/round | Rune sequence length |
 |-------|------------|--------------|-------------------|----------------------|
 | 1 | `gameTime` (300 s) | 4 | 1 button | 1 rune |
 | 2 | `gameTime` (300 s) | 3 | 1 button | 3 runes |
