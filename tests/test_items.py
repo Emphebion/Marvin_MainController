@@ -119,6 +119,11 @@ class TestLookup:
         items = make_items(item_config_file)
         assert items.getItemByID("000000270F") is None
 
+    def test_get_item_by_character_rfid_returns_none(self, item_config_file):
+        """A character RFID scanned in item context must return None, not crash."""
+        items = make_items(item_config_file)
+        assert items.getItemByID("0000CCD207") is None
+
 
 # ---------------------------------------------------------------------------
 # write_tag / hot-reload

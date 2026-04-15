@@ -225,7 +225,7 @@ class _MQTT:
             return
         rfid = _int_to_hex(rfid_raw) if isinstance(rfid_raw, int) else str(rfid_raw).strip().upper().zfill(10)
 
-        if rfid_type in ("character", "player"):
+        if rfid_type == "character":
             # Check for duplicate — update existing rather than creating a new entry
             parser = configparser.ConfigParser()
             parser.read(glbs.character_file)
@@ -501,8 +501,7 @@ class _MQTT:
         import glbs
 
         # Update characterconfig.txt
-        # Accept both "characters" and "players" keys as a defensive safeguard
-        char_data = payload.get("characters", payload.get("players", []))
+        char_data = payload.get("characters", [])
         parser_p = configparser.ConfigParser()
         parser_p.read(glbs.character_file)
 

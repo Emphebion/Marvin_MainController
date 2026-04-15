@@ -223,17 +223,12 @@ class _Items(object):
         return self.currentItemName
     
     def getItemByID(self, foundID):
-        """Look up an Item by its hex string RFID tag ID (e.g. "00DDBC16").
+        """Look up an Item by its hex string RFID tag ID (e.g. "0000DDBC16").
 
         Returns:
             Item object, or None if not found.
         """
-        try:
-            return self.itemsIDs[foundID]
-        except IndexError:
-            print('ERROR: Item ID index out of range/not found')
-        except:
-            print('ERROR: Unknown error while finding Item by ID')
+        return self.itemsIDs.get(foundID, None)
 
     def getLowestInactiveItemIndex(self):
         for item in self.items.values():

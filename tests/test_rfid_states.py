@@ -347,6 +347,18 @@ class TestS7RfidHandling:
         glbs_stub.mqtt.publish_rfid_unknown.assert_called_once_with("DEADBEEF")
         assert s7.state == s7.states.S7
 
+    def test_character_tag_in_s7_stays_s7(self, monkeypatch):
+        """Character RFID scanned during item connect → no crash, stays S7."""
+        hero = _make_player("Hero", "00000007D1", ["connect1"])
+        s7, glbs_stub = self._make_s7(monkeypatch, active_player=hero)
+        _inject_rfid(glbs_stub, "00000007D1")  # Hero's own tag (a character, not an item)
+
+        s7._setState()
+
+        glbs_stub.mqtt.publish_rfid_unknown.assert_called_once_with("00000007D1")
+        glbs_stub.items.connectItem.assert_not_called()
+        assert s7.state == s7.states.S7
+
 
 # ---------------------------------------------------------------------------
 # S4_Disconnect_Item — RFID handling in _setState
@@ -402,5 +414,17 @@ class TestS4RfidHandling:
         s4._setState()
 
         # S4 doesn't publish rfid_unknown (no such call in S4 code)
+        glbs_stub.items.disconnectItem.assert_not_called()
+        assert s4.state == s4.states.S4
+
+    def test_character_tag_in_s4_stays_s4(self, monkeypatch):
+        """Character RFID scanned during item disconnect → no crash, stays S4."""
+        boss = _make_player("Boss", "000000000A",
+                            ["disconnect1item"], is_gm=True)
+        s4, glbs_stub = self._make_s4(monkeypatch, active_player=boss)
+        _inject_rfid(glbs_stub, "00000007D1")  # Hero's tag (a character, not an item)
+
+        s4._setState()
+
         glbs_stub.items.disconnectItem.assert_not_called()
         assert s4.state == s4.states.S4

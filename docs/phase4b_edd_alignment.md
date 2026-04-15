@@ -55,9 +55,9 @@ After:
 {"version": 42, "characters": [...], "items": [...]}
 ```
 
-Inbound `cmd/rfid/register` handler should accept both `"type": "character"` and `"type": "player"` as a defensive safeguard during transition.
+Inbound `cmd/rfid/register` handler accepts `"type": "character"` only. No backward compatibility for `"player"` is needed — the MQTT protocol between EDD and MARVIN is new and has never used `"player"` payloads.
 
-Inbound `cmd/sync/offer` handler should accept both `"characters"` and `"players"` keys.
+Inbound `cmd/sync/offer` handler reads the `"characters"` key only.
 
 #### Tests to update
 
