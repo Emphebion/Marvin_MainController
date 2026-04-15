@@ -41,23 +41,24 @@ load = 8
 connected = 1
 """
 
-PLAYER_CONFIG = """
+CHARACTER_CONFIG = """
 [common]
-players = hero,boss,unknown_player
+characters = hero,boss,unknown_character
 
 [hero]
 name = Hero
-id = 000007D1
+id = 00000007D1
 skills = connect1,wellsize
 
 [boss]
 name = Boss
-id = 0000000A
-skills = disconnectall,disconnect1item,connect1,connect2,connect3,wellsize,SL
+id = 000000000A
+skills = disconnectall,disconnect1item,connect1,connect2,connect3,wellsize
+gm = true
 
-[unknown_player]
+[unknown_character]
 name = Unknown
-id = 00000000
+id = 0000000000
 skills = None
 """
 
@@ -107,10 +108,10 @@ def item_config_file(tmp_path):
 
 
 @pytest.fixture
-def player_config_file(tmp_path):
-    """Write minimal playerconfig to a temp file and return its path."""
-    p = tmp_path / "playerconfig.txt"
-    p.write_text(PLAYER_CONFIG)
+def character_config_file(tmp_path):
+    """Write minimal characterconfig to a temp file and return its path."""
+    p = tmp_path / "characterconfig.txt"
+    p.write_text(CHARACTER_CONFIG)
     return str(p)
 
 

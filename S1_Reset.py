@@ -45,7 +45,7 @@ class S1_Reset():
         device_names = [device.name for device in glbs.devices.connectedDevices]
         print("Connected devices: {}".format(device_names))
 
-        glbs.players.setActivePlayer(None)
+        glbs.characters.setActiveCharacter(None)
 
         self._setIdleLightBehaviour()
         self.idleStartTime = glbs.time.time()
@@ -76,7 +76,7 @@ class S1_Reset():
     def _setState(self):
         self._checkInput()
         if glbs.table.status not in ('Broken', 'Disabled'):
-            if glbs.players.activePlayer:
+            if glbs.characters.activeCharacter:
                 self.state = self.states.S2
 
     def _checkInput(self):
@@ -86,10 +86,10 @@ class S1_Reset():
             if new_input["event"] == "rfid":
                 ID = new_input["data"]
                 print("Received ID: {}".format(ID))
-                if ID in glbs.players.playerDict:
-                    player = glbs.players.playerDict[ID]
-                    glbs.players.setActivePlayer(ID)
-                    glbs.mqtt.publish_rfid_player(ID, player.name)
+                if ID in glbs.characters.characterDict:
+                    character = glbs.characters.characterDict[ID]
+                    glbs.characters.setActiveCharacter(ID)
+                    glbs.mqtt.publish_rfid_character(ID, character.name)
                 else:
                     glbs.mqtt.publish_rfid_unknown(ID)
             elif new_input["event"] == "keydown":
@@ -135,8 +135,8 @@ class S1_Reset():
                 elif ev["event"] == "rfid":
                     new_id = ev["data"]
                     entry = entries[sel_idx]
-                    if entry["type"] == "player":
-                        glbs.players.write_tag(entry["section"], new_id)
+                    if entry["type"] == "character":
+                        glbs.characters.write_tag(entry["section"], new_id)
                     else:
                         glbs.items.write_tag(entry["section"], new_id)
                     updated[sel_idx] = new_id
@@ -148,23 +148,23 @@ class S1_Reset():
         glbs.display.screenOff()
 
     def _build_gm_entries(self):
-        """Return a flat ordered list of assignable player and item entries.
+        """Return a flat ordered list of assignable character and item entries.
 
         Each entry is a dict with keys:
-            type       -- 'player' or 'item'
+            type       -- 'character' or 'item'
             label      -- display name
             section    -- config section / key for write_tag()
-            current_id -- current integer tag ID
+            current_id -- current hex tag ID
         """
         entries = []
-        for section, player in glbs.players._player_sections.items():
-            if player.ID in ("00000000", "0000000A"):
+        for section, character in glbs.characters._character_sections.items():
+            if character.ID in ("0000000000", "000000000A"):
                 continue
             entries.append({
-                'type': 'player',
-                'label': player.name,
+                'type': 'character',
+                'label': character.name,
                 'section': section,
-                'current_id': player.ID,
+                'current_id': character.ID,
             })
         for item_name, item in glbs.items.items.items():
             entries.append({

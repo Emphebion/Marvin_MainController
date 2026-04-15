@@ -43,7 +43,7 @@ class _Items(object):
         for name in self.itemnames:
             display_name = self.parser.get(name, 'name', fallback=name)
             function = self.parser.get(name, 'function')
-            ID = self.parser.get(name, 'id').strip().upper()
+            ID = self.parser.get(name, 'id').strip().upper().zfill(10)
             level = self.parser.getint(name, 'level')
             activationSkill = f"connect{level}"
             load = self.parser.getint(name, 'load')
@@ -86,7 +86,7 @@ class _Items(object):
             try:
                 display_name = parser.get(name, 'name', fallback=name)
                 function = parser.get(name, 'function')
-                ID = parser.get(name, 'id').strip().upper()
+                ID = parser.get(name, 'id').strip().upper().zfill(10)
                 level = parser.getint(name, 'level')
                 activationSkill = f"connect{level}"
                 load = parser.getint(name, 'load')

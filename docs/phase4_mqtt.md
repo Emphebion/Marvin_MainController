@@ -5,6 +5,7 @@
 **Followed by:** [Phase 5](phase5_multisnake.md)
 **Note:** Review empnode docs before implementation starts.
 **Status: DONE** — `_MQTT.py` implemented; `requirements.txt` updated; all state-file integration points wired.
+**Extension:** [Phase 4b — EDD Alignment](phase4b_edd_alignment.md) — rename players→characters, RFID 8→10 char, skill mapping docs
 
 ### Completion Notes
 - RFID hex conversion completed before MQTT start: all IDs now 8-char uppercase hex strings in configs and in-memory
@@ -19,7 +20,10 @@
 - Heartbeat fires every 30 s from the S1 run loop via `glbs.mqtt.tick_heartbeat()`
 - `_Items.py` mtime sentinel fix: `connectItem()`, `disconnectItem()`, and `disconnectAll()` now advance `self._mtime` after writing config, preventing the hot-reload watcher from triggering a redundant `reload()` (which re-created all Item objects and spammed terminal output)
 - `S1_Reset._build_gm_entries` hex string fix: GM/unknown player filter changed from `player.ID in (0, 10)` to `player.ID in ("00000000", "0000000A")` to match hex ID format
+- `_Display.py` hex string fix: RFID panel player-button rendering had `pid == 0` (integer comparison against a hex string); changed to `pid == "00000000"` to correctly skip PlayerUnknown
+- **Known latent bug:** `S7_Connect_Item.py` line 66 calls `time.sleep(3)` in the insufficient-skill branch, but `time` is never imported — would crash with `NameError` if a player without the required skill scans an item. Not fixed (out of Phase 4 scope); state-level test patches around it with `create=True`
 - `test_dependencies.py` added: parametrized test that reads `requirements.txt` and verifies every package is importable — catches missing dependencies at test time rather than at runtime
+- RFID wire format: all MQTT payloads use 8-char uppercase hex strings (e.g. `"000003E9"`) to match EDD's existing convention for empnode RFID values (`VoidRfidModel.Rfid` is `string`). Inbound command handlers also accept integer values as a defensive safeguard (converted via `_int_to_hex()`). `_hex_to_int()` helper removed (no longer needed).
 - paho-mqtt v2 API: uses `CallbackAPIVersion.VERSION2` with 5-arg callbacks (`client, userdata, flags, reason_code, properties`)
 - Input validation added to command handlers: `_cmd_rfid_register` rejects missing `rfid` field; `_cmd_well_size` rejects negative/zero/non-numeric values; `_cmd_table_status` rejects unknown status strings
 - Duplicate RFID registration: `_cmd_rfid_register` now checks for existing RFID via `_find_section_by_id` — updates the existing entry instead of creating a duplicate section
@@ -57,7 +61,7 @@ Connect MARVIN to the empnode MQTT broker and publish game state events so EDD/G
 
 ## Topic and Payload Specification
 
-All `rfid` fields carry the **raw RFID tag number** (integer) as stored in `playerconfig.txt` and `itemconfig.txt`.
+All `rfid` fields carry the **8-char uppercase hex string** as stored in `playerconfig.txt` and `itemconfig.txt` (e.g. `"000003E9"`). This matches EDD's existing convention for empnode RFID strings. Inbound command handlers also accept integer values as a defensive safeguard.
 
 ### MARVIN → broker (publish)
 
@@ -73,13 +77,13 @@ All `rfid` fields carry the **raw RFID tag number** (integer) as stored in `play
 **RFID payload variants:**
 ```json
 // Known player — from S1_Reset._checkInput()
-{"action": "detected", "type": "player", "name": "Aldric", "rfid": 4}
+{"action": "detected", "type": "player", "name": "Aldric", "rfid": "00000004"}
 
 // Known item — from S7_Connect_Item._setState()
-{"action": "detected", "type": "item", "name": "Staff of Power", "rfid": 12}
+{"action": "detected", "type": "item", "name": "Staff of Power", "rfid": "0000000C"}
 
 // Unknown tag — from S1_Reset or S7_Connect_Item, whichever context produced it
-{"action": "unknown", "rfid": 99999}
+{"action": "unknown", "rfid": "0001869F"}
 ```
 
 **Items payload variants** (all variants include the full `connected` list and current `well` state):
@@ -87,16 +91,16 @@ All `rfid` fields carry the **raw RFID tag number** (integer) as stored in `play
 // Item connected
 {
   "action": "connected",
-  "changed": {"name": "Staff of Power", "rfid": 12},
-  "connected": [{"name": "Staff of Power", "rfid": 12}, {"name": "Crystal Orb", "rfid": 7}],
+  "changed": {"name": "Staff of Power", "rfid": "0000000C"},
+  "connected": [{"name": "Staff of Power", "rfid": "0000000C"}, {"name": "Crystal Orb", "rfid": "00000007"}],
   "well": {"use": 2, "capacity": 70, "pct": 0.03}
 }
 
 // Item disconnected
 {
   "action": "disconnected",
-  "changed": {"name": "Crystal Orb", "rfid": 7},
-  "connected": [{"name": "Staff of Power", "rfid": 12}],
+  "changed": {"name": "Crystal Orb", "rfid": "00000007"},
+  "connected": [{"name": "Staff of Power", "rfid": "0000000C"}],
   "well": {"use": 30, "capacity": 70, "pct": 0.43}
 }
 
@@ -132,25 +136,25 @@ All `rfid` fields carry the **raw RFID tag number** (integer) as stored in `play
 **`cmd/rfid/register` payload variants:**
 ```json
 // Register new player — skills are functional game tokens (see overview)
-{"rfid": 99999, "type": "player", "name": "Seraphina", "level": 3, "skills": ["connect1", "connect2", "disconnectall"]}
+{"rfid": "0001869F", "type": "player", "name": "Seraphina", "level": 3, "skills": ["connect1", "connect2", "disconnectall"]}
 
 // Register new item — load and function are required; no skill field
-{"rfid": 99999, "type": "item", "name": "Amulet of Flame", "level": 2, "load": 15, "function": "Passively boosts heat affinity"}
+{"rfid": "0001869F", "type": "item", "name": "Amulet of Flame", "level": 2, "load": 15, "function": "Passively boosts heat affinity"}
 ```
 
-Validate incoming `skills` list at receive time — log a warning on unknown tokens but still write them, so new tokens can be introduced in config and payload simultaneously without a code change.
+RFID values should be 8-char uppercase hex strings. Integer values are also accepted as a defensive safeguard (converted to hex internally). Validate incoming `skills` list at receive time — log a warning on unknown tokens but still write them, so new tokens can be introduced in config and payload simultaneously without a code change.
 
 **`cmd/sync/offer` payload (EDD → MARVIN):**
 ```json
 {
   "version": 45,
   "players": [
-    {"rfid": 11111, "name": "Seraphina", "level": 3, "skills": ["connect1", "connect2"]},
-    {"rfid": 22222, "name": "Aldric", "level": 2, "skills": ["connect1", "disconnectall"]}
+    {"rfid": "00002B67", "name": "Seraphina", "level": 3, "skills": ["connect1", "connect2"]},
+    {"rfid": "000056CE", "name": "Aldric", "level": 2, "skills": ["connect1", "disconnectall"]}
   ],
   "items": [
-    {"rfid": 33333, "name": "Staff of Power", "level": 2, "load": 20, "function": "Channels elemental fire"},
-    {"rfid": 44444, "name": "Amulet of Flame", "level": 1, "load": 10, "function": "Passively boosts heat affinity"}
+    {"rfid": "00008235", "name": "Staff of Power", "level": 2, "load": 20, "function": "Channels elemental fire"},
+    {"rfid": "0000AD9C", "name": "Amulet of Flame", "level": 1, "load": 10, "function": "Passively boosts heat affinity"}
   ]
 }
 ```
@@ -350,12 +354,16 @@ No MQTT logic lives inside individual state files. Each state calls `glbs.mqtt.p
 | `S13_FinishGame.py` | Add game success publish |
 | `_Items.py` | Add write method for new item registration; add `config_version` bump |
 | `_Players.py` | Add write method for new player registration; add `config_version` bump |
+| `tools/edd_stub.py` | New. EDD simulator for manual MQTT testing (S4.2) |
+| `tests/test_mqtt_integration.py` | New. 18 integration tests with real amqtt broker (S4.5) |
+| `tests/test_rfid_states.py` | New. 14 state-level RFID tests for S1, S7, S4 (T4.23) |
+| `docs/edd_marvin_integration.md` | New. EDD integration guide: implementation steps, use/misuse scenarios, test plan, simulation setup |
 
 ---
 
 ## Test Implementation Plan
 
-66 tests implemented in `tests/test_mqtt.py` — all passing. Additional dependency coverage in `tests/test_dependencies.py` (4 tests).
+64 tests implemented in `tests/test_mqtt.py` — all passing. 14 state-level RFID tests in `tests/test_rfid_states.py` — all passing. 18 integration tests in `tests/test_mqtt_integration.py` (real amqtt broker) — all passing. Additional dependency coverage in `tests/test_dependencies.py` (4 tests). Total: 236 tests.
 
 | ID | Test | Status | Test class(es) |
 |---|---|---|---|
@@ -381,25 +389,34 @@ No MQTT logic lives inside individual state files. Each state calls `glbs.mqtt.p
 | T4.20 | Misuse: well size (negative, zero, non-numeric) | ✅ | `TestMisuseWellSize` (4) |
 | T4.21 | Misuse: table status (invalid, empty, missing) | ✅ | `TestMisuseTableStatus` (3) |
 | T4.22 | Misuse: malformed messages (bad JSON, wrong prefix, unknown cmd) | ✅ | `TestMalformedMessage` (3) |
+| T4.23 | State-level RFID handling (S1, S7, S4) | ✅ | `TestS1RfidHandling` (6), `TestS7RfidHandling` (5), `TestS4RfidHandling` (3) — in `test_rfid_states.py` |
+| T4.24 | Integration: broker connect + config_version | ✅ | `TestBrokerConnect` (2) — in `test_mqtt_integration.py` |
+| T4.25 | Integration: retained messages | ✅ | `TestRetainedMessages` (2) — in `test_mqtt_integration.py` |
+| T4.26 | Integration: sync exchange (EDD newer, MARVIN newer, equal) | ✅ | `TestSyncExchange` (3) — in `test_mqtt_integration.py` |
+| T4.27 | Integration: publish flow (rfid, game, heartbeat) | ✅ | `TestPublishFlow` (5) — in `test_mqtt_integration.py` |
+| T4.28 | Integration: command flow (status, well, register, color) | ✅ | `TestCommandFlow` (4) — in `test_mqtt_integration.py` |
+| T4.29 | Integration: heartbeat timer | ✅ | `TestHeartbeatTimer` (2) — in `test_mqtt_integration.py` |
 
 ---
 
 ## Simulation Extension Plan
 
-**Reviewed against empnode `tools/` patterns** (2026-04-12). Key architectural constraint: MARVIN and empnode never communicate directly — they share a broker but use separate topic namespaces (`marvin/` vs `empnode/`). EDD is the only system that bridges both.
+**Reviewed against empnode `tools/` patterns** (2026-04-12). **Simulation verified against real EDD codebase and empnode firmware** (2026-04-13): protocol alignment confirmed, no discrepancies found. Key architectural constraint: MARVIN and empnode never communicate directly — they share a broker but use separate topic namespaces (`marvin/` vs `empnode/`). EDD is the only system that bridges both.
+
+**EDD integration guide:** [edd_marvin_integration.md](edd_marvin_integration.md) — step-by-step implementation plan for the EDD team adding MARVIN support, including all use/misuse scenarios, test plan, and simulation environment setup.
 
 - **S4.1 — MARVIN simulation mode + MQTT:** MARVIN already runs without hardware (pygame simulation). With `[MQTT] enabled = true` in `marvinconfig.txt` and a broker running, the full MQTT stack operates live. No separate MockMARVIN is needed — the simulation IS the mock. Verify: start broker, start MARVIN in sim mode, subscribe to `marvin/#`, use mouse clicks to trigger RFID scans and game events.
-- **S4.2 — EDD stub script (`tools/edd_stub.py`):** Standalone Python script (not part of empnode). Subscribes to `marvin/<id>/state/#`; prints received messages with timestamps. Accepts CLI commands: `register-player`, `register-item`, `set-well`, `set-status`, `set-color`, `sync-offer`. Modeled after empnode's `server.py` CLI prompt pattern but limited to MARVIN's `cmd/` topics. Must also implement the sync exchange: subscribe to `state/config_version`, respond with `cmd/sync/offer`.
+- **S4.2 — EDD stub script (`tools/edd_stub.py`): DONE.** Standalone Python script (not part of empnode). Subscribes to `marvin/<id>/state/#`; prints received messages with timestamps. Accepts CLI commands: `register-player`, `register-item`, `set-well`, `set-status`, `set-color-idle`, `set-color-game`, `sync-offer`. Supports `--broker`, `--port`, `--node-id` CLI arguments. Usage: `py -3 tools/edd_stub.py [--broker HOST] [--port PORT] [--node-id ID]`.
 - **S4.3 — Sync scenario:** EDD stub starts with config version 8. MARVIN starts with version 5. On connect MARVIN publishes `state/config_version: 5`. EDD stub sends `cmd/sync/offer` with version 8 + full player/item lists. Verify MARVIN accepts and config files update. Then restart MARVIN (now at version 8) and send `sync/offer` with version 3. Verify MARVIN publishes `state/sync/push`. Also test equal versions (no action).
 - **S4.4 — Full RFID lifecycle demo:** Unknown tag scan → `state/rfid action:unknown` → EDD stub sends `cmd/rfid/register` → tag now recognised → item connect → `state/items action:connected` → connect enough to overload → `state/items action:overload`.
-- **S4.5 — Integration test (`test_mqtt_integration.py`):** Spawns an `amqtt` broker in a daemon thread (same pattern as empnode `test_protocol.py`), creates a real `_MQTT` instance (not mocked), and an EDD stub subscriber. Tests real MQTT message flow: retained messages, reconnect + re-publish of `config_version`, sync exchange, heartbeat arrival over 30s. Scoped to MQTT layer only — does not require pygame or the game loop.
+- **S4.5 — Integration test (`test_mqtt_integration.py`): DONE.** Spawns an `amqtt` broker in a daemon thread (same pattern as empnode `test_protocol.py`), creates a real `_MQTT` instance (not mocked), and an EDD stub subscriber. 18 tests verify real MQTT message flow: broker connect + config_version publish, retained messages (config_version, table status), full sync exchange (EDD newer/MARVIN newer/equal), publish flow (rfid player/unknown, game failure/success, heartbeat), command flow (table status, well size, register player, idle colour), and heartbeat timer. Scoped to MQTT layer only — no pygame or game loop. Requires `amqtt` (test-only dependency).
 
 ### Known Limitations
 
 | Scenario | Status | Notes |
 |---|---|---|
 | Concurrent config writes (rapid-fire commands) | Not protected | All handlers write full config via `configparser`. Concurrent writes from the paho thread could interleave. Acceptable for LARP use case (commands are infrequent). If needed, add a threading.Lock around config writes. |
-| Broker disconnect / reconnect | Handled by paho | `loop_start()` auto-reconnects. `on_connect` re-subscribes and re-publishes `config_version`. Not yet tested in integration. |
+| Broker disconnect / reconnect | Handled by paho | `loop_start()` auto-reconnects. `on_connect` re-subscribes and re-publishes `config_version`. Connect + re-publish verified in `test_mqtt_integration.py`. Full disconnect/reconnect cycle not yet tested. |
 | Large sync payloads | Not bounded | A sync offer with thousands of players/items would work but is slow. Not a realistic scenario. |
 
 ---
@@ -442,13 +459,13 @@ cd Marvin_MainController && py -3 MARVIN.py
 # Test register player:
 mosquitto_pub -h localhost \
   -t "marvin/marvin-001/cmd/rfid/register" \
-  -m '{"rfid":99999,"type":"player","name":"Seraphina","level":3,"skills":["connect1","disconnectall"]}'
-# Expected: next scan of tag 99999 resolves to "Seraphina"
+  -m '{"rfid":"0001869F","type":"player","name":"Seraphina","level":3,"skills":["connect1","disconnectall"]}'
+# Expected: next scan of tag 0001869F resolves to "Seraphina"
 
 # Test register duplicate player (should update, not create second entry):
 mosquitto_pub -h localhost \
   -t "marvin/marvin-001/cmd/rfid/register" \
-  -m '{"rfid":99999,"type":"player","name":"Seraphina the Bold","skills":["connect1","connect2","disconnectall"]}'
+  -m '{"rfid":"0001869F","type":"player","name":"Seraphina the Bold","skills":["connect1","connect2","disconnectall"]}'
 # Expected: existing entry updated, no new section in playerconfig.txt
 
 # Test well size:
@@ -472,7 +489,7 @@ mosquitto_pub -h localhost \
 # Test sync (EDD newer):
 mosquitto_pub -h localhost \
   -t "marvin/marvin-001/cmd/sync/offer" \
-  -m '{"version":999,"players":[{"rfid":88888,"name":"TestSync","skills":["connect1"]}],"items":[]}'
+  -m '{"version":999,"players":[{"rfid":"00015B38","name":"TestSync","skills":["connect1"]}],"items":[]}'
 # Expected: MARVIN accepts, playerconfig.txt updated, config_version set to 999
 ```
 

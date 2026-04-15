@@ -12,7 +12,7 @@ class S2_Welcome(object):
     def run(self):
         self.state = self.states.S2
         print("current state is {}".format(self.state))
-        print("Welcome to the game, {}!".format(glbs.players.activePlayer.name))
+        print("Welcome to the game, {}!".format(glbs.characters.activeCharacter.name))
         glbs.display.display(self.folder, self.name, self.location)
         glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
         glbs.devices.transmitLED(glbs.table.getLEDData())

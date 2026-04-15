@@ -11,7 +11,7 @@ Subsystem objects (read-only after init):
     items     -- item inventory and power-node manager
     devices   -- serial device connections
     table     -- LED segment graph and animation engine
-    players   -- player registry and active-player tracker
+    characters -- character registry and active-character tracker
     game      -- active game mode instance (LineGame by default; swap for RuneGame)
     mqtt      -- MQTT client (no-op when disabled or paho-mqtt not installed)
 
@@ -31,7 +31,7 @@ from _InputHandler import _InputHandler
 from _Items import _Items
 from _Devices import _Devices
 from _Table import _Table
-from _Players import _Players
+from _Characters import _Characters
 from _LineGame import LineGame
 from _RuneGame import RuneGame
 from _GameContext import GameContext
@@ -44,7 +44,7 @@ import random
 config_file = 'marvinconfig.txt'
 item_file = 'itemconfig.txt'
 table_file = 'tableconfig.txt'
-player_file = 'playerconfig.txt'
+character_file = 'characterconfig.txt'
 
 pygame.init()
 
@@ -58,7 +58,7 @@ handler  = _InputHandler()
 items    = _Items(item_file)
 devices  = _Devices(config_file)               # must be before _Display (sim-mode detection)
 table    = _Table(table_file)                  # must be before _Display (LED positions)
-players  = _Players(player_file)
+characters = _Characters(character_file)
 display  = _Display(config_file)               # last: can see all objects
 rune_config_file = 'runeconfig.txt'
 snake_game = LineGame(table)                   # snake game instance
@@ -83,6 +83,6 @@ def bedTime():
     """
     sleep = False
     if (time.time() - systemWakeTime) > systemTimeout:
-        players.resetActivePlayer()
+        characters.resetActiveCharacter()
         sleep = True
     return sleep

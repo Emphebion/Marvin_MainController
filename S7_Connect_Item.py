@@ -18,7 +18,7 @@ class S7_Connect_Item():
         self.state = self.states.S7
         print("current state is {}".format(self.state))
         print("current state name is {}".format(self.state.name))
-        if glbs.players.activePlayer.hasSkill(self.skills):
+        if glbs.characters.activeCharacter.hasSkill(self.skills):
             glbs.display.display(self.folder,self.name,self.location)
         else:
             self._skipThisState()
@@ -43,10 +43,10 @@ class S7_Connect_Item():
                 newItem = glbs.items.getItemByID(rfid_hex)
                 if newItem:
                     glbs.mqtt.publish_rfid_item(rfid_hex, newItem.name)
-                    playerIsGM = glbs.players.activePlayer.isGM
-                    playerCanActivate = glbs.players.activePlayer.hasSkill(newItem.activationSkill)
+                    characterIsGM = glbs.characters.activeCharacter.isGM
+                    characterCanActivate = glbs.characters.activeCharacter.hasSkill(newItem.activationSkill)
                     # TODO: give feedback if item was invalid, already connected or level is insufficient!
-                    if playerIsGM and not(newItem.connected):
+                    if characterIsGM and not(newItem.connected):
                         item_before = newItem
                         glbs.items.currentItemName = newItem.name
                         overloaded = glbs.items.connectItem()
@@ -56,12 +56,12 @@ class S7_Connect_Item():
                             glbs.mqtt.publish_item_connected(item_before)
                         glbs.items.currentItemName = ""
                         self.state = self.states.S1
-                    elif playerCanActivate and (glbs.items.currentItemName != newItem.name) and not(newItem.connected):
+                    elif characterCanActivate and (glbs.items.currentItemName != newItem.name) and not(newItem.connected):
                         glbs.items.currentItemName = newItem.name
                         glbs.ctx.gameTimeout = self.gameTime  # Set game timeout (in seconds) to the value in the config
                         glbs.ctx.returnState = self.states.S7
                         self.state = self.states.S9
-                    elif not playerCanActivate:
+                    elif not characterCanActivate:
                         glbs.table.setAllTableLEDs(glbs.table.colorsLED["orange"])
                         time.sleep(3)
                         glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])

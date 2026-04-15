@@ -73,7 +73,7 @@ class _Display(object):
     def __init__(self, config_file):
         """Set up display in hardware or simulation mode.
 
-        glbs.devices, glbs.table, glbs.players, and glbs.items must all
+        glbs.devices, glbs.table, glbs.characters, and glbs.items must all
         exist before this is called (they are created first in glbs.py).
         """
         import configparser as _cp
@@ -373,7 +373,7 @@ class _Display(object):
         The right-panel area is not cleared between frames, so a skipped
         render simply keeps the previous frame's content visible.
         """
-        active = glbs.players.activePlayer
+        active = glbs.characters.activeCharacter
         return (
             active.ID if active else None,
             tuple(item.connected for item in glbs.items.items.values()),
@@ -437,12 +437,12 @@ class _Display(object):
             self._rfid_btns.append((rect, event_dict))
             y += 20
 
-        # Players section
-        _section("── Players ──")
-        for pid, player in glbs.players.playerDict.items():
-            if pid == "00000000":
-                continue  # skip PlayerUnknown
-            _button(player.name, {"event": "rfid", "data": pid})
+        # Characters section
+        _section("── Characters ──")
+        for pid, character in glbs.characters.characterDict.items():
+            if pid == "0000000000":
+                continue  # skip CharacterUnknown
+            _button(character.name, {"event": "rfid", "data": pid})
             if y > self._SIM_H - 120:
                 break
 
@@ -458,10 +458,10 @@ class _Display(object):
         by = self._SIM_H - 58
         glbs.pygame.draw.line(self.screen, (50, 50, 50), (px, by - 2), (px + pw, by - 2), 1)
 
-        active = glbs.players.activePlayer
-        player_txt = f"Player: {active.name}" if active else "No active player"
+        active = glbs.characters.activeCharacter
+        character_txt = f"Character: {active.name}" if active else "No active character"
         self.screen.blit(
-            self._font_sm.render(player_txt, True,
+            self._font_sm.render(character_txt, True,
                                  (100, 220, 100) if active else (120, 120, 120)),
             (px + 8, by))
         by += 14
@@ -651,7 +651,7 @@ class _Display(object):
             else:
                 prefix = "  "
                 id_str = f"[{entry['current_id']}]"
-            typ = "P" if entry["type"] == "player" else "I"
+            typ = "C" if entry["type"] == "character" else "I"
             text = f"{prefix}{typ} {entry['label']}"
 
             if i == sel_idx:
@@ -709,7 +709,7 @@ class _Display(object):
                 id_str = str(entry['current_id'])
                 fg = (140, 140, 140)
 
-            typ = "P" if entry["type"] == "player" else "I"
+            typ = "C" if entry["type"] == "character" else "I"
             label = f"{prefix}{typ} {entry['label']}"
 
             if i == sel_idx:

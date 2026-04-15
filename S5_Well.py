@@ -14,7 +14,7 @@ class S5_Well(object):
         self.state = self.states.S5
         print("current state is {}".format(self.state))
         print("current state name is {}".format(self.state.name))
-        if glbs.players.activePlayer.hasSkill(self.skills):
+        if glbs.characters.activeCharacter.hasSkill(self.skills):
             glbs.display.display(self.folder,self.name,self.location)
         else:
             self._skipThisState()

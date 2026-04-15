@@ -84,7 +84,7 @@ Player skill tokens are stored comma-separated in `playerconfig.txt` and checked
 3. **[Phase 2](phase2_architecture.md)** — Architecture refactor + test suite
 4. **[Phase 3](phase3_runegame.md)** — RuneGame mode
 5. **[Phase 3b](phase3_runegame.md#phase-3b--dead-code--unused-parameter-cleanup--performance-optimisation)** — Dead code cleanup + performance optimisation
-6. **[Phase 4](phase4_mqtt.md)** — MQTT connection
+6. **[Phase 4](phase4_mqtt.md)** — MQTT connection | **[EDD integration guide](edd_marvin_integration.md)** | **[Phase 4b — EDD alignment](phase4b_edd_alignment.md)**
 7. **[Phase 5](phase5_multisnake.md)** — MultiSnakeGame mode
 8. **[Phase 6](phase6_hardware_fixes.md)** — Post-hardware-test fixes
 

@@ -85,18 +85,18 @@ def _build_glbs(monkeypatch, *, status="Active", active_player=None):
     parser = configparser.ConfigParser()
     parser.read_string(_MARVIN_CONFIG)
 
-    hero = _make_player("Hero", "000007D1", ["connect1", "wellsize"])
-    boss = _make_player("Boss", "0000000A",
+    hero = _make_player("Hero", "00000007D1", ["connect1", "wellsize"])
+    boss = _make_player("Boss", "000000000A",
                         ["disconnectall", "disconnect1item", "connect1",
-                         "connect2", "connect3", "wellsize", "SL"],
+                         "connect2", "connect3", "wellsize"],
                         is_gm=True)
 
-    widget = _make_item("widget", "000003E9", 1, 5, connected=False, display_name="Widget")
-    gadget = _make_item("gadget", "000003EA", 2, 8, connected=True, display_name="Gadget")
+    widget = _make_item("widget", "00000003E9", 1, 5, connected=False, display_name="Widget")
+    gadget = _make_item("gadget", "00000003EA", 2, 8, connected=True, display_name="Gadget")
 
     items_ns = types.SimpleNamespace(
         items={"widget": widget, "gadget": gadget},
-        itemsIDs={"000003E9": widget, "000003EA": gadget},
+        itemsIDs={"00000003E9": widget, "00000003EA": gadget},
         currentItemName="",
         source=70,
         connectItem=MagicMock(return_value=False),
@@ -105,28 +105,28 @@ def _build_glbs(monkeypatch, *, status="Active", active_player=None):
     )
     items_ns.getItemByID = lambda fid: items_ns.itemsIDs.get(fid)
 
-    players_ns = types.SimpleNamespace(
-        playerDict={"000007D1": hero, "0000000A": boss},
-        activePlayer=active_player,
-        setActivePlayer=MagicMock(),
-        _player_sections={"hero": hero, "boss": boss},
+    characters_ns = types.SimpleNamespace(
+        characterDict={"00000007D1": hero, "000000000A": boss},
+        activeCharacter=active_player,
+        setActiveCharacter=MagicMock(),
+        _character_sections={"hero": hero, "boss": boss},
     )
 
-    # Make setActivePlayer actually set activePlayer so S1._setState can read it
+    # Make setActiveCharacter actually set activeCharacter so S1._setState can read it
     def _set_active(pid):
         if pid is None:
-            players_ns.activePlayer = None
-        elif pid in players_ns.playerDict:
-            players_ns.activePlayer = players_ns.playerDict[pid]
-    players_ns.setActivePlayer = MagicMock(side_effect=_set_active)
+            characters_ns.activeCharacter = None
+        elif pid in characters_ns.characterDict:
+            characters_ns.activeCharacter = characters_ns.characterDict[pid]
+    characters_ns.setActiveCharacter = MagicMock(side_effect=_set_active)
 
     glbs_stub = types.SimpleNamespace(
         parser=parser,
-        players=players_ns,
+        characters=characters_ns,
         items=items_ns,
         handler=types.SimpleNamespace(event_handler=MagicMock(return_value=[])),
         mqtt=types.SimpleNamespace(
-            publish_rfid_player=MagicMock(),
+            publish_rfid_character=MagicMock(),
             publish_rfid_item=MagicMock(),
             publish_rfid_unknown=MagicMock(),
             publish_item_connected=MagicMock(),
@@ -198,34 +198,34 @@ class TestS1RfidHandling:
         s1.state = s1.states.S1
         return s1, glbs_stub
 
-    def test_known_player_sets_active_and_publishes(self, monkeypatch):
-        """Known player hex ID → setActivePlayer called, MQTT rfid published."""
+    def test_known_character_sets_active_and_publishes(self, monkeypatch):
+        """Known character hex ID → setActiveCharacter called, MQTT rfid published."""
         s1, glbs_stub = self._make_s1(monkeypatch)
-        _inject_rfid(glbs_stub, "000007D1")
+        _inject_rfid(glbs_stub, "00000007D1")
 
         s1._checkInput()
 
-        glbs_stub.players.setActivePlayer.assert_called_once_with("000007D1")
-        glbs_stub.mqtt.publish_rfid_player.assert_called_once_with("000007D1", "Hero")
+        glbs_stub.characters.setActiveCharacter.assert_called_once_with("00000007D1")
+        glbs_stub.mqtt.publish_rfid_character.assert_called_once_with("00000007D1", "Hero")
 
-    def test_known_player_active_transitions_to_s2(self, monkeypatch):
-        """After setActivePlayer, _setState transitions S1 → S2 when Active."""
+    def test_known_character_active_transitions_to_s2(self, monkeypatch):
+        """After setActiveCharacter, _setState transitions S1 → S2 when Active."""
         s1, glbs_stub = self._make_s1(monkeypatch, status="Active")
-        _inject_rfid(glbs_stub, "000007D1")
+        _inject_rfid(glbs_stub, "00000007D1")
 
         s1._setState()
 
         assert s1.state == s1.states.S2
 
     def test_unknown_tag_publishes_unknown(self, monkeypatch):
-        """Unknown hex ID → MQTT unknown published, no setActivePlayer."""
+        """Unknown hex ID → MQTT unknown published, no setActiveCharacter."""
         s1, glbs_stub = self._make_s1(monkeypatch)
         _inject_rfid(glbs_stub, "DEADBEEF")
 
         s1._checkInput()
 
         glbs_stub.mqtt.publish_rfid_unknown.assert_called_once_with("DEADBEEF")
-        glbs_stub.players.setActivePlayer.assert_not_called()
+        glbs_stub.characters.setActiveCharacter.assert_not_called()
 
     def test_unknown_tag_state_stays_s1(self, monkeypatch):
         """Unknown tag does not cause state transition."""
@@ -237,22 +237,22 @@ class TestS1RfidHandling:
         assert s1.state == s1.states.S1
 
     def test_disabled_status_blocks_transition_to_s2(self, monkeypatch):
-        """Known player scanned while Disabled → player set but state stays S1."""
+        """Known character scanned while Disabled → character set but state stays S1."""
         s1, glbs_stub = self._make_s1(monkeypatch, status="Disabled")
-        _inject_rfid(glbs_stub, "000007D1")
+        _inject_rfid(glbs_stub, "00000007D1")
 
         s1._setState()
 
-        # Player was set (RFID was processed)
-        glbs_stub.players.setActivePlayer.assert_called_once_with("000007D1")
-        glbs_stub.mqtt.publish_rfid_player.assert_called_once()
+        # Character was set (RFID was processed)
+        glbs_stub.characters.setActiveCharacter.assert_called_once_with("00000007D1")
+        glbs_stub.mqtt.publish_rfid_character.assert_called_once()
         # But state stays S1 because Disabled blocks transition
         assert s1.state == s1.states.S1
 
     def test_broken_status_blocks_transition_to_s2(self, monkeypatch):
-        """Known player scanned while Broken → state stays S1."""
+        """Known character scanned while Broken → state stays S1."""
         s1, glbs_stub = self._make_s1(monkeypatch, status="Broken")
-        _inject_rfid(glbs_stub, "000007D1")
+        _inject_rfid(glbs_stub, "00000007D1")
 
         s1._setState()
 
@@ -279,10 +279,10 @@ class TestS7RfidHandling:
 
     def test_known_item_gm_connects_and_transitions(self, monkeypatch):
         """GM scans disconnected item → connectItem, MQTT publish, state → S1."""
-        boss = _make_player("Boss", "0000000A",
-                            ["connect1", "connect2", "SL"], is_gm=True)
+        boss = _make_player("Boss", "000000000A",
+                            ["connect1", "connect2"], is_gm=True)
         s7, glbs_stub = self._make_s7(monkeypatch, active_player=boss)
-        _inject_rfid(glbs_stub, "000003E9")  # widget, disconnected
+        _inject_rfid(glbs_stub, "00000003E9")  # widget, disconnected
 
         s7._setState()
 
@@ -293,11 +293,11 @@ class TestS7RfidHandling:
 
     def test_known_item_gm_overload_publishes_overload(self, monkeypatch):
         """GM connects item that causes overload → publish_items_overload."""
-        boss = _make_player("Boss", "0000000A",
-                            ["connect1", "connect2", "SL"], is_gm=True)
+        boss = _make_player("Boss", "000000000A",
+                            ["connect1", "connect2"], is_gm=True)
         s7, glbs_stub = self._make_s7(monkeypatch, active_player=boss)
         glbs_stub.items.connectItem = MagicMock(return_value=True)  # overload
-        _inject_rfid(glbs_stub, "000003E9")
+        _inject_rfid(glbs_stub, "00000003E9")
 
         s7._setState()
 
@@ -306,10 +306,10 @@ class TestS7RfidHandling:
         assert s7.state == s7.states.S1
 
     def test_known_item_matching_skill_transitions_to_s9(self, monkeypatch):
-        """Player with connect1 scans level-1 item → state → S9 (game start)."""
-        hero = _make_player("Hero", "000007D1", ["connect1", "wellsize"])
+        """Character with connect1 scans level-1 item → state → S9 (game start)."""
+        hero = _make_player("Hero", "00000007D1", ["connect1", "wellsize"])
         s7, glbs_stub = self._make_s7(monkeypatch, active_player=hero)
-        _inject_rfid(glbs_stub, "000003E9")  # widget, level 1, activationSkill=connect1
+        _inject_rfid(glbs_stub, "00000003E9")  # widget, level 1, activationSkill=connect1
 
         s7._setState()
 
@@ -320,14 +320,14 @@ class TestS7RfidHandling:
         glbs_stub.items.connectItem.assert_not_called()
 
     def test_known_item_insufficient_skill_stays_s7(self, monkeypatch):
-        """Player without connect2 scans level-2 item → stays S7."""
-        hero = _make_player("Hero", "000007D1", ["connect1", "wellsize"])
+        """Character without connect2 scans level-2 item → stays S7."""
+        hero = _make_player("Hero", "00000007D1", ["connect1", "wellsize"])
         s7, glbs_stub = self._make_s7(monkeypatch, active_player=hero)
-        _inject_rfid(glbs_stub, "000003EA")  # gadget, level 2, needs connect2
+        _inject_rfid(glbs_stub, "00000003EA")  # gadget, level 2, needs connect2
 
         # Gadget is connected=True, so the skill check path won't enter the
         # connect branch anyway. Make it disconnected to hit the skill check.
-        glbs_stub.items.itemsIDs["000003EA"].connected = False
+        glbs_stub.items.itemsIDs["00000003EA"].connected = False
 
         # Patch time.sleep to avoid 3s delay in the "insufficient skill" path
         with patch("S7_Connect_Item.time", create=True, new=MagicMock()):
@@ -338,7 +338,7 @@ class TestS7RfidHandling:
 
     def test_unknown_tag_publishes_unknown_stays_s7(self, monkeypatch):
         """Unknown hex RFID in S7 → MQTT unknown, state stays S7."""
-        hero = _make_player("Hero", "000007D1", ["connect1"])
+        hero = _make_player("Hero", "00000007D1", ["connect1"])
         s7, glbs_stub = self._make_s7(monkeypatch, active_player=hero)
         _inject_rfid(glbs_stub, "DEADBEEF")
 
@@ -368,10 +368,10 @@ class TestS4RfidHandling:
 
     def test_gm_disconnects_connected_item(self, monkeypatch):
         """GM scans connected item → disconnectItem, MQTT publish, state → S1."""
-        boss = _make_player("Boss", "0000000A",
-                            ["disconnect1item", "SL"], is_gm=True)
+        boss = _make_player("Boss", "000000000A",
+                            ["disconnect1item"], is_gm=True)
         s4, glbs_stub = self._make_s4(monkeypatch, active_player=boss)
-        _inject_rfid(glbs_stub, "000003EA")  # gadget, connected=True
+        _inject_rfid(glbs_stub, "00000003EA")  # gadget, connected=True
 
         s4._setState()
 
@@ -379,11 +379,11 @@ class TestS4RfidHandling:
         glbs_stub.mqtt.publish_item_disconnected.assert_called_once()
         assert s4.state == s4.states.S1
 
-    def test_normal_player_disconnects_via_game(self, monkeypatch):
-        """Normal player scans connected item → state → S9 (game required)."""
-        hero = _make_player("Hero", "000007D1", ["connect1", "disconnect1item"])
+    def test_normal_character_disconnects_via_game(self, monkeypatch):
+        """Normal character scans connected item → state → S9 (game required)."""
+        hero = _make_player("Hero", "00000007D1", ["connect1", "disconnect1item"])
         s4, glbs_stub = self._make_s4(monkeypatch, active_player=hero)
-        _inject_rfid(glbs_stub, "000003EA")  # gadget, connected=True
+        _inject_rfid(glbs_stub, "00000003EA")  # gadget, connected=True
 
         s4._setState()
 
@@ -394,8 +394,8 @@ class TestS4RfidHandling:
 
     def test_unknown_tag_stays_s4(self, monkeypatch):
         """Unknown RFID in S4 → state stays S4, no disconnect."""
-        boss = _make_player("Boss", "0000000A",
-                            ["disconnect1item", "SL"], is_gm=True)
+        boss = _make_player("Boss", "000000000A",
+                            ["disconnect1item"], is_gm=True)
         s4, glbs_stub = self._make_s4(monkeypatch, active_player=boss)
         _inject_rfid(glbs_stub, "DEADBEEF")
 

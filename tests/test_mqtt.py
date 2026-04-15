@@ -59,7 +59,7 @@ class TestDisabledMode:
         mqtt = _MQTT(mqtt_config_disabled)
         # Should not raise
         mqtt.publish("state/test", {"key": "value"})
-        mqtt.publish_rfid_player("00CCA97F", "TestPlayer")
+        mqtt.publish_rfid_character("0000CCA97F", "TestCharacter")
         mqtt.publish_heartbeat()
 
     def test_disconnect_is_safe_when_disabled(self, mqtt_config_disabled):
@@ -137,14 +137,14 @@ class TestPublishHelpers:
         args, _ = client.publish.call_args
         return json.loads(args[1])
 
-    def test_rfid_player_payload(self, mqtt_config_enabled):
+    def test_rfid_character_payload(self, mqtt_config_enabled):
         mqtt, client = self._make_mqtt(mqtt_config_enabled)
-        mqtt.publish_rfid_player("00CCA97F", "SL1")
+        mqtt.publish_rfid_character("0000CCA97F", "SL1")
         payload = self._last_payload(client)
         assert payload["action"] == "detected"
-        assert payload["type"] == "player"
+        assert payload["type"] == "character"
         assert payload["name"] == "SL1"
-        assert payload["rfid"] == 0x00CCA97F
+        assert payload["rfid"] == "0000CCA97F"
 
     def test_rfid_item_payload(self, mqtt_config_enabled):
         mqtt, client = self._make_mqtt(mqtt_config_enabled)
@@ -152,14 +152,14 @@ class TestPublishHelpers:
         payload = self._last_payload(client)
         assert payload["action"] == "detected"
         assert payload["type"] == "item"
-        assert payload["rfid"] == 0x00DDBC16
+        assert payload["rfid"] == "00DDBC16"
 
     def test_rfid_unknown_payload(self, mqtt_config_enabled):
         mqtt, client = self._make_mqtt(mqtt_config_enabled)
         mqtt.publish_rfid_unknown("DEADBEEF")
         payload = self._last_payload(client)
         assert payload["action"] == "unknown"
-        assert payload["rfid"] == 0xDEADBEEF
+        assert payload["rfid"] == "DEADBEEF"
 
     def test_game_failure_payload(self, mqtt_config_enabled):
         mqtt, client = self._make_mqtt(mqtt_config_enabled)
@@ -219,14 +219,14 @@ connected = 0
 [common]
 status = Active
 """)
-        player_cfg = tmp_path / "playerconfig.txt"
-        player_cfg.write_text("""
+        character_cfg = tmp_path / "characterconfig.txt"
+        character_cfg.write_text("""
 [common]
-players = hero
+characters = hero
 
 [hero]
 name = Hero
-id = 000007D1
+id = 00000007D1
 skills = connect1,wellsize
 """)
 
@@ -234,7 +234,7 @@ skills = connect1,wellsize
         glbs_stub = types.SimpleNamespace(
             item_file=str(item_cfg),
             table_file=str(table_cfg),
-            player_file=str(player_cfg),
+            character_file=str(character_cfg),
             table=types.SimpleNamespace(status="Active", colorsLED={"black": [0, 0, 0]}),
             items=types.SimpleNamespace(
                 source=70,
@@ -242,8 +242,8 @@ skills = connect1,wellsize
                 items={},
                 reload=MagicMock(),
             ),
-            players=types.SimpleNamespace(
-                playerDict={},
+            characters=types.SimpleNamespace(
+                characterDict={},
                 reload=MagicMock(),
             ),
             parser=configparser.ConfigParser(),
@@ -295,29 +295,29 @@ skills = connect1,wellsize
         parser.read(glbs_stub.item_file)
         assert parser.getint("items", "config_version") == 6  # was 5
 
-    def test_cmd_register_player_persists(
+    def test_cmd_register_character_persists(
             self, mqtt_config_enabled, tmp_path, monkeypatch):
         mqtt, client, glbs_stub = self._make_mqtt_with_glbs(
             mqtt_config_enabled, tmp_path, monkeypatch)
 
         mqtt._cmd_rfid_register({
-            "type": "player",
+            "type": "character",
             "rfid": 99999,
             "name": "Seraphina",
             "level": 3,
             "skills": ["connect1", "disconnectall"],
         })
 
-        glbs_stub.players.reload.assert_called_once()
+        glbs_stub.characters.reload.assert_called_once()
         parser = configparser.ConfigParser()
-        parser.read(glbs_stub.player_file)
-        # New player section should exist
+        parser.read(glbs_stub.character_file)
+        # New character section should exist
         sections = [s for s in parser.sections() if s != "common"]
-        assert len(sections) == 2   # hero + new player
+        assert len(sections) == 2   # hero + new character
         # Find the new section (not hero)
         new_section = [s for s in sections if s != "hero"][0]
         assert parser.get(new_section, "name") == "Seraphina"
-        assert parser.get(new_section, "id") == "0001869F"  # 99999 decimal = 0x1869F
+        assert parser.get(new_section, "id") == "000001869F"  # 99999 decimal = 0x1869F
 
     def test_cmd_register_item_persists(
             self, mqtt_config_enabled, tmp_path, monkeypatch):
@@ -345,27 +345,15 @@ skills = connect1,wellsize
 # ---------------------------------------------------------------------------
 
 class TestHexConversion:
-    def test_hex_to_int(self):
-        from _MQTT import _hex_to_int
-        assert _hex_to_int("00CCA97F") == 13412735
-        assert _hex_to_int("0000000A") == 10
-        assert _hex_to_int("00000000") == 0
-        assert _hex_to_int("DEADBEEF") == 0xDEADBEEF
-
-    def test_hex_to_int_invalid(self):
-        from _MQTT import _hex_to_int
-        assert _hex_to_int("not_hex") == 0
-        assert _hex_to_int(None) == 0
-
     def test_int_to_hex(self):
         from _MQTT import _int_to_hex
-        assert _int_to_hex(13412735) == "00CCA97F"
-        assert _int_to_hex(10) == "0000000A"
-        assert _int_to_hex(0) == "00000000"
+        assert _int_to_hex(13412735) == "0000CCA97F"
+        assert _int_to_hex(10) == "000000000A"
+        assert _int_to_hex(0) == "0000000000"
 
     def test_int_to_hex_invalid(self):
         from _MQTT import _int_to_hex
-        assert _int_to_hex("not_a_number") == "00000000"
+        assert _int_to_hex("not_a_number") == "0000000000"
 
 
 # ---------------------------------------------------------------------------
@@ -446,7 +434,7 @@ class TestItemsPayload:
         payload = json.loads(client.publish.call_args[0][1])
         assert payload["action"] == "connected"
         assert payload["changed"]["name"] == "Widget"
-        assert payload["changed"]["rfid"] == 0x000003E9
+        assert payload["changed"]["rfid"] == "000003E9"
 
     def test_connected_payload_includes_well(self, mqtt_config_enabled, monkeypatch):
         mqtt, client, _, widget, _ = self._make_mqtt_with_items(
@@ -553,14 +541,14 @@ level = 1
 load = 5
 connected = 0
 """)
-        player_cfg = tmp_path / "playerconfig.txt"
-        player_cfg.write_text("""
+        character_cfg = tmp_path / "characterconfig.txt"
+        character_cfg.write_text("""
 [common]
-players = hero
+characters = hero
 
 [hero]
 name = Hero
-id = 000007D1
+id = 00000007D1
 skills = connect1,wellsize
 """)
         table_cfg = tmp_path / "tableconfig.txt"
@@ -569,11 +557,11 @@ skills = connect1,wellsize
         glbs_stub = types.SimpleNamespace(
             item_file=str(item_cfg),
             table_file=str(table_cfg),
-            player_file=str(player_cfg),
+            character_file=str(character_cfg),
             table=types.SimpleNamespace(status="Active", colorsLED={}),
             items=types.SimpleNamespace(source=70, calculateNodeUse=lambda: 0,
                                         items={}, reload=MagicMock()),
-            players=types.SimpleNamespace(playerDict={}, reload=MagicMock()),
+            characters=types.SimpleNamespace(characterDict={}, reload=MagicMock()),
             parser=configparser.ConfigParser(),
         )
         glbs_stub.parser.read(str(mqtt_cfg))
@@ -587,18 +575,18 @@ skills = connect1,wellsize
         mqtt._client = mock_client
         return mqtt, glbs_stub
 
-    def test_registered_player_survives_reinit(self, tmp_path, monkeypatch):
+    def test_registered_character_survives_reinit(self, tmp_path, monkeypatch):
         mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
         mqtt._cmd_rfid_register({
-            "type": "player", "rfid": 55555,
+            "type": "character", "rfid": 55555,
             "name": "Aldric", "skills": ["connect1", "connect2"],
         })
         # Re-read from file (simulates restart)
-        from _Players import _Players
-        players = _Players(glbs_stub.player_file)
-        assert "0000D903" in players.playerDict
-        assert players.playerDict["0000D903"].name == "Aldric"
-        assert players.playerDict["0000D903"].hasSkill("connect2")
+        from _Characters import _Characters
+        characters = _Characters(glbs_stub.character_file)
+        assert "000000D903" in characters.characterDict
+        assert characters.characterDict["000000D903"].name == "Aldric"
+        assert characters.characterDict["000000D903"].hasSkill("connect2")
 
     def test_registered_item_survives_reinit(self, tmp_path, monkeypatch):
         mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
@@ -609,8 +597,8 @@ skills = connect1,wellsize
         })
         from _Items import _Items
         items = _Items(glbs_stub.item_file)
-        assert "00012FD1" in items.itemsIDs
-        item = items.itemsIDs["00012FD1"]
+        assert "0000012FD1" in items.itemsIDs
+        item = items.itemsIDs["0000012FD1"]
         assert item.name == "item1"  # _Items uses section key, not display name
         assert item.level == 2
         assert item.load == 15
@@ -761,28 +749,28 @@ level = 1
 load = 5
 connected = 0
 """)
-        player_cfg = tmp_path / "playerconfig.txt"
-        player_cfg.write_text("""
+        character_cfg = tmp_path / "characterconfig.txt"
+        character_cfg.write_text("""
 [common]
-players = hero
+characters = hero
 
 [hero]
 name = Hero
-id = 000007D1
+id = 00000007D1
 skills = connect1,wellsize
 """)
 
         glbs_stub = types.SimpleNamespace(
             item_file=str(item_cfg),
-            player_file=str(player_cfg),
+            character_file=str(character_cfg),
             table_file="dummy",
             table=types.SimpleNamespace(status="Active", colorsLED={}),
             items=types.SimpleNamespace(
                 source=70, calculateNodeUse=lambda: 0,
                 items={}, reload=MagicMock(),
             ),
-            players=types.SimpleNamespace(
-                playerDict={}, reload=MagicMock(),
+            characters=types.SimpleNamespace(
+                characterDict={}, reload=MagicMock(),
             ),
             parser=configparser.ConfigParser(),
         )
@@ -803,7 +791,7 @@ skills = connect1,wellsize
 
         mqtt._cmd_sync_offer({
             "version": 8,
-            "players": [
+            "characters": [
                 {"rfid": 11111, "name": "Seraphina", "skills": ["connect1"]},
             ],
             "items": [
@@ -814,22 +802,22 @@ skills = connect1,wellsize
 
         # Version bumped to EDD's version
         assert mqtt._get_config_version() == 8
-        # reload called for both players and items
-        glbs_stub.players.reload.assert_called_once()
+        # reload called for both characters and items
+        glbs_stub.characters.reload.assert_called_once()
         glbs_stub.items.reload.assert_called_once()
-        # New player written to file
+        # New character written to file
         parser_p = configparser.ConfigParser()
-        parser_p.read(glbs_stub.player_file)
+        parser_p.read(glbs_stub.character_file)
         all_ids = [parser_p.get(s, "id", fallback="").strip().upper()
                    for s in parser_p.sections() if s != "common"]
-        assert "00002B67" in all_ids   # 11111 → 0x2B67
+        assert "0000002B67" in all_ids   # 11111 → 0x2B67
 
     def test_edd_newer_items_written(self, tmp_path, monkeypatch):
         mqtt, client, glbs_stub = self._setup(tmp_path, monkeypatch)
 
         mqtt._cmd_sync_offer({
             "version": 10,
-            "players": [],
+            "characters": [],
             "items": [
                 {"rfid": 33333, "name": "Staff of Power", "level": 2,
                  "load": 20, "function": "Channels fire"},
@@ -845,7 +833,7 @@ skills = connect1,wellsize
         """T4.17: When MARVIN version > EDD version, publish sync/push."""
         mqtt, client, glbs_stub = self._setup(tmp_path, monkeypatch)
 
-        mqtt._cmd_sync_offer({"version": 2, "players": [], "items": []})
+        mqtt._cmd_sync_offer({"version": 2, "characters": [], "items": []})
 
         # Should have published state/sync/push
         published_topics = [c[0][0] for c in client.publish.call_args_list]
@@ -860,11 +848,11 @@ skills = connect1,wellsize
     def test_equal_versions_no_action(self, tmp_path, monkeypatch):
         mqtt, client, glbs_stub = self._setup(tmp_path, monkeypatch)
 
-        mqtt._cmd_sync_offer({"version": 5, "players": [], "items": []})
+        mqtt._cmd_sync_offer({"version": 5, "characters": [], "items": []})
 
         # No publish, no reload
         client.publish.assert_not_called()
-        glbs_stub.players.reload.assert_not_called()
+        glbs_stub.characters.reload.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -897,14 +885,14 @@ class TestItemDisplayName:
 
         glbs_stub = types.SimpleNamespace(
             item_file=str(tmp_path / "dummy.txt"),
-            player_file=str(tmp_path / "dummy2.txt"),
+            character_file=str(tmp_path / "dummy2.txt"),
             table_file=str(tmp_path / "dummy3.txt"),
             table=types.SimpleNamespace(status="Active", colorsLED={}),
             items=types.SimpleNamespace(
                 source=70, calculateNodeUse=lambda: 5,
                 items={"widget": widget, "gadget": gadget},
             ),
-            players=types.SimpleNamespace(playerDict={}),
+            characters=types.SimpleNamespace(characterDict={}),
             parser=configparser.ConfigParser(),
         )
         glbs_stub.parser.read(str(mqtt_cfg))
@@ -951,28 +939,28 @@ level = 1
 load = 5
 connected = 0
 """)
-        player_cfg = tmp_path / "playerconfig.txt"
-        player_cfg.write_text("""
+        character_cfg = tmp_path / "characterconfig.txt"
+        character_cfg.write_text("""
 [common]
-players = hero
+characters = hero
 
 [hero]
 name = Hero
-id = 000007D1
+id = 00000007D1
 skills = connect1,wellsize
 """)
 
         glbs_stub = types.SimpleNamespace(
             item_file=str(item_cfg),
-            player_file=str(player_cfg),
+            character_file=str(character_cfg),
             table_file="dummy",
             table=types.SimpleNamespace(status="Active", colorsLED={}),
             items=types.SimpleNamespace(
                 source=70, calculateNodeUse=lambda: 0,
                 items={}, reload=MagicMock(),
             ),
-            players=types.SimpleNamespace(
-                playerDict={}, reload=MagicMock(),
+            characters=types.SimpleNamespace(
+                characterDict={}, reload=MagicMock(),
             ),
             parser=configparser.ConfigParser(),
         )
@@ -990,32 +978,32 @@ skills = connect1,wellsize
     def test_missing_rfid_ignored(self, tmp_path, monkeypatch):
         """Register with no 'rfid' field should be silently rejected."""
         mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
-        mqtt._cmd_rfid_register({"type": "player", "name": "Ghost"})
+        mqtt._cmd_rfid_register({"type": "character", "name": "Ghost"})
         # No reload called — registration was rejected
-        glbs_stub.players.reload.assert_not_called()
+        glbs_stub.characters.reload.assert_not_called()
 
     def test_missing_type_ignored(self, tmp_path, monkeypatch):
         """Register with no 'type' field should be silently rejected."""
         mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
         mqtt._cmd_rfid_register({"rfid": 12345, "name": "Ghost"})
-        glbs_stub.players.reload.assert_not_called()
+        glbs_stub.characters.reload.assert_not_called()
         glbs_stub.items.reload.assert_not_called()
 
-    def test_duplicate_player_rfid_updates_existing(self, tmp_path, monkeypatch):
-        """Registering a player with an RFID that already exists updates, not duplicates."""
+    def test_duplicate_character_rfid_updates_existing(self, tmp_path, monkeypatch):
+        """Registering a character with an RFID that already exists updates, not duplicates."""
         mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
-        # hero has id 000007D1 = 2001
+        # hero has id 00000007D1 = 2001
         mqtt._cmd_rfid_register({
-            "type": "player", "rfid": 2001,
+            "type": "character", "rfid": 2001,
             "name": "Hero Reborn", "skills": ["connect2", "wellsize"],
         })
         # Verify config was updated, not duplicated
         parser = configparser.ConfigParser()
-        parser.read(glbs_stub.player_file)
-        players_list = parser.get("common", "players").split(",")
+        parser.read(glbs_stub.character_file)
+        characters_list = parser.get("common", "characters").split(",")
         # Only one entry for this RFID — no new section appended
-        assert players_list.count("hero") == 1
-        assert "PC1" not in players_list  # no new PC section created
+        assert characters_list.count("hero") == 1
+        assert "PC1" not in characters_list  # no new PC section created
         # Existing section updated
         assert parser.get("hero", "name") == "Hero Reborn"
         assert "connect2" in parser.get("hero", "skills")
@@ -1051,13 +1039,13 @@ class TestMisuseWellSize:
 
         glbs_stub = types.SimpleNamespace(
             item_file=str(item_cfg),
-            player_file="dummy",
+            character_file="dummy",
             table_file="dummy",
             table=types.SimpleNamespace(status="Active", colorsLED={}),
             items=types.SimpleNamespace(
                 source=70, calculateNodeUse=lambda: 0, items={},
             ),
-            players=types.SimpleNamespace(playerDict={}),
+            characters=types.SimpleNamespace(characterDict={}),
             parser=configparser.ConfigParser(),
         )
         glbs_stub.parser.read(str(mqtt_cfg))
@@ -1105,11 +1093,11 @@ class TestMisuseTableStatus:
 
         glbs_stub = types.SimpleNamespace(
             item_file="dummy",
-            player_file="dummy",
+            character_file="dummy",
             table_file=str(table_cfg),
             table=types.SimpleNamespace(status="Active", colorsLED={}),
             items=types.SimpleNamespace(source=70, calculateNodeUse=lambda: 0, items={}),
-            players=types.SimpleNamespace(playerDict={}),
+            characters=types.SimpleNamespace(characterDict={}),
             parser=configparser.ConfigParser(),
         )
         glbs_stub.parser.read(str(mqtt_cfg))
@@ -1149,10 +1137,10 @@ class TestMalformedMessage:
         mqtt_cfg.write_text(MQTT_CONFIG_ENABLED)
 
         glbs_stub = types.SimpleNamespace(
-            item_file="dummy", player_file="dummy", table_file="dummy",
+            item_file="dummy", character_file="dummy", table_file="dummy",
             table=types.SimpleNamespace(status="Active", colorsLED={}),
             items=types.SimpleNamespace(source=70, calculateNodeUse=lambda: 0, items={}),
-            players=types.SimpleNamespace(playerDict={}),
+            characters=types.SimpleNamespace(characterDict={}),
             parser=configparser.ConfigParser(),
         )
         glbs_stub.parser.read(str(mqtt_cfg))

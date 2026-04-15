@@ -2,8 +2,8 @@
 _MQTT.py — MQTT client for MARVIN.
 
 Connects to the MQTT broker and publishes game state events so EDD/GMControl
-can react to player actions, item changes, and game outcomes. Also handles
-inbound commands to set table parameters and register new players/items.
+can react to character actions, item changes, and game outcomes. Also handles
+inbound commands to set table parameters and register new characters/items.
 
 Topic namespace: marvin/<node-id>/state/... (publish) and
                  marvin/<node-id>/cmd/...   (subscribe)
@@ -95,13 +95,13 @@ class _MQTT:
     # Convenience publish methods (called from state files)               #
     # ------------------------------------------------------------------ #
 
-    def publish_rfid_player(self, rfid_hex, player_name):
-        """Publish a known-player RFID detection event."""
+    def publish_rfid_character(self, rfid_hex, character_name):
+        """Publish a known-character RFID detection event."""
         self.publish("state/rfid", {
             "action": "detected",
-            "type": "player",
-            "name": player_name,
-            "rfid": _hex_to_int(rfid_hex),
+            "type": "character",
+            "name": character_name,
+            "rfid": rfid_hex,
         })
 
     def publish_rfid_item(self, rfid_hex, item_name):
@@ -110,14 +110,14 @@ class _MQTT:
             "action": "detected",
             "type": "item",
             "name": item_name,
-            "rfid": _hex_to_int(rfid_hex),
+            "rfid": rfid_hex,
         })
 
     def publish_rfid_unknown(self, rfid_hex):
         """Publish an unknown RFID tag event."""
         self.publish("state/rfid", {
             "action": "unknown",
-            "rfid": _hex_to_int(rfid_hex),
+            "rfid": rfid_hex,
         })
 
     def publish_item_connected(self, item):
@@ -223,29 +223,32 @@ class _MQTT:
         if rfid_raw is None:
             print("_MQTT register: missing 'rfid' field — ignoring")
             return
-        rfid = _int_to_hex(rfid_raw) if isinstance(rfid_raw, int) else str(rfid_raw).strip().upper()
+        rfid = _int_to_hex(rfid_raw) if isinstance(rfid_raw, int) else str(rfid_raw).strip().upper().zfill(10)
 
-        if rfid_type == "player":
+        if rfid_type in ("character", "player"):
             # Check for duplicate — update existing rather than creating a new entry
             parser = configparser.ConfigParser()
-            parser.read(glbs.player_file)
+            parser.read(glbs.character_file)
             existing = _find_section_by_id(parser, rfid)
             if existing:
-                print(f"_MQTT register: player RFID {rfid} already exists in [{existing}] — updating")
+                print(f"_MQTT register: character RFID {rfid} already exists in [{existing}] — updating")
                 skills = payload.get("skills", [])
                 parser.set(existing, "name", name)
                 parser.set(existing, "skills", ",".join(skills))
-                with open(glbs.player_file, "w") as f:
+                if "gm" in payload:
+                    parser.set(existing, "gm", str(payload["gm"]).lower())
+                with open(glbs.character_file, "w") as f:
                     parser.write(f)
             else:
                 skills = payload.get("skills", [])
                 _KNOWN_SKILLS = {"connect1","connect2","connect3","disconnectall",
-                                 "disconnect1item","wellsize","SL"}
+                                 "disconnect1item","wellsize"}
                 for s in skills:
                     if s not in _KNOWN_SKILLS:
                         print(f"_MQTT register: unknown skill token '{s}' — writing anyway")
-                self._write_new_player(rfid, name, skills)
-            glbs.players.reload()
+                is_gm = payload.get("gm", False)
+                self._write_new_character(rfid, name, skills, is_gm)
+            glbs.characters.reload()
 
         elif rfid_type == "item":
             # Check for duplicate — update existing rather than creating a new entry
@@ -269,7 +272,7 @@ class _MQTT:
             glbs.items.reload()
 
         else:
-            print(f"_MQTT register: unknown type '{rfid_type}'")
+            print(f"_MQTT register: unknown type '{rfid_type}' — expected 'character' or 'item'")
             return
 
         self._bump_config_version()
@@ -352,7 +355,7 @@ class _MQTT:
             self._accept_sync_data(payload)
             self._set_config_version(edd_version)
             import glbs
-            glbs.players.reload()
+            glbs.characters.reload()
             glbs.items.reload()
         elif my_version > edd_version:
             print(f"_MQTT sync: MARVIN v{my_version} > EDD v{edd_version} — pushing")
@@ -394,14 +397,14 @@ class _MQTT:
         pct      = round(use / capacity, 2) if capacity > 0 else 0.0
 
         connected = [
-            {"name": item.display_name, "rfid": _hex_to_int(item.ID)}
+            {"name": item.display_name, "rfid": item.ID}
             for item in glbs.items.items.values()
             if item.connected
         ]
         well = {"use": use, "capacity": capacity, "pct": pct}
         result = {"action": action, "connected": connected, "well": well}
         if changed_item is not None:
-            result["changed"] = {"name": changed_item.display_name, "rfid": _hex_to_int(changed_item.ID)}
+            result["changed"] = {"name": changed_item.display_name, "rfid": changed_item.ID}
         return result
 
     # ------------------------------------------------------------------ #
@@ -424,10 +427,10 @@ class _MQTT:
     # Registration writers                                                 #
     # ------------------------------------------------------------------ #
 
-    def _write_new_player(self, rfid, name, skills):
+    def _write_new_character(self, rfid, name, skills, is_gm=False):
         import glbs
         parser = configparser.ConfigParser()
-        parser.read(glbs.player_file)
+        parser.read(glbs.character_file)
 
         existing_pcs = [s for s in parser.sections() if s.upper().startswith("PC")]
         section_key = f"PC{len(existing_pcs) + 1}"
@@ -435,16 +438,18 @@ class _MQTT:
             n = int(section_key[2:]) + 1
             section_key = f"PC{n}"
 
-        players_str = parser.get("common", "players")
-        parser.set("common", "players", players_str + f",{section_key}")
+        characters_str = parser.get("common", "characters")
+        parser.set("common", "characters", characters_str + f",{section_key}")
         parser.add_section(section_key)
         parser.set(section_key, "name", name)
         parser.set(section_key, "id", rfid)
         parser.set(section_key, "skills", ",".join(skills))
+        if is_gm:
+            parser.set(section_key, "gm", "true")
 
-        with open(glbs.player_file, "w") as f:
+        with open(glbs.character_file, "w") as f:
             parser.write(f)
-        print(f"_MQTT: registered player '{name}' as [{section_key}] id={rfid}")
+        print(f"_MQTT: registered character '{name}' as [{section_key}] id={rfid}")
 
     def _write_new_item(self, rfid, name, level, load, function):
         import glbs
@@ -476,13 +481,13 @@ class _MQTT:
 
     def _build_sync_push(self, version):
         import glbs
-        players = [
-            {"rfid": _hex_to_int(p.ID), "name": p.name, "skills": p.skillList}
-            for p in glbs.players.playerDict.values()
+        characters = [
+            {"rfid": c.ID, "name": c.name, "skills": c.skillList, "gm": c.isGM}
+            for c in glbs.characters.characterDict.values()
         ]
         items = [
             {
-                "rfid": _hex_to_int(item.ID),
+                "rfid": item.ID,
                 "name": item.display_name,
                 "level": item.level,
                 "load": item.load,
@@ -490,36 +495,43 @@ class _MQTT:
             }
             for item in glbs.items.items.values()
         ]
-        return {"version": version, "players": players, "items": items}
+        return {"version": version, "characters": characters, "items": items}
 
     def _accept_sync_data(self, payload):
         import glbs
 
-        # Update playerconfig.txt
+        # Update characterconfig.txt
+        # Accept both "characters" and "players" keys as a defensive safeguard
+        char_data = payload.get("characters", payload.get("players", []))
         parser_p = configparser.ConfigParser()
-        parser_p.read(glbs.player_file)
+        parser_p.read(glbs.character_file)
 
-        for pd in payload.get("players", []):
-            rfid   = _int_to_hex(pd["rfid"]) if isinstance(pd["rfid"], int) else str(pd["rfid"]).strip().upper()
-            name   = pd.get("name", "Unknown")
-            skills = pd.get("skills", [])
+        for cd in char_data:
+            rfid   = _int_to_hex(cd["rfid"]) if isinstance(cd["rfid"], int) else str(cd["rfid"]).strip().upper().zfill(10)
+            name   = cd.get("name", "Unknown")
+            skills = cd.get("skills", [])
+            is_gm  = cd.get("gm", False)
             matched = _find_section_by_id(parser_p, rfid)
             if matched:
                 parser_p.set(matched, "id", rfid)
                 parser_p.set(matched, "skills", ",".join(skills))
+                if is_gm:
+                    parser_p.set(matched, "gm", "true")
             else:
                 existing_pcs = [s for s in parser_p.sections() if s.upper().startswith("PC")]
                 key = f"PC{len(existing_pcs) + 1}"
                 while parser_p.has_section(key):
                     key = f"PC{int(key[2:]) + 1}"
-                parser_p.set("common", "players",
-                             parser_p.get("common", "players") + f",{key}")
+                parser_p.set("common", "characters",
+                             parser_p.get("common", "characters") + f",{key}")
                 parser_p.add_section(key)
                 parser_p.set(key, "name", name)
                 parser_p.set(key, "id", rfid)
                 parser_p.set(key, "skills", ",".join(skills))
+                if is_gm:
+                    parser_p.set(key, "gm", "true")
 
-        with open(glbs.player_file, "w") as f:
+        with open(glbs.character_file, "w") as f:
             parser_p.write(f)
 
         # Update itemconfig.txt
@@ -527,7 +539,7 @@ class _MQTT:
         parser_i.read(glbs.item_file)
 
         for id_ in payload.get("items", []):
-            rfid     = _int_to_hex(id_["rfid"]) if isinstance(id_["rfid"], int) else str(id_["rfid"]).strip().upper()
+            rfid     = _int_to_hex(id_["rfid"]) if isinstance(id_["rfid"], int) else str(id_["rfid"]).strip().upper().zfill(10)
             name     = id_.get("name", "Unknown")
             level    = int(id_.get("level", 1))
             load     = int(id_.get("load", 1))
@@ -556,38 +568,40 @@ class _MQTT:
         with open(glbs.item_file, "w") as f:
             parser_i.write(f)
 
-        n_players = len(payload.get("players", []))
-        n_items   = len(payload.get("items", []))
-        print(f"_MQTT sync: accepted EDD data — {n_players} players, {n_items} items")
+        n_characters = len(char_data)
+        n_items      = len(payload.get("items", []))
+        print(f"_MQTT sync: accepted EDD data — {n_characters} characters, {n_items} items")
 
 
 # ------------------------------------------------------------------ #
 # Module-level helpers                                                #
 # ------------------------------------------------------------------ #
 
-def _hex_to_int(hex_str):
-    """Convert an 8-char hex string ID to an integer. Returns 0 on error."""
-    try:
-        return int(str(hex_str), 16)
-    except (ValueError, TypeError):
-        return 0
-
-
 def _int_to_hex(value):
-    """Convert an integer RFID value to an 8-char uppercase hex string."""
+    """Convert an integer RFID value to a 10-char uppercase hex string.
+
+    Inbound command handlers accept both hex strings and integers as a
+    defensive safeguard — if an integer arrives, this converts it to the
+    canonical 10-char hex format used internally.
+    """
     try:
-        return f"{int(value):08X}"
+        return f"{int(value):010X}"
     except (ValueError, TypeError):
-        return "00000000"
+        return "0000000000"
 
 
 def _find_section_by_id(parser, rfid_hex):
-    """Return the first section whose 'id' value matches rfid_hex, or None."""
+    """Return the first section whose 'id' value matches rfid_hex, or None.
+
+    Normalises both sides to 10-char uppercase hex so that existing 8-char
+    config IDs match incoming 10-char lookups (migration compatibility).
+    """
     for section in parser.sections():
         if section.lower() == "common" or section.lower() == "items":
             continue
         try:
-            if parser.get(section, "id", fallback="").strip().upper() == rfid_hex:
+            stored = parser.get(section, "id", fallback="").strip().upper().zfill(10)
+            if stored == rfid_hex.upper().zfill(10):
                 return section
         except Exception:
             pass

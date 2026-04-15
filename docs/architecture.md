@@ -261,7 +261,7 @@ Game modes are implemented as `BaseGame` subclasses in `_LineGame.py` and `_Rune
 
 **Config sync:** On connect, MARVIN publishes its `config_version` (monotonically incrementing integer in `itemconfig.txt [items]`). EDD responds with a `cmd/sync/offer`. If EDD's version is higher, MARVIN accepts EDD data and overwrites local config. If MARVIN's version is higher, it publishes `state/sync/push` so EDD can update.
 
-See [phase4_mqtt.md](phase4_mqtt.md) for full topic/payload specification.
+See [phase4_mqtt.md](phase4_mqtt.md) for full topic/payload specification. See [edd_marvin_integration.md](edd_marvin_integration.md) for the EDD-side implementation guide covering how to add MARVIN support to the C#/.NET EDD codebase.
 
 ---
 

@@ -70,6 +70,14 @@ level3 = multisnake
 
 ---
 
+## Bug Fixes Carried Forward
+
+| File | Bug | Fix |
+|---|---|---|
+| `S7_Connect_Item.py` line 66 | `time.sleep(3)` in the insufficient-skill branch, but `time` is never imported — crashes with `NameError` if a player without the required skill scans an item | Add `import glbs`-style access (`glbs.time.sleep(3)`) to use the already-available `glbs.time` reference, consistent with how other state files access `time` |
+
+---
+
 ## Critical Files
 
 | File | Action |
