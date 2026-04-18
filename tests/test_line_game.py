@@ -80,17 +80,17 @@ class TestRouteBuild:
         game.start('east')
         route = glbs_stub.ctx.currentGameRoute
         for i in range(len(route) - 1):
-            curr = route[i]
-            nxt = route[i + 1]
+            curr_seg, _curr_dir = route[i]
+            nxt_seg, _nxt_dir = route[i + 1]
             connected = (
-                nxt.name in curr.flowSegments
-                or nxt.name in curr.counterSegments
+                nxt_seg.name in curr_seg.flowSegments
+                or nxt_seg.name in curr_seg.counterSegments
             )
             assert connected, (
-                f"Route broken between {curr.name} and {nxt.name}")
+                f"Route broken between {curr_seg.name} and {nxt_seg.name}")
 
-    def test_route_segments_have_flow_direction(self, table_config_file, monkeypatch):
-        """Every segment except the last in the route must have a flow value recorded."""
+    def test_route_entries_are_tuples_with_direction(self, table_config_file, monkeypatch):
+        """Every route entry is a (segment, direction) tuple with direction +1 or -1."""
         table = make_table(table_config_file)
         game = LineGame(table)
 
@@ -101,8 +101,12 @@ class TestRouteBuild:
 
         game.start('east')
         route = glbs_stub.ctx.currentGameRoute
-        for seg in route[:-1]:
-            assert len(seg.flow) > 0, f"{seg.name} has no flow recorded"
+        for entry in route:
+            assert isinstance(entry, tuple) and len(entry) == 2, (
+                f"Route entry should be (segment, direction) tuple, got {type(entry)}")
+            seg, direction = entry
+            assert direction in (1, -1), (
+                f"{seg.name} has invalid direction {direction}")
 
 
 # ---------------------------------------------------------------------------

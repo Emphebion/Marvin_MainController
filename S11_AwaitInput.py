@@ -10,6 +10,8 @@ class S11_AwaitInput():
         self._line_color_name = glbs.parser.get('LineGame', 'lineColor', fallback='turquoise')
         self.loopStartTime = 0
         self.routeDone = []
+        self.head_idx = 0   # cursor position in current head segment (line mode)
+        self.tail_idx = 0   # cursor position in current tail segment (line mode)
 
     def run(self):
         self.state = self.states.S11
@@ -34,6 +36,13 @@ class S11_AwaitInput():
                 else:
                     self.loopStartTime = glbs.time.time()
                     self.state = self.states.S12
+            elif glbs.game.mode == 'multiline':
+                # Multiline mode: check if all routes are done
+                if glbs.game.is_complete() and all(not r['done'] for r in glbs.game.routes):
+                    self.state = self.states.S10
+                else:
+                    self.loopStartTime = glbs.time.time()
+                    self.state = self.states.S12
             else:
                 # Line mode: check if the line is done
                 if(not self.routeDone) & (not glbs.ctx.currentGameRoute):
@@ -47,6 +56,8 @@ class S11_AwaitInput():
         if glbs.bedTime():
             glbs.table.clearRoute()
             self.routeDone.clear()
+            self.head_idx = 0
+            self.tail_idx = 0
             glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
             glbs.devices.transmitLED(glbs.table.getLEDData())
             self.state = self.states.S1
@@ -78,22 +89,104 @@ class S11_AwaitInput():
         if glbs.game.mode == 'runes':
             glbs.game.update()
             return
-        # Line mode: advance line animation by one LED
+        if glbs.game.mode == 'multiline':
+            self._setMultiLineLEDOutput()
+            return
+        # Line mode: advance line animation by one LED using index tracking
+        color = glbs.table.colorsLED[self._line_color_name]
+        black = glbs.table.colorsLED["black"]
+        # Head: colour one LED at head_idx in the current head segment
         if glbs.ctx.currentGameRoute:
-            glbs.ctx.lineCounter = glbs.ctx.lineCounter + 1
-            if self.setLEDinLine(glbs.ctx.currentGameRoute[-1], glbs.table.colorsLED["black"], glbs.table.colorsLED[self._line_color_name]):
-                self.routeDone.append(glbs.ctx.currentGameRoute.pop())
-        if (glbs.ctx.lineCounter > self.lineLength) & (len(self.routeDone) > 0):
-            if (self.setLEDinLine(self.routeDone[0], glbs.table.colorsLED[self._line_color_name], glbs.table.colorsLED["black"])):
-                oldSegment = self.routeDone.pop(0)
-                oldSegment.flow.pop()
-
-    # Move the line by one position
-    def setLEDinLine(self, segment, oldColor, color):
-        if (oldColor in segment.getLEDvalues()):
-            LEDValues = segment.getLEDvalues()
-            if (segment.getLastSegmentFlow()) > 0:
-                segment.setLEDValue(LEDValues.index(oldColor), color)
+            glbs.ctx.lineCounter += 1
+            seg, direction = glbs.ctx.currentGameRoute[-1]
+            if self.head_idx < seg.nrLEDs:
+                self.setLEDatIndex(seg, direction, self.head_idx, color)
+                self.head_idx += 1
             else:
-                segment.setLEDValue((len(segment.getLEDvalues()) - 1) - list(reversed(LEDValues)).index(oldColor), color)
-        return not (oldColor in segment.getLEDvalues())
+                self.routeDone.append(glbs.ctx.currentGameRoute.pop())
+                self.head_idx = 0
+                # Immediately colour the first LED of the next segment if available
+                if glbs.ctx.currentGameRoute:
+                    seg, direction = glbs.ctx.currentGameRoute[-1]
+                    self.setLEDatIndex(seg, direction, self.head_idx, color)
+                    self.head_idx += 1
+        # Tail: erase one LED at tail_idx after line reaches full length
+        if (glbs.ctx.lineCounter > self.lineLength) and self.routeDone:
+            seg, direction = self.routeDone[0]
+            if self.tail_idx < seg.nrLEDs:
+                self.setLEDatIndex(seg, direction, self.tail_idx, black)
+                self.tail_idx += 1
+            else:
+                self.routeDone.pop(0)
+                self.tail_idx = 0
+                # Immediately erase the first LED of the next done segment if available
+                if self.routeDone:
+                    seg, direction = self.routeDone[0]
+                    self.setLEDatIndex(seg, direction, self.tail_idx, black)
+                    self.tail_idx += 1
+
+    def _setMultiLineLEDOutput(self):
+        """Advance all multiline routes by one LED each using index tracking."""
+        glbs.ctx.lineCounter += 1
+        for r in glbs.game.routes:
+            color = glbs.table.colorsLED[r['color']]
+            black = glbs.table.colorsLED["black"]
+            # Head: colour one LED at head_idx in the current head segment
+            if r['route']:
+                seg, direction = r['route'][-1]
+                if r['head_idx'] < seg.nrLEDs:
+                    self.setLEDatIndex(seg, direction, r['head_idx'], color)
+                    r['head_idx'] += 1
+                else:
+                    r['done'].append(r['route'].pop())
+                    r['head_idx'] = 0
+                    # Immediately colour the first LED of the next segment if available
+                    if r['route']:
+                        seg, direction = r['route'][-1]
+                        self.setLEDatIndex(seg, direction, r['head_idx'], color)
+                        r['head_idx'] += 1
+            # Tail: erase one LED at tail_idx after line reaches full length
+            r['counter'] += 1
+            if (r['counter'] > self.lineLength) and r['done']:
+                seg, direction = r['done'][0]
+                if r['tail_idx'] < seg.nrLEDs:
+                    self.setLEDatIndex(seg, direction, r['tail_idx'], black)
+                    r['tail_idx'] += 1
+                else:
+                    r['done'].pop(0)
+                    r['tail_idx'] = 0
+                    # Immediately erase the first LED of the next done segment if available
+                    if r['done']:
+                        seg, direction = r['done'][0]
+                        self.setLEDatIndex(seg, direction, r['tail_idx'], black)
+                        r['tail_idx'] += 1
+
+    def setLEDatIndex(self, segment, direction, cursor, color):
+        """Write color to the LED at logical position cursor.
+
+        Args:
+            segment   -- _Segment object
+            direction -- +1 (traverse 0→N) or -1 (traverse N→0)
+            cursor    -- logical LED position (0-based, relative to direction)
+            color     -- RGB tuple to write
+
+        The physical LED index is derived from cursor and direction:
+            direction +1: physical = cursor
+            direction -1: physical = (nrLEDs - 1) - cursor
+        Ref-counting is used for safe overlap: increment when colouring,
+        decrement when erasing, only write black when count reaches 0.
+        """
+        black = glbs.table.colorsLED["black"]
+        if direction > 0:
+            phys = cursor
+        else:
+            phys = (segment.nrLEDs - 1) - cursor
+
+        if color != black:
+            segment.incRefCount(phys)
+            segment.setLEDValue(phys, color)
+        else:
+            remaining = segment.decRefCount(phys)
+            if remaining == 0:
+                segment.setLEDValue(phys, black)
+    

@@ -73,6 +73,25 @@ Effect per scenario:
 
 The counter array lives on the segment object, reset to all zeros on `clear()`.
 
+#### Solution 3 — Index-tracked LED animation (replaces colour-search)
+
+Solutions 1 and 2 address flow conflicts and premature erasure but do not fix the animation advancement logic itself. The original `setLEDinLine` finds the next LED by searching for a colour match (`LEDValues.index(oldColor)`). This breaks on shared segments:
+
+- **Head skips LEDs:** searches for black, but another line already coloured some LEDs → finds one further along → line jumps forward by 2+ positions.
+- **Tail loses track:** searches for its colour, but another tail already erased some → skips to the next match or considers the segment "done" while LEDs remain lit on a previous segment. Can cause the game to freeze (line never finishes).
+- **Merge invisibility:** on the outer octagon (fewer branches), same-colour lines often share long stretches of segments. Players cannot tell where one line ends and another begins.
+
+**Fix:** replace colour-search with per-route cursor tracking. Each route maintains a `head_idx` and `tail_idx` — the logical LED position within the current segment. The cursor advances by exactly 1 per tick, translating to a physical LED index via the direction:
+
+```
+physical = cursor                       if direction == +1
+physical = (nrLEDs - 1) - cursor        if direction == -1
+```
+
+A new `setLEDatIndex(segment, direction, cursor, color)` method writes directly to the computed physical index, using ref-counting for safe overlap. `setLEDinLine` (colour-search) is removed; both single-line and multiline modes use the index-tracked approach for consistency.
+
+When `cursor >= nrLEDs`, the segment is complete — determined by arithmetic, not by colour absence. This guarantees termination regardless of what other lines have done to the LED array.
+
 ### Implementation approach
 
 - `MultiLineGame(LineGame)` subclass in `_LineGame.py` (same file, reuses `_build_route` and helpers).
@@ -105,11 +124,69 @@ level3 = multiline
 
 ---
 
+## Simulation: Game Mode Toggle
+
+The RFID panel in simulation mode (`_Display.py`) currently shows characters, items, and game state feedback. Add a clickable toggle button that cycles the game mode for level 2 and 3 between `runes` and `multiline`, so the operator can switch modes without editing `marvinconfig.txt`.
+
+### Behaviour
+
+- **Location:** Below the items list, above the game state feedback block at the bottom of the RFID panel.
+- **Label:** Shows the current mode for level 2/3, e.g. `Mode L2/3: runes` or `Mode L2/3: multiline`.
+- **Click action:** Cycles `[GameModes] level2` and `level3` together through the available modes: `runes` → `multiline` → `runes`. Writes the new value to `glbs.parser` in memory (same as `[GameModes]` is read). No file write — the change is session-only.
+- **Effect:** The next game round (S9) picks up the new mode. A round already in progress is not affected.
+- **Level 1** stays fixed at `line` — it is not affected by the toggle.
+- **Hardware mode:** The button is not rendered and `handle_click` ignores the area (same pattern as all other sim-only elements).
+
+### Implementation
+
+| File | Action |
+|---|---|
+| `_Display.py` | Add a `_game_mode_btn` rect in `_draw_rfid_panel()` between items and feedback block. Add click handling in `handle_click()` that updates `glbs.parser` `[GameModes]` level2/level3 values. Include current mode in `_rfid_panel_snapshot()` so the panel redraws on change. |
+
+---
+
+## Idea: Overload Spark Animation
+
+When the table overloads (total item load exceeds source capacity), play a spark animation for 5–15 seconds before resuming the regular code flow. This gives the overload event a dramatic visual payoff — the table "short-circuits" before all items disconnect.
+
+### Current overload flow
+
+Overload is triggered in two places:
+- `S7_Connect_Item.py` — GM direct-connects an item that pushes load over capacity
+- `S13_FinishGame.py` — player wins a game, item connects, load exceeds capacity
+
+In both cases `_Items.connectItem()` detects the overload, calls `disconnectAll()` internally, and returns `True`. The caller publishes an MQTT overload event and continues. There is no visual feedback on the table — the items simply disconnect silently.
+
+### Proposed behaviour
+
+1. When `connectItem()` returns `True` (overload), clear the table LEDs and run the existing Spark animation system (`_Table.createRandomSpark()` + `_runSparkRoutes()`) for a random duration between 5 and 15 seconds.
+2. After the spark duration expires, clear all LEDs to black and resume the normal code flow (S7 returns to S1, S13 continues to its finish timer).
+3. The spark animation already exists in `S1_Reset._runSparkBehaviour()` for the "Broken" table status. Extract the spark logic into a reusable method (on `_Table` or a shared helper) so it can be called from S7 and S13 without duplicating code.
+
+### Configuration
+
+Add to `marvinconfig.txt`:
+```ini
+[common]
+overloadSparkMin = 5       ; minimum spark duration in seconds
+overloadSparkMax = 15      ; maximum spark duration in seconds
+```
+
+### Implementation notes
+
+- The spark list (`sparklist`) is currently built and owned by S1. To reuse it, either move spark list creation to `_Table` (where `createRandomSpark` already lives) or lazily build it on first use in a shared location.
+- During the spark animation the main loop is blocked (same pattern as S1's Broken behaviour). No input handling is needed — the overload is a non-interactive dramatic event.
+- The Overload table status (`_Table.status = "Overload"`) already exists but is only checked in S1. This could be set during the spark animation to signal the state to MQTT/display.
+
+---
+
 ## Bug Fixes Carried Forward
 
-| File | Bug | Fix |
-|---|---|---|
-| `S7_Connect_Item.py` line 66 | `time.sleep(3)` in the insufficient-skill branch, but `time` is never imported — crashes with `NameError` if a player without the required skill scans an item | Add `import glbs`-style access (`glbs.time.sleep(3)`) to use the already-available `glbs.time` reference, consistent with how other state files access `time` |
+| File | Bug | Fix | Status |
+|---|---|---|---|
+| `S7_Connect_Item.py` line 69 | `time.sleep(3)` in the insufficient-skill branch, but `time` is never imported — crashes with `NameError` if a player without the required skill scans an item | Changed to `glbs.time.sleep(3)` | **Fixed** |
+| `S7_Connect_Item.py` line 59 | `currentItemName != newItem.name` guard blocks game start when the scanned item matches `currentItemName`. After startup this is the last item in the config list; after a failed game it's the played item — both block legitimate scans/retries. | **Arduino side fixed** — stale RFID reads are now handled by dedup on the Arduino (see [arduino_rfid_improvement.md](arduino_rfid_improvement.md)). Python side: guard removed from S7 and S4, `_Items.__init__` fixed. | **Fixed** |
+| `_Items.py` line 54 | `__init__` sets `currentItemName` to the last loaded item instead of clearing it. | Set `self.currentItemName = ""` after the loading loop. | **Fixed** |
 
 ---
 
@@ -124,7 +201,49 @@ level3 = multiline
 | `S10_IdleGame.py` | Add `multiline` branch (same pattern as rune branch) |
 | `marvinconfig.txt` | Add `[MultiLineGame]` section |
 | `tableconfig.txt` | Ensure `falseLineColor` value exists (`red` is already present) |
-| `tests/test_line_game.py` | Add unit tests: route tuples carry direction, ref-count prevents premature erase, multi-route count, false line colour, input scoring, simultaneous advance |
+| `tests/test_line_game.py` | Add unit tests (see test plan below) |
+
+---
+
+## Test Plan
+
+### Unit tests (`tests/test_line_game.py`)
+
+**Flow refactor (base LineGame):**
+- Route entries are `(segment, direction)` tuples, not bare segments
+- Direction is +1 when previous segment is in `flowSegments`, -1 when in `counterSegments`
+- `setLEDinLine` uses the route-provided direction, not `segment.getLastSegmentFlow()`
+- Existing single-line tests still pass with the new route format
+
+**LED reference counting:**
+- Colouring a LED increments its ref-count
+- Erasing decrements; LED only goes black when ref-count reaches 0
+- Two lines colouring the same LED position → ref-count = 2; first tail erase leaves LED lit
+- `clear()` resets all ref-counts to 0
+
+**MultiLineGame basics:**
+- `mode == 'multiline'`
+- `start()` produces the configured number of routes (L2: `multiLineCountL2`, L3: `multiLineCountL3` + 1 false)
+- Each route targets a different goal button
+- False line route uses `falseLineColor`; real lines use `lineColor`
+
+**MultiLineGame shared segments:**
+- Two routes sharing a segment in the same direction: both animate correctly, tail does not erase the other line's LEDs prematurely
+- Two routes sharing a segment in opposite directions: each animates in its own traversal order (one 0→N, the other N→0)
+- False line (different colour) crossing a real line on a shared segment: colours do not bleed; each tail only erases its own colour
+
+**MultiLineGame input scoring:**
+- Pressing all real goal buttons (any order) = round success
+- Pressing a non-goal button = failure
+- Pressing the false line's goal button = immediate failure
+- Multiple buttons pressed simultaneously with one wrong = failure
+
+### Integration tests (`tests/test_game_simulation.py`)
+
+- Full round lifecycle with `mode == 'multiline'`: start → animate → input → finish
+- Level 2 round with 2 lines, no false line
+- Level 3 round with 3 lines + 1 false line
+- Win condition (survive `gameTimeout`) and fail condition (`failuresPerLevel` exceeded) both fire correctly
 
 ---
 
@@ -132,7 +251,10 @@ level3 = multiline
 
 In simulation, run level 2 and level 3 MultiLineGame rounds from start to finish. Verify:
 - Parallel lines advance simultaneously each tick.
-- False line (level 3) appears in the correct distinct colour.
-- Pressing the false line's button registers as failure.
+- Lines that share segments merge visually and split apart correctly — no flickering, no premature LED erasure.
+- Lines that cross from opposite sides each animate in their own physical strip direction on the shared segment.
+- False line (level 3) appears in the correct distinct colour; crossing a real line on the same segment does not mix colours.
+- Pressing the false line's button registers as immediate failure.
 - All real goal buttons must be pressed for success; any wrong press is failure.
 - Time-based win and fail conditions fire correctly.
+- **Regression:** single-line LineGame rounds still behave identically after the flow refactor.

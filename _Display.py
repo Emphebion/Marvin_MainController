@@ -215,6 +215,10 @@ class _Display(object):
             if rect.collidepoint(pos):
                 self._last_input = event.get("data", "?")
                 return event
+        # Game mode toggle button
+        if hasattr(self, '_game_mode_btn') and self._game_mode_btn.collidepoint(pos):
+            self._cycle_game_mode()
+            return None
         return None
 
     # ------------------------------------------------------------------ #
@@ -374,12 +378,17 @@ class _Display(object):
         render simply keeps the previous frame's content visible.
         """
         active = glbs.characters.activeCharacter
+        try:
+            game_mode_l2 = glbs.parser.get('GameModes', 'level2')
+        except Exception:
+            game_mode_l2 = '?'
         return (
             active.ID if active else None,
             tuple(item.connected for item in glbs.items.items.values()),
             self._last_input,
             tuple(glbs.ctx.currentRoundInputs),
             len(glbs.ctx.currentGameRoute),
+            game_mode_l2,
         )
 
     def _draw_rfid_panel(self):
@@ -454,6 +463,21 @@ class _Display(object):
             if y > self._SIM_H - 20:
                 break
 
+        # Game mode toggle button
+        y += 6
+        try:
+            mode_l2 = glbs.parser.get('GameModes', 'level2')
+        except Exception:
+            mode_l2 = '?'
+        mode_label = f"Mode L2/3: {mode_l2}"
+        mode_bg = (60, 50, 70)
+        mode_fg = (220, 180, 255)
+        mode_rect = glbs.pygame.Rect(px + 4, y, pw - 8, 17)
+        glbs.pygame.draw.rect(self.screen, mode_bg, mode_rect, border_radius=2)
+        lbl = self._font_sm.render(mode_label, True, mode_fg)
+        self.screen.blit(lbl, (px + 7, y + 2))
+        self._game_mode_btn = mode_rect
+
         # Game state feedback block at bottom of panel
         by = self._SIM_H - 58
         glbs.pygame.draw.line(self.screen, (50, 50, 50), (px, by - 2), (px + pw, by - 2), 1)
@@ -492,6 +516,23 @@ class _Display(object):
         self.screen.blit(
             self._font_sm.render(route_txt, True, (120, 160, 220)),
             (px + 8, by))
+
+    def _cycle_game_mode(self):
+        """Cycle the game mode for level 2/3 between runes and multiline.
+
+        Session-only change — updates glbs.parser in memory, no file write.
+        Takes effect on the next game round (S9).
+        """
+        _MODES = ['runes', 'multiline']
+        try:
+            current = glbs.parser.get('GameModes', 'level2')
+        except Exception:
+            current = 'runes'
+        idx = _MODES.index(current) if current in _MODES else 0
+        new_mode = _MODES[(idx + 1) % len(_MODES)]
+        glbs.parser.set('GameModes', 'level2', new_mode)
+        glbs.parser.set('GameModes', 'level3', new_mode)
+        print(f"Game mode toggled to: {new_mode}")
 
     # ------------------------------------------------------------------ #
     # Rune catalog display (simulation only)                               #

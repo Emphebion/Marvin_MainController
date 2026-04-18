@@ -133,3 +133,8 @@ node_id  = marvin-001
 
 [LineGame]
 lineColor = turquoise
+
+[MultiLineGame]
+multiLineCountL2 = 2
+multiLineCountL3 = 3
+falseLineColor = red

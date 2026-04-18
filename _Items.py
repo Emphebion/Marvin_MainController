@@ -51,10 +51,10 @@ class _Items(object):
                 connected = True
             else:
                 connected = False
-            self.currentItemName = name
             item = Item(name, function, ID, level, activationSkill, load, connected, display_name)
             self.items[name]   = item
             self.itemsIDs[ID]  = item
+        self.currentItemName = ""
         try:
             self._mtime = os.path.getmtime(config_file)
         except OSError:

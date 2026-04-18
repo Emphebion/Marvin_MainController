@@ -32,7 +32,7 @@ from _Items import _Items
 from _Devices import _Devices
 from _Table import _Table
 from _Characters import _Characters
-from _LineGame import LineGame
+from _LineGame import LineGame, MultiLineGame
 from _RuneGame import RuneGame
 from _GameContext import GameContext
 from _MQTT import _MQTT
@@ -61,9 +61,10 @@ table    = _Table(table_file)                  # must be before _Display (LED po
 characters = _Characters(character_file)
 display  = _Display(config_file)               # last: can see all objects
 rune_config_file = 'runeconfig.txt'
-line_game  = LineGame(table)                    # line game instance
-rune_game  = RuneGame(table, config_file, rune_config_file)  # rune game instance
-game       = line_game                         # active game mode (switched by S9)
+line_game      = LineGame(table)                        # line game instance
+multiline_game = MultiLineGame(table, parser)             # multiline game instance
+rune_game      = RuneGame(table, config_file, rune_config_file)  # rune game instance
+game           = line_game                               # active game mode (switched by S9)
 mqtt       = _MQTT(config_file)                # MQTT client (no-op if disabled)
 
 # Round state — all mutable per-round variables live here

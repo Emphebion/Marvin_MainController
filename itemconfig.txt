@@ -1,5 +1,5 @@
 [items]
-names = item1,item2,item3,item4,item5,item6,item7,item8,item9,item10,item11,item12
+names = item1,item2,item3,item4,item5,item6,item7,item8,item9,item10,item11,item12,item99
 folder = items
 source = 70
 item_location = 120,80
@@ -27,7 +27,7 @@ function = Wijst naar de put waar op dit construct is aangesloten. Als dit wordt
 id = 00DD42B7
 level = 1
 load = 5
-connected = 1
+connected = 0
 
 [item4]
 name = Zelfreparerend Pantser
@@ -91,7 +91,7 @@ function = Laat op een landkaart zien waar iets van belang gebeurd voor de kijke
 id = 00DDDD07
 level = 1
 load = 10
-connected = 1
+connected = 0
 
 [item12]
 name = Herhaal paal
@@ -99,7 +99,7 @@ function = Communiceerd tot 2x met zijn tegenpool
 id = 00DE1384
 level = 1
 load = 12
-connected = 1
+connected = 0
 
 [item13]
 name = Spintol Vonne TEMP
@@ -107,5 +107,13 @@ function = Spintol Vonne TEMP function tbd
 id = 00DCBF27
 level = 0
 load = 0
+connected = 0
+
+[item99]
+name = TEST
+function = This is just for test purposes
+id = F0DEAD0F
+level = 3
+load = 99
 connected = 0
 

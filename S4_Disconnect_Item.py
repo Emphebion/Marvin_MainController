@@ -46,9 +46,12 @@ class S4_Disconnect_Item(object):
                         glbs.mqtt.publish_item_disconnected(item_before)
                         glbs.items.currentItemName = ""
                         self.state = self.states.S1
-                    elif glbs.items.currentItemName != newItem.name and newItem.connected:
+                    elif newItem.connected:
                         glbs.items.currentItemName = newItem.name
-                        glbs.ctx.gameTimeout = self.gameTime  #Set game timeout (in seconds) to the value in the config
+                        if glbs.display._sim:
+                            glbs.ctx.gameTimeout = 60  # shorter timeout for testing
+                        else:
+                            glbs.ctx.gameTimeout = self.gameTime  # Set game timeout (in seconds) to the value in the config
                         glbs.ctx.returnState = self.states.S4
                         self.state = self.states.S9
                     else:

@@ -20,8 +20,8 @@ class S10_IdleGame():        #S10_GameMaster
         level_idx = min(level - 1, len(self.failuresPerLevel) - 1)
         self._max_failures = self.failuresPerLevel[level_idx]
 
-        # Wait between rounds (line only)
-        if self.state == self.states.S10 and glbs.game.mode == 'line':
+        # Wait between rounds (line and multiline)
+        if self.state == self.states.S10 and glbs.game.mode in ('line', 'multiline'):
             self.idleTime = glbs.random.randint(3,5) + glbs.time.time()
         self.state = self.states.S10
         print("current state is {}".format(self.state))
@@ -37,6 +37,12 @@ class S10_IdleGame():        #S10_GameMaster
             glbs.ctx.currentGameRoute = glbs.table.createCurrentLine(self.currentGoal)
             print("current input required: " + str(self.currentGoal))
             glbs.ctx.lineCounter = 0
+        elif glbs.game.mode == 'multiline':
+            self.checkForMultiLineFailures()
+            print("failures: %s" % glbs.ctx.gameFailures)
+            glbs.ctx.currentRoundInputs.clear()
+            glbs.game.start(None)  # MultiLineGame picks its own goals
+            print("current goals: " + str(glbs.game.goal_buttons))
         else:
             # Rune mode: RuneGame handles sequences internally
             print("failures: %s" % glbs.ctx.gameFailures)
@@ -69,6 +75,9 @@ class S10_IdleGame():        #S10_GameMaster
             # Line mode: wait between rounds
             elif glbs.game.mode == 'line' and (self.idleTime - glbs.time.time() > 0):
                 self.state = self.states.S10
+            # Multiline mode: wait between rounds (same as line)
+            elif glbs.game.mode == 'multiline' and (self.idleTime - glbs.time.time() > 0):
+                self.state = self.states.S10
             # Start next round/sequence
             else:
                 self.state = self.states.S11
@@ -92,6 +101,28 @@ class S10_IdleGame():        #S10_GameMaster
             glbs.systemWakeTime = glbs.time.time()
         if not((self.currentGoal in inputs) and (len(inputs) == 1)):
             glbs.ctx.gameFailures = glbs.ctx.gameFailures + 1
+            glbs.mqtt.publish_game_failure(glbs.ctx.gameFailures, self._max_failures)
+
+    def checkForMultiLineFailures(self):
+        """Check multiline round inputs: all real goals must be pressed, no false goal."""
+        inputs = list(set(glbs.ctx.currentRoundInputs))
+        if inputs:
+            glbs.systemWakeTime = glbs.time.time()
+        if not inputs:
+            glbs.ctx.gameFailures += 1
+            glbs.mqtt.publish_game_failure(glbs.ctx.gameFailures, self._max_failures)
+            return
+        # Pressing the false line's goal = immediate failure (max out failures)
+        for r in glbs.game.routes:
+            if r['is_false'] and r['goal'] in inputs:
+                print("False line pressed — immediate failure")
+                glbs.ctx.gameFailures = self._max_failures + 1
+                glbs.mqtt.publish_game_failure(glbs.ctx.gameFailures, self._max_failures)
+                return
+        # All real goals must be present, no extra buttons
+        expected = set(glbs.game.goal_buttons)
+        if set(inputs) != expected:
+            glbs.ctx.gameFailures += 1
             glbs.mqtt.publish_game_failure(glbs.ctx.gameFailures, self._max_failures)
 
     def checkGameTime(self):

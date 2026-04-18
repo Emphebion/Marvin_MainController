@@ -2,26 +2,36 @@
 _LineGame.py — Line game mode for MARVIN.
 
 Defines:
-    BaseGame   -- abstract base class for all game modes (LineGame, RuneGame, …)
-    LineGame   -- concrete line implementation; routes a coloured LED trail
-                  from a random inner-ring start outward to a goal button.
+    BaseGame       -- abstract base class for all game modes (LineGame, RuneGame, …)
+    LineGame       -- concrete line implementation; routes a coloured LED trail
+                      from a random inner-ring start outward to a goal button.
+    MultiLineGame  -- subclass of LineGame; multiple simultaneous routes for
+                      level 2/3 items, with an optional false line at level 3.
 
 The BaseGame interface decouples S10/S11/S12/S13 from the specific game type.
-A future RuneGame (Phase 3) will extend BaseGame without requiring new states.
 
 Integration with glbs:
-    glbs.game          -- the active BaseGame instance (set by S8/S9)
-    glbs.currentGameRoute  -- list of _Segment objects owned by the active game;
-                              written by LineGame.start() and read by S11 for animation.
-    glbs.lineCounter   -- LED-step counter used by S11's animation loop.
+    glbs.game              -- the active BaseGame instance (set by S8/S9)
+    glbs.ctx.currentGameRoute  -- list of (segment, direction) tuples owned by
+                                  the active game; written by LineGame.start()
+                                  and read by S11 for animation.
+    glbs.ctx.lineCounter   -- LED-step counter used by S11's animation loop.
+
+Route format:
+    Each route entry is a (segment, direction) tuple where direction is +1 or -1.
+    Direction encodes the physical LED strip traversal order: +1 means the line
+    entered from the flow side (animate LED index 0→N), -1 means it entered from
+    the counter side (animate N→0). This is derived from the flowSegments /
+    counterSegments neighbour lists in tableconfig.txt, which encode the NeoPixel
+    strip wiring direction.
 
 Routing algorithm (LineGame):
     1. Pick a random segment adjacent to the goal button.
     2. Walk the segment graph away from the previous segment until at least
        nrOfStartSegments inner-ring segments appear in the route or
        maxRouteLength is reached.
-    3. Record traversal direction (+1/-1) on each segment so S11 knows which
-       LED indices to advance in order.
+    3. Compute the traversal direction (+1/-1) for each segment and store it
+       alongside the segment in the route tuple.
 """
 
 import random
@@ -90,7 +100,7 @@ class LineGame(BaseGame):
             table -- _Table object (provides segment graph and config)
         """
         self._table = table
-        self.route = []    # list of _Segment objects, goal-end first
+        self.route = []    # list of (segment, direction) tuples, goal-end first
 
     # ------------------------------------------------------------------ #
     # BaseGame interface                                                   #
@@ -121,11 +131,16 @@ class LineGame(BaseGame):
         return not glbs.ctx.currentGameRoute
 
     def clear(self):
-        """Clear the route list and reset all segment flow records."""
+        """Clear the route list and reset LED ref-counts on used segments."""
         import glbs
+        # Reset ref-counts on segments that were part of the route
+        seen = set()
+        for seg, _dir in self.route:
+            if seg.name not in seen:
+                seg.resetRefCounts()
+                seen.add(seg.name)
         glbs.ctx.currentGameRoute.clear()
         self.route.clear()
-        self._table.clearRoute()
 
     # ------------------------------------------------------------------ #
     # Route building (extracted from _Table.createCurrentLine)            #
@@ -140,83 +155,206 @@ class LineGame(BaseGame):
                the previous segment, appending segments until at least
                nrOfStartSegments inner-ring segments appear in the route
                or maxRouteLength is reached.
-            3. Record the traversal direction (+1/-1) on each segment so
-               S11 knows which LED indices to animate in order.
+            3. Compute the traversal direction (+1/-1) for each segment
+               based on which neighbour was entered from.
 
         Args:
             goal -- button name string (e.g. 'east')
 
         Returns:
-            list of _Segment objects from goal-end to inner-ring start
+            list of (segment, direction) tuples from goal-end to inner-ring start.
+            Direction is +1 (traverse LED index 0→N) or -1 (N→0).
         """
         table = self._table
-        route = []
+        segments = []
         namelist = []
 
         destination = table.getButton(goal)
-        route.append(table.getSegment(destination.getRandomButtonSegment()))
-        namelist.append(route[0].name)
-        self._set_destination_flow(destination, route[0])
+        segments.append(table.getSegment(destination.getRandomButtonSegment()))
+        namelist.append(segments[0].name)
 
-        if len(route[0].flowSegments) > 1:
-            route.append(table.getSegment(
-                route[0].flowSegments[random.randint(0, len(route[0].flowSegments) - 1)]))
+        if len(segments[0].flowSegments) > 1:
+            segments.append(table.getSegment(
+                segments[0].flowSegments[random.randint(0, len(segments[0].flowSegments) - 1)]))
         else:
-            route.append(table.getSegment(
-                route[0].counterSegments[random.randint(0, len(route[0].counterSegments) - 1)]))
-        namelist.append(route[-1].name)
+            segments.append(table.getSegment(
+                segments[0].counterSegments[random.randint(0, len(segments[0].counterSegments) - 1)]))
+        namelist.append(segments[-1].name)
 
         inner_count = 0
         while (inner_count < table.nrOfStartSegments
-               and len(route) < table.maxRouteLength):
-            if route[-2].name in route[-1].flowSegments:
+               and len(segments) < table.maxRouteLength):
+            if segments[-2].name in segments[-1].flowSegments:
                 next_seg = table.getSegment(
-                    route[-1].counterSegments[
-                        random.randint(0, len(route[-1].counterSegments) - 1)])
+                    segments[-1].counterSegments[
+                        random.randint(0, len(segments[-1].counterSegments) - 1)])
             else:
                 next_seg = table.getSegment(
-                    route[-1].flowSegments[
-                        random.randint(0, len(route[-1].flowSegments) - 1)])
-            route.append(next_seg)
-            namelist.append(route[-1].name)
+                    segments[-1].flowSegments[
+                        random.randint(0, len(segments[-1].flowSegments) - 1)])
+            segments.append(next_seg)
+            namelist.append(segments[-1].name)
             if namelist[-1] in self._INNER_RING:
                 inner_count += 1
 
-        for i in range(len(route) - 1):
-            self._set_route_flow(route[i], route[i + 1])
+        # Compute per-segment traversal directions
+        directions = []
+        directions.append(self._get_destination_flow(destination, segments[0]))
+        for i in range(len(segments) - 1):
+            directions.append(self._get_route_flow(segments[i], segments[i + 1]))
+
+        route = list(zip(segments, directions))
 
         print(namelist)
         print(f"Route length: {len(namelist)}")
         return route
 
-    def _set_route_flow(self, current_seg, previous_seg):
-        """Record +1 or -1 on previous_seg based on where current_seg lies.
+    @staticmethod
+    def _get_route_flow(current_seg, previous_seg):
+        """Compute traversal direction for previous_seg based on where current_seg lies.
 
-        Returns the recorded flow value, or 0 if segments are not connected.
+        Returns +1 if current_seg is in previous_seg's flowSegments (traverse 0→N),
+        -1 if in counterSegments (traverse N→0), or 0 on error.
         """
         if current_seg.name in previous_seg.flowSegments:
-            previous_seg.addSegmentFlow(1)
             return 1
         elif current_seg.name in previous_seg.counterSegments:
-            previous_seg.addSegmentFlow(-1)
             return -1
         else:
             print("ERROR: Segments not linked in route — re-run route")
             return 0
 
-    def _set_destination_flow(self, destination, segment):
-        """Record traversal direction on the first (goal-end) segment.
+    @staticmethod
+    def _get_destination_flow(destination, segment):
+        """Compute traversal direction for the first (goal-end) segment.
 
         Args:
             destination -- _Button object
             segment     -- first _Segment in the route
+
+        Returns +1 or -1 based on which button segment list contains the segment.
         """
         if segment.name in destination.flowSegments:
-            segment.addSegmentFlow(1)
             return 1
         elif segment.name in destination.counterSegments:
-            segment.addSegmentFlow(-1)
             return -1
         else:
             print("ERROR: Destination and segment not linked — re-run route")
             return 0
+
+
+# ------------------------------------------------------------------ #
+# MultiLineGame                                                        #
+# ------------------------------------------------------------------ #
+
+class MultiLineGame(LineGame):
+    """Multiple simultaneous LED lines for level 2/3 items.
+
+    Level 2: N real lines (same colour), no false line.
+    Level 3: N real lines + 1 false line (distinct colour).
+
+    Each line is an independent route built by the inherited _build_route().
+    Routes may share segments — the per-route direction tuples and LED
+    ref-counting on segments handle merging and crossing correctly.
+
+    S10/S11 drive the animation via the routes list; each route entry is
+    a dict with 'route' (list of tuples), 'color', 'goal', 'done' (list),
+    and 'is_false' flag.
+    """
+
+    mode = 'multiline'
+
+    def __init__(self, table, config_parser):
+        """Create a MultiLineGame bound to the given _Table instance.
+
+        Args:
+            table          -- _Table object
+            config_parser  -- configparser with [MultiLineGame] and [LineGame] sections
+        """
+        super().__init__(table)
+        self._parser = config_parser
+        self.routes = []        # list of route dicts (see start())
+        self.goal_buttons = []  # real goal button names for input scoring
+
+    # BUG: Game not starting for a new item (item99) I've just added manually. I have exited the game and restarted it, so that is not the issue. I thought it might 
+    # be the level (the new item is level 3), but changing the level of an existing item to 3 does not cause the issue, so that is not it either. 
+    # If I click the item in the simulation menu before anything else, the last input shows the correct code, so there is something else wrong.
+    # In noticed that after another item was connected, the game for the new item did start. However, after restarting the program, the same issue occurs again, 
+    # so it is not a one-time glitch.
+    def start(self, goal):
+        """Build multiple routes to different goal buttons.
+
+        Args:
+            goal -- ignored (MultiLineGame picks its own goals)
+        """
+        import glbs
+
+        level = 1
+        if glbs.items.currentItemName and glbs.items.currentItemName in glbs.items.items:
+            level = glbs.items.items[glbs.items.currentItemName].level
+
+        line_color = self._parser.get('LineGame', 'lineColor', fallback='turquoise')
+        false_color = self._parser.get('MultiLineGame', 'falseLineColor', fallback='red')
+
+        if level >= 3:
+            real_count = self._parser.getint('MultiLineGame', 'multiLineCountL3', fallback=3)
+            has_false = True
+        else:
+            real_count = self._parser.getint('MultiLineGame', 'multiLineCountL2', fallback=2)
+            has_false = False
+
+        # Pick unique goal buttons for each line
+        available = list(self._table.gameButtons)
+        random.shuffle(available)
+        total = real_count + (1 if has_false else 0)
+        goals = available[:min(total, len(available))]
+
+        self.routes = []
+        self.goal_buttons = []
+
+        for i, g in enumerate(goals):
+            is_false = has_false and (i == len(goals) - 1)
+            route = self._build_route(g)
+            self.routes.append({
+                'route': route,
+                'done': [],
+                'color': false_color if is_false else line_color,
+                'goal': g,
+                'is_false': is_false,
+                'counter': 0,
+                'head_idx': 0,
+                'tail_idx': 0,
+            })
+            if not is_false:
+                self.goal_buttons.append(g)
+
+        # Store the first real route in ctx for S11 compatibility
+        # (S11's line-mode check uses ctx.currentGameRoute)
+        # For multiline, S11 will use glbs.game.routes directly
+        glbs.ctx.currentGameRoute = self.routes[0]['route'] if self.routes else []
+        glbs.ctx.lineCounter = 0
+        self.route = [entry for r in self.routes for entry in r['route']]
+
+    def is_complete(self):
+        """Return True when all routes have been fully animated."""
+        return all(not r['route'] for r in self.routes)
+
+    def clear(self):
+        """Clear all routes and reset ref-counts on used segments."""
+        import glbs
+        seen = set()
+        for r in self.routes:
+            for seg, _dir in r['route']:
+                if seg.name not in seen:
+                    seg.resetRefCounts()
+                    seen.add(seg.name)
+            for seg, _dir in r['done']:
+                if seg.name not in seen:
+                    seg.resetRefCounts()
+                    seen.add(seg.name)
+            r['route'].clear()
+            r['done'].clear()
+        self.routes.clear()
+        self.goal_buttons.clear()
+        glbs.ctx.currentGameRoute.clear()
+        self.route.clear()

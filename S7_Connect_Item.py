@@ -56,14 +56,17 @@ class S7_Connect_Item():
                             glbs.mqtt.publish_item_connected(item_before)
                         glbs.items.currentItemName = ""
                         self.state = self.states.S1
-                    elif characterCanActivate and (glbs.items.currentItemName != newItem.name) and not(newItem.connected):
+                    elif characterCanActivate and not(newItem.connected):
                         glbs.items.currentItemName = newItem.name
-                        glbs.ctx.gameTimeout = self.gameTime  # Set game timeout (in seconds) to the value in the config
+                        if glbs.display._sim:
+                            glbs.ctx.gameTimeout = 60  # shorter timeout for testing
+                        else:
+                            glbs.ctx.gameTimeout = self.gameTime  # Set game timeout (in seconds) to the value in the config
                         glbs.ctx.returnState = self.states.S7
                         self.state = self.states.S9
                     elif not characterCanActivate:
                         glbs.table.setAllTableLEDs(glbs.table.colorsLED["orange"])
-                        time.sleep(3)
+                        glbs.time.sleep(3)
                         glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
                         self.state = self.states.S7
                     else:

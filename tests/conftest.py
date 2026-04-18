@@ -158,6 +158,100 @@ lineColor = turquoise
 """
 
 
+MULTILINE_TABLE_CONFIG = """
+[common]
+status = Active
+segments = segm0,segm1,segm2,segm3,segm4,segm5
+gamebuttons = east,west,north
+screenbuttons = bottom,right,top,left,null,null,tag,shutdown
+colors = black,turquoise,red
+maxRouteLength = 10
+nrOfStartSegments = 1
+
+[segm0]
+nrLEDs = 5
+flowSegments = segm1,segm3
+counterSegments = segm2
+
+[segm1]
+nrLEDs = 5
+flowSegments = segm2
+counterSegments = segm0
+
+[segm2]
+nrLEDs = 5
+flowSegments = segm0
+counterSegments = segm1,segm5
+
+[segm3]
+nrLEDs = 5
+flowSegments = segm4
+counterSegments = segm0
+
+[segm4]
+nrLEDs = 5
+flowSegments = segm5
+counterSegments = segm3
+
+[segm5]
+nrLEDs = 5
+flowSegments = segm2
+counterSegments = segm4
+
+[east]
+flowSegments = segm0
+counterSegments = segm1
+
+[west]
+flowSegments = segm3
+counterSegments = segm4
+
+[north]
+flowSegments = segm5
+counterSegments = segm2
+
+[black]
+rgb = 0,0,0
+
+[turquoise]
+rgb = 64,224,208
+
+[red]
+rgb = 200,0,0
+"""
+
+MULTILINE_MARVIN_CONFIG = """
+[LineGame]
+lineColor = turquoise
+
+[MultiLineGame]
+multiLineCountL2 = 2
+multiLineCountL3 = 3
+falseLineColor = red
+
+[GameModes]
+level1 = line
+level2 = multiline
+level3 = multiline
+"""
+
+
+@pytest.fixture
+def multiline_table_config_file(tmp_path):
+    """Write a tableconfig with multiple buttons for MultiLineGame tests."""
+    p = tmp_path / "tableconfig.txt"
+    p.write_text(MULTILINE_TABLE_CONFIG)
+    return str(p)
+
+
+@pytest.fixture
+def multiline_marvin_config(tmp_path):
+    """Write a marvinconfig with MultiLineGame section."""
+    p = tmp_path / "marvinconfig.txt"
+    p.write_text(MULTILINE_MARVIN_CONFIG)
+    return str(p)
+
+
 @pytest.fixture
 def mqtt_config_disabled(tmp_path):
     """Write a marvinconfig with MQTT disabled and return its path."""

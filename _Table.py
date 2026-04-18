@@ -159,12 +159,16 @@ class _Segment(object):
     Attributes:
         name            -- config key (e.g. 'segm0')
         nrLEDs          -- number of physical NeoPixels
-        flowSegments    -- neighbour names in the forward direction
-        counterSegments -- neighbour names in the reverse direction
+        flowSegments    -- neighbour names in the forward (strip index 0→N) direction
+        counterSegments -- neighbour names in the reverse (strip index N→0) direction
         flow            -- list of direction values recorded during route building
-                           (+1 = forward, -1 = reverse)
+                           (+1 = forward, -1 = reverse). Legacy — kept for Spark
+                           compatibility; LineGame now stores direction per route entry.
         LEDvalues       -- list of [R, G, B] triples, one per LED
         LEDUsers        -- list of owner strings per LED ('Unused', 'line', 'spark', ...)
+        LEDRefCounts    -- per-LED reference counter; tracks how many active lines
+                           are colouring each LED. Only erase to black when count
+                           reaches 0. Used by MultiLineGame for shared segments.
         timesInRoute    -- number of times this segment appears in the current route
     """
 
@@ -174,8 +178,9 @@ class _Segment(object):
         self.flowSegments = flowSegs
         self.counterSegments = counterSegs
         self.flow = []
-        self.LEDvalues = [] 
+        self.LEDvalues = []
         self.LEDUsers = []
+        self.LEDRefCounts = [0] * nrLEDs
         self.timesInRoute = 0
         for x in range(nrLEDs):
             self.LEDvalues.append(defaultColor)
@@ -190,10 +195,27 @@ class _Segment(object):
 
     def getLastSegmentFlow(self):
         return self.flow[-1]
-    
+
+    def incRefCount(self, index):
+        """Increment the LED reference counter at index."""
+        if 0 <= index < self.nrLEDs:
+            self.LEDRefCounts[index] += 1
+
+    def decRefCount(self, index):
+        """Decrement the LED reference counter at index. Returns the new count."""
+        if 0 <= index < self.nrLEDs:
+            self.LEDRefCounts[index] = max(0, self.LEDRefCounts[index] - 1)
+            return self.LEDRefCounts[index]
+        return 0
+
+    def resetRefCounts(self):
+        """Reset all LED reference counters to 0."""
+        self.LEDRefCounts = [0] * self.nrLEDs
+
     def clearSegment(self,color):
         self.flow.clear()
         self.timesInRoute = 0
+        self.resetRefCounts()
         for index,prevColor in enumerate(self.LEDvalues):
             self.setLEDValue(index,color)
         

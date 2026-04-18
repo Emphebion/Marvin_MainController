@@ -42,7 +42,10 @@ class S3_Disconnect_All(object):
                         # improve return state (to S2?) Maybe this is the best return state for all except sleep
                         self.state = self.states.S3
                     else:
-                        glbs.ctx.gameTimeout = self.gameTime  #Set game timeout (in seconds) to the value in the config
+                        if glbs.display._sim:
+                            glbs.ctx.gameTimeout = 60  # shorter timeout for testing
+                        else:
+                            glbs.ctx.gameTimeout = self.gameTime  # Set game timeout (in seconds) to the value in the config
                         glbs.ctx.returnState = self.states.S3
                     self.state = self.states.S9
                 elif new_input["data"] == "left":

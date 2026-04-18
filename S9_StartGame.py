@@ -34,6 +34,8 @@ class S9_StartGame(object):
         if mode == 'runes':
             glbs.game = glbs.rune_game
             glbs.ctx.gameFailures = 0  # rune mode doesn't use the -1 compensation
+        elif mode == 'multiline':
+            glbs.game = glbs.multiline_game
         else:
             glbs.game = glbs.line_game
 
