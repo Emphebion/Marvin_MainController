@@ -3,7 +3,7 @@
 **Overview:** [overhaul_plan.md](overhaul_plan.md)
 **Parent phase:** [Phase 4 — MQTT](phase4_mqtt.md)
 **EDD integration guide:** [edd_marvin_integration.md](edd_marvin_integration.md)
-**Status:** TODO
+**Status:** DONE
 
 ---
 

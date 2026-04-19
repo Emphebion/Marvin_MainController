@@ -116,6 +116,20 @@ class _Table(object):
             for i,prevColor in enumerate(segment.LEDvalues):
                 segment.setLEDValue(i,color)
 
+    def resolve_color(self, value):
+        """Resolve a colour parameter value to [R,G,B].
+
+        Accepts either a named colour key (e.g. 'turquoise') or a
+        comma-separated RGB string (e.g. '0,255,128').
+        """
+        try:
+            parts = [int(x.strip()) for x in value.split(',')]
+            if len(parts) == 3:
+                return parts
+        except ValueError:
+            pass
+        return self.colorsLED.get(value, self.colorsLED.get("black", [0, 0, 0]))
+
 # OTHER TABLE FUNCTIONS
 
     # Ensures the LEDs in the final segment are run in the correct order/direction
@@ -126,6 +140,113 @@ class _Table(object):
         segment.addSegmentFlow(rnd)
         return rnd
     
+    # ------------------------------------------------------------------ #
+    # Spark animation (reusable)                                           #
+    # ------------------------------------------------------------------ #
+    def _ensure_sparklist(self):
+        """Lazily build the pool of 666 pre-generated Spark objects."""
+        if not hasattr(self, '_sparklist') or not self._sparklist:
+            self._sparklist = []
+            while len(self._sparklist) < 666:
+                name = "spark" + str(len(self._sparklist))
+                self._sparklist.append(self.createRandomSpark(name))
+
+    def run_spark_animation(self, duration, color=None):
+        """Run spark animations across the table for the given duration (seconds).
+
+        Blocks the main loop for the duration. Used for Broken idle state
+        and overload events.
+
+        Args:
+            duration -- how long to animate (seconds)
+            color    -- spark colour [R,G,B]; defaults to turquoise
+        """
+        if color is None:
+            color = self.colorsLED["turquoise"]
+        black = self.colorsLED["black"]
+        self._ensure_sparklist()
+        self.setAllTableLEDs(black)
+
+        import glbs
+        end_time = glbs.time.time() + duration
+        while glbs.time.time() < end_time:
+            chosen = random.choice(self._sparklist)
+            chosen.resetSpark()
+            sparks = [chosen]
+            while sparks:
+                self._advance_sparks(sparks, color)
+                glbs.devices.transmitLED(self.getLEDData())
+
+        self.setAllTableLEDs(black)
+        glbs.devices.transmitLED(self.getLEDData())
+
+    def _advance_sparks(self, sparks, color):
+        """Advance each spark by one LED; erase tail when length is reached."""
+        black = self.colorsLED["black"]
+        for spark in sparks[:]:
+            if spark.segmentsActive:
+                spark.lengthCounter += 1
+                done = self._set_spark_led(
+                    spark.name,
+                    spark.segmentsActive[-1],
+                    spark.segmentActiveDirection[-1],
+                    color,
+                )
+                if done:
+                    spark.segmentsDone.append(spark.segmentsActive.pop())
+                    spark.segmentDoneDirection.append(spark.segmentActiveDirection.pop())
+            elif not spark.segmentsDone:
+                sparks.remove(spark)
+
+            if spark.lengthCounter >= spark.length and spark.segmentsDone:
+                done = self._set_spark_led(
+                    spark.name,
+                    spark.segmentsDone[0],
+                    spark.segmentDoneDirection[0],
+                    black,
+                )
+                if done:
+                    spark.segmentsDone.pop(0)
+                    spark.segmentDoneDirection.pop(0)
+
+    def _set_spark_led(self, name, segment, direction, color):
+        """Set the next LED in segment for spark. Returns 1 when segment is done."""
+        black = self.colorsLED["black"]
+        users = segment.getLEDUsers()
+        if name in users:
+            if direction > 0:
+                if color == black:
+                    idx = users.index(name)
+                    segment.setLEDValue(idx, color)
+                    segment.setUser(idx, "Done")
+                    return 1 if (idx >= len(users) - 1 or users.count("Done") == len(users)) else 0
+                else:
+                    idx = len(users) - 1 - users[::-1].index(name)
+                    if idx + 1 < len(users):
+                        segment.setLEDValue(idx + 1, color)
+                        segment.setUser(idx + 1, name)
+                    return 1 if idx + 1 >= len(users) - 1 else 0
+            else:
+                if color == black:
+                    idx = len(users) - 1 - users[::-1].index(name)
+                    segment.setLEDValue(idx, color)
+                    segment.setUser(idx, "Done")
+                    return 1 if idx <= 0 else 0
+                else:
+                    idx = users.index(name)
+                    if idx - 1 >= 0:
+                        segment.setLEDValue(idx - 1, color)
+                        segment.setUser(idx - 1, name)
+                    return 1 if idx - 1 <= 0 else 0
+        else:
+            if direction > 0:
+                segment.setLEDValue(0, color)
+                segment.setUser(0, name)
+            else:
+                segment.setLEDValue(len(users) - 1, color)
+                segment.setUser(len(users) - 1, name)
+        return 0
+
     def createRandomSpark(self, name):
         route = []
         routeLength = random.randint(1,5)

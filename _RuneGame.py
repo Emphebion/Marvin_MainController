@@ -168,7 +168,7 @@ class RuneGame(BaseGame):
 
         # Resolve colour for this level
         color_name = self._color_names[level_idx]
-        self._color = self._table.colorsLED.get(color_name, [148, 103, 189])
+        self._color = self._table.resolve_color(color_name)
 
         # Smart timeout: skip if not enough time for a full sequence
         if not self._has_enough_time():

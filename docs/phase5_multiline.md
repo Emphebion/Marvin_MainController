@@ -124,59 +124,23 @@ level3 = multiline
 
 ---
 
-## Simulation: Game Mode Toggle
+## Simulation: Game Mode Toggle — DONE
 
-The RFID panel in simulation mode (`_Display.py`) currently shows characters, items, and game state feedback. Add a clickable toggle button that cycles the game mode for level 2 and 3 between `runes` and `multiline`, so the operator can switch modes without editing `marvinconfig.txt`.
-
-### Behaviour
-
-- **Location:** Below the items list, above the game state feedback block at the bottom of the RFID panel.
-- **Label:** Shows the current mode for level 2/3, e.g. `Mode L2/3: runes` or `Mode L2/3: multiline`.
-- **Click action:** Cycles `[GameModes] level2` and `level3` together through the available modes: `runes` → `multiline` → `runes`. Writes the new value to `glbs.parser` in memory (same as `[GameModes]` is read). No file write — the change is session-only.
-- **Effect:** The next game round (S9) picks up the new mode. A round already in progress is not affected.
-- **Level 1** stays fixed at `line` — it is not affected by the toggle.
-- **Hardware mode:** The button is not rendered and `handle_click` ignores the area (same pattern as all other sim-only elements).
-
-### Implementation
-
-| File | Action |
-|---|---|
-| `_Display.py` | Add a `_game_mode_btn` rect in `_draw_rfid_panel()` between items and feedback block. Add click handling in `handle_click()` that updates `glbs.parser` `[GameModes]` level2/level3 values. Include current mode in `_rfid_panel_snapshot()` so the panel redraws on change. |
+Implemented in `_Display.py`: clickable toggle in the RFID panel cycles level 2/3 between `runes` and `multiline`. Session-only (no file write). Level 1 stays fixed at `line`.
 
 ---
 
-## Idea: Overload Spark Animation
+## Overload Spark Animation — DONE
 
-When the table overloads (total item load exceeds source capacity), play a spark animation for 5–15 seconds before resuming the regular code flow. This gives the overload event a dramatic visual payoff — the table "short-circuits" before all items disconnect.
+When the table overloads, a spark animation plays for a random duration (5–15 seconds, configurable) before resuming normal flow. The table "short-circuits" visually before all items disconnect.
 
-### Current overload flow
+### Implementation
 
-Overload is triggered in two places:
-- `S7_Connect_Item.py` — GM direct-connects an item that pushes load over capacity
-- `S13_FinishGame.py` — player wins a game, item connects, load exceeds capacity
-
-In both cases `_Items.connectItem()` detects the overload, calls `disconnectAll()` internally, and returns `True`. The caller publishes an MQTT overload event and continues. There is no visual feedback on the table — the items simply disconnect silently.
-
-### Proposed behaviour
-
-1. When `connectItem()` returns `True` (overload), clear the table LEDs and run the existing Spark animation system (`_Table.createRandomSpark()` + `_runSparkRoutes()`) for a random duration between 5 and 15 seconds.
-2. After the spark duration expires, clear all LEDs to black and resume the normal code flow (S7 returns to S1, S13 continues to its finish timer).
-3. The spark animation already exists in `S1_Reset._runSparkBehaviour()` for the "Broken" table status. Extract the spark logic into a reusable method (on `_Table` or a shared helper) so it can be called from S7 and S13 without duplicating code.
-
-### Configuration
-
-Add to `marvinconfig.txt`:
-```ini
-[common]
-overloadSparkMin = 5       ; minimum spark duration in seconds
-overloadSparkMax = 15      ; maximum spark duration in seconds
-```
-
-### Implementation notes
-
-- The spark list (`sparklist`) is currently built and owned by S1. To reuse it, either move spark list creation to `_Table` (where `createRandomSpark` already lives) or lazily build it on first use in a shared location.
-- During the spark animation the main loop is blocked (same pattern as S1's Broken behaviour). No input handling is needed — the overload is a non-interactive dramatic event.
-- The Overload table status (`_Table.status = "Overload"`) already exists but is only checked in S1. This could be set during the spark animation to signal the state to MQTT/display.
+- Spark animation logic extracted from `S1_Reset` into `_Table.py` as reusable methods: `run_spark_animation(duration, color)`, `_advance_sparks()`, `_set_spark_led()`.
+- Spark pool (`_sparklist`) lazily built on `_Table` via `_ensure_sparklist()` — shared by S1 Broken status and overload events.
+- `S7_Connect_Item.py` and `S13_FinishGame.py` call `glbs.table.run_spark_animation(duration)` when `connectItem()` returns `True` (overload). Duration is `random.randint(overloadSparkMin, overloadSparkMax)`.
+- `S1_Reset` delegates to `_Table._advance_sparks()` for its single-spark Broken behaviour.
+- Config: `[common] overloadSparkMin = 5`, `overloadSparkMax = 15` in `marvinconfig.txt`.
 
 ---
 

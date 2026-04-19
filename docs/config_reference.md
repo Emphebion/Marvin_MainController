@@ -129,7 +129,7 @@ Named states for the physical table mode. Set via `[common] status` in `tablecon
 
 | Section | Status value | Behaviour |
 |---------|-------------|-----------|
-| `StateT1` | `Off` | Table LEDs off, minimal response. |
+| `StateT1` | `Disabled` | Table LEDs off, tag scans ignored. |
 | `StateT2` | `Active` | Normal operation. |
 | `StateT3` | `Broken` | Random flicker spark effect; no game input accepted. |
 | `StateT4` | `Overload` | All items disconnected; special visual feedback. |
@@ -144,7 +144,7 @@ LED segment graph, button definitions, colours, and routing constraints.
 
 | Key | Type | Example | Description |
 |-----|------|---------|-------------|
-| `status` | string | `Active` | Table operating mode: `Off`, `Active`, `Broken`, or `Overload`. |
+| `status` | string | `Active` | Table operating mode: `Active`, `Broken`, `Disabled`, or `Overload`. |
 | `segments` | list | `segm0,...,segm63` | All segment names. Loaded in order; this order defines the LED transmission sequence. |
 | `gamebuttons` | list | `southeast,south,...,east` | Names of the 8 outer game buttons. Order matches the bit order in byte 2 of the Arduino `B` message (bit 7 first). |
 | `screenbuttons` | list | `bottom,right,top,left,null,null,tag,shutdown` | Names of the 8 screen/control buttons. Order matches byte 1 of the `B` message. |

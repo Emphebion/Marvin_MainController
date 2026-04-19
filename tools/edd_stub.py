@@ -15,9 +15,10 @@ Commands (type at the > prompt):
     register-character <name> <rfid_hex> <skill1,skill2,...> [--gm]
     register-item      <name> <rfid_hex> <level> <load> <function_text>
     set-well           <size>
-    set-status         <active|broken|off|disabled>
-    set-color-idle     <R> <G> <B>
-    set-color-game     <linegame|runegame> <R> <G> <B>
+    set-status         <active|broken|disabled>
+    set-color          <param> rgb <R> <G> <B>
+    set-color          <param> preset <name>
+    define-color       <name> <R> <G> <B>
     sync-offer         <version> [characters_json] [items_json]
     help
     quit
@@ -135,30 +136,37 @@ def cmd_set_well(args):
 
 
 def cmd_set_status(args):
-    """set-status <active|broken|off|disabled>"""
+    """set-status <active|broken|disabled>"""
     if not args:
-        print("  Usage: set-status <active|broken|off|disabled>")
+        print("  Usage: set-status <active|broken|disabled>")
         return
     _pub("table/status", {"status": args[0]})
 
 
-def cmd_set_color_idle(args):
-    """set-color-idle <R> <G> <B>"""
+def cmd_set_color(args):
+    """set-color <param> rgb <R> <G> <B>  OR  set-color <param> preset <name>"""
     if len(args) < 3:
-        print("  Usage: set-color-idle <R> <G> <B>")
+        print("  Usage: set-color <param> rgb <R> <G> <B>")
+        print("         set-color <param> preset <name>")
+        print("  Params: lineColor, falseLineColor, runeColorL1/L2/L3, energyFlowColor")
         return
-    _pub("table/color/idle", {"color": [int(args[0]), int(args[1]), int(args[2])]})
+    param = args[0]
+    mode  = args[1]
+    if mode == "rgb" and len(args) >= 5:
+        _pub("color/set", {"param": param, "color": [int(args[2]), int(args[3]), int(args[4])]})
+    elif mode == "preset" and len(args) >= 3:
+        _pub("color/set", {"param": param, "preset": args[2]})
+    else:
+        print("  Usage: set-color <param> rgb <R> <G> <B>")
+        print("         set-color <param> preset <name>")
 
 
-def cmd_set_color_game(args):
-    """set-color-game <linegame|runegame> <R> <G> <B>"""
+def cmd_define_color(args):
+    """define-color <name> <R> <G> <B>"""
     if len(args) < 4:
-        print("  Usage: set-color-game <linegame|runegame> <R> <G> <B>")
+        print("  Usage: define-color <name> <R> <G> <B>")
         return
-    _pub("game/color", {
-        "game": args[0],
-        "color": [int(args[1]), int(args[2]), int(args[3])],
-    })
+    _pub("color/define", {"name": args[0], "color": [int(args[1]), int(args[2]), int(args[3])]})
 
 
 def cmd_sync_offer(args):
@@ -195,9 +203,10 @@ def cmd_help(_args):
     register-character <name> <rfid_hex> <skill1,skill2,...> [--gm]
     register-item      <name> <rfid_hex> <level> <load> <function text>
     set-well           <size>
-    set-status         <active|broken|off|disabled>
-    set-color-idle     <R> <G> <B>
-    set-color-game     <linegame|runegame> <R> <G> <B>
+    set-status         <active|broken|disabled>
+    set-color          <param> rgb <R> <G> <B>
+    set-color          <param> preset <name>
+    define-color       <name> <R> <G> <B>
     sync-offer         <version> [characters.json] [items.json]
     help
     quit
@@ -209,8 +218,8 @@ _COMMANDS = {
     "register-item":      cmd_register_item,
     "set-well":        cmd_set_well,
     "set-status":      cmd_set_status,
-    "set-color-idle":  cmd_set_color_idle,
-    "set-color-game":  cmd_set_color_game,
+    "set-color":       cmd_set_color,
+    "define-color":    cmd_define_color,
     "sync-offer":      cmd_sync_offer,
     "help":            cmd_help,
 }

@@ -632,18 +632,42 @@ class TestOldConfigCompat:
 
 
 # ---------------------------------------------------------------------------
-# T4.15 — cmd/game/color and cmd/table/color/idle
+# T4.15 — cmd/color/set and cmd/color/define
 # ---------------------------------------------------------------------------
 
-class TestColorCommands:
-    def _setup(self, mqtt_config_enabled, tmp_path, monkeypatch):
+class TestColorSetCommand:
+    """Test _cmd_color_set: set game colour parameters to RGB or named preset."""
+
+    def _setup(self, tmp_path, monkeypatch):
         from _MQTT import _MQTT
 
+        mqtt_cfg = tmp_path / "marvinconfig.txt"
+        mqtt_cfg.write_text("""
+[MQTT]
+enabled = true
+broker = localhost
+port = 1883
+node_id = test-001
+
+[State1]
+energyFlowColor = amethist
+
+[RuneGame]
+runeColorL1 = runeL1
+runeColorL2 = runeL2
+runeColorL3 = runeL3
+
+[LineGame]
+lineColor = turquoise
+
+[MultiLineGame]
+falseLineColor = red
+""")
         table_cfg = tmp_path / "tableconfig.txt"
         table_cfg.write_text("""
 [common]
 status = Active
-colors = black,turquoise,amethist
+colors = black,turquoise,amethist,red
 
 [black]
 rgb = 0,0,0
@@ -653,56 +677,168 @@ rgb = 64,224,208
 
 [amethist]
 rgb = 153,67,140
+
+[red]
+rgb = 200,0,0
 """)
         glbs_stub = types.SimpleNamespace(
             item_file="dummy",
             table_file=str(table_cfg),
             table=types.SimpleNamespace(
                 status="Active",
-                colorsLED={"turquoise": [64, 224, 208], "amethist": [153, 67, 140]},
+                colorsLED={
+                    "black": [0, 0, 0],
+                    "turquoise": [64, 224, 208],
+                    "amethist": [153, 67, 140],
+                    "red": [200, 0, 0],
+                },
             ),
             parser=configparser.ConfigParser(),
         )
-        glbs_stub.parser.read(mqtt_config_enabled)
+        glbs_stub.parser.read(str(mqtt_cfg))
         monkeypatch.setitem(sys.modules, 'glbs', glbs_stub)
 
         with patch('_MQTT._mqtt_client') as mock_paho:
             mock_client = MagicMock()
             mock_paho.Client.return_value = mock_client
             mock_paho.CallbackAPIVersion.VERSION2 = 2
-            mqtt = _MQTT(mqtt_config_enabled)
+            mqtt = _MQTT(str(mqtt_cfg))
         mqtt._client = mock_client
         return mqtt, glbs_stub
 
-    def test_idle_color_updates_memory(self, mqtt_config_enabled, tmp_path, monkeypatch):
-        mqtt, glbs_stub = self._setup(mqtt_config_enabled, tmp_path, monkeypatch)
-        mqtt._cmd_color_idle({"color": [255, 0, 128]})
-        assert glbs_stub.table.colorsLED["amethist"] == [255, 0, 128]
+    def test_rgb_writes_csv_to_marvinconfig(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        mqtt._cmd_color_set({"param": "lineColor", "color": [0, 255, 128]})
+        assert glbs_stub.parser.get("LineGame", "lineColor") == "0,255,128"
 
-    def test_idle_color_persists_to_file(self, mqtt_config_enabled, tmp_path, monkeypatch):
-        mqtt, glbs_stub = self._setup(mqtt_config_enabled, tmp_path, monkeypatch)
-        mqtt._cmd_color_idle({"color": [255, 0, 128]})
+    def test_rgb_persists_to_file(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        mqtt._cmd_color_set({"param": "lineColor", "color": [0, 255, 128]})
+        parser = configparser.ConfigParser()
+        parser.read(mqtt._config_file)
+        assert parser.get("LineGame", "lineColor") == "0,255,128"
+
+    def test_preset_writes_name_to_marvinconfig(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        mqtt._cmd_color_set({"param": "lineColor", "preset": "amethist"})
+        assert glbs_stub.parser.get("LineGame", "lineColor") == "amethist"
+
+    def test_preset_persists_to_file(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        mqtt._cmd_color_set({"param": "energyFlowColor", "preset": "turquoise"})
+        parser = configparser.ConfigParser()
+        parser.read(mqtt._config_file)
+        assert parser.get("State1", "energyFlowColor") == "turquoise"
+
+    def test_unknown_param_rejected(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        original = glbs_stub.parser.get("LineGame", "lineColor")
+        mqtt._cmd_color_set({"param": "noSuchParam", "color": [255, 0, 0]})
+        # lineColor unchanged
+        assert glbs_stub.parser.get("LineGame", "lineColor") == original
+
+    def test_unknown_preset_rejected(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        original = glbs_stub.parser.get("LineGame", "lineColor")
+        mqtt._cmd_color_set({"param": "lineColor", "preset": "nonexistent"})
+        assert glbs_stub.parser.get("LineGame", "lineColor") == original
+
+    def test_both_color_and_preset_rejected(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        original = glbs_stub.parser.get("LineGame", "lineColor")
+        mqtt._cmd_color_set({"param": "lineColor", "color": [0, 0, 0], "preset": "red"})
+        assert glbs_stub.parser.get("LineGame", "lineColor") == original
+
+    def test_neither_color_nor_preset_rejected(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        original = glbs_stub.parser.get("LineGame", "lineColor")
+        mqtt._cmd_color_set({"param": "lineColor"})
+        assert glbs_stub.parser.get("LineGame", "lineColor") == original
+
+    def test_all_params_accepted(self, tmp_path, monkeypatch):
+        """Every key in _COLOR_PARAMS should be settable."""
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        for param in ("lineColor", "falseLineColor", "runeColorL1",
+                       "runeColorL2", "runeColorL3", "energyFlowColor"):
+            mqtt._cmd_color_set({"param": param, "color": [1, 2, 3]})
+        assert glbs_stub.parser.get("LineGame", "lineColor") == "1,2,3"
+        assert glbs_stub.parser.get("MultiLineGame", "falseLineColor") == "1,2,3"
+        assert glbs_stub.parser.get("RuneGame", "runeColorL1") == "1,2,3"
+        assert glbs_stub.parser.get("State1", "energyFlowColor") == "1,2,3"
+
+
+class TestColorDefineCommand:
+    """Test _cmd_color_define: update named palette colour RGB."""
+
+    def _setup(self, tmp_path, monkeypatch):
+        from _MQTT import _MQTT
+
+        mqtt_cfg = tmp_path / "marvinconfig.txt"
+        mqtt_cfg.write_text("""
+[MQTT]
+enabled = true
+broker = localhost
+port = 1883
+node_id = test-001
+
+[LineGame]
+lineColor = turquoise
+""")
+        table_cfg = tmp_path / "tableconfig.txt"
+        table_cfg.write_text("""
+[common]
+status = Active
+colors = black,turquoise
+
+[black]
+rgb = 0,0,0
+
+[turquoise]
+rgb = 64,224,208
+""")
+        glbs_stub = types.SimpleNamespace(
+            item_file="dummy",
+            table_file=str(table_cfg),
+            table=types.SimpleNamespace(
+                status="Active",
+                colorsLED={"black": [0, 0, 0], "turquoise": [64, 224, 208]},
+            ),
+            parser=configparser.ConfigParser(),
+        )
+        glbs_stub.parser.read(str(mqtt_cfg))
+        monkeypatch.setitem(sys.modules, 'glbs', glbs_stub)
+
+        with patch('_MQTT._mqtt_client') as mock_paho:
+            mock_client = MagicMock()
+            mock_paho.Client.return_value = mock_client
+            mock_paho.CallbackAPIVersion.VERSION2 = 2
+            mqtt = _MQTT(str(mqtt_cfg))
+        mqtt._client = mock_client
+        return mqtt, glbs_stub
+
+    def test_define_updates_palette_in_memory(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        mqtt._cmd_color_define({"name": "turquoise", "color": [0, 200, 180]})
+        assert glbs_stub.table.colorsLED["turquoise"] == [0, 200, 180]
+
+    def test_define_persists_to_tableconfig(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        mqtt._cmd_color_define({"name": "turquoise", "color": [0, 200, 180]})
         parser = configparser.ConfigParser()
         parser.read(glbs_stub.table_file)
-        assert parser.get("amethist", "rgb") == "255,0,128"
+        assert parser.get("turquoise", "rgb") == "0,200,180"
 
-    def test_linegame_color_updates_memory(self, mqtt_config_enabled, tmp_path, monkeypatch):
-        mqtt, glbs_stub = self._setup(mqtt_config_enabled, tmp_path, monkeypatch)
-        mqtt._cmd_color_game({"game": "linegame", "color": [0, 255, 0]})
-        assert glbs_stub.table.colorsLED["turquoise"] == [0, 255, 0]
+    def test_define_missing_name_rejected(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        original = list(glbs_stub.table.colorsLED["turquoise"])
+        mqtt._cmd_color_define({"color": [0, 200, 180]})
+        assert glbs_stub.table.colorsLED["turquoise"] == original
 
-    def test_linegame_color_persists_to_file(self, mqtt_config_enabled, tmp_path, monkeypatch):
-        mqtt, glbs_stub = self._setup(mqtt_config_enabled, tmp_path, monkeypatch)
-        mqtt._cmd_color_game({"game": "linegame", "color": [0, 255, 0]})
-        parser = configparser.ConfigParser()
-        parser.read(glbs_stub.table_file)
-        assert parser.get("turquoise", "rgb") == "0,255,0"
-
-    def test_invalid_color_ignored(self, mqtt_config_enabled, tmp_path, monkeypatch):
-        mqtt, glbs_stub = self._setup(mqtt_config_enabled, tmp_path, monkeypatch)
-        original = list(glbs_stub.table.colorsLED["amethist"])
-        mqtt._cmd_color_idle({"color": [255, 0]})  # only 2 elements
-        assert glbs_stub.table.colorsLED["amethist"] == original
+    def test_define_invalid_color_rejected(self, tmp_path, monkeypatch):
+        mqtt, glbs_stub = self._setup(tmp_path, monkeypatch)
+        original = list(glbs_stub.table.colorsLED["turquoise"])
+        mqtt._cmd_color_define({"name": "turquoise", "color": [255, 0]})
+        assert glbs_stub.table.colorsLED["turquoise"] == original
 
 
 # ---------------------------------------------------------------------------

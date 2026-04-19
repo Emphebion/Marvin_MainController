@@ -117,7 +117,7 @@ All `rfid` fields carry the **8-char uppercase hex string** as stored in `player
 {"event": "success", "elapsed_s": 45.2}
 ```
 
-**Table status payload:** `{"status": "active" | "broken" | "off" | "disabled"}`
+**Table status payload:** `{"status": "active" | "broken" | "disabled"}`
 
 **Config version payload:** `{"version": 42}`
 
@@ -126,10 +126,10 @@ All `rfid` fields carry the **8-char uppercase hex string** as stored in `player
 | Topic | Purpose | Payload |
 |---|---|---|
 | `marvin/<id>/cmd/rfid/register` | Register a new player or item | see below |
-| `marvin/<id>/cmd/table/status` | Set table status | `{"status": "active" \| "broken" \| "off" \| "disabled"}` |
+| `marvin/<id>/cmd/table/status` | Set table status | `{"status": "active" \| "broken" \| "disabled"}` |
 | `marvin/<id>/cmd/well/size` | Set well capacity | `{"size": <int>}` |
-| `marvin/<id>/cmd/table/color/idle` | Set idle animation colour | `{"color": [R, G, B]}` |
-| `marvin/<id>/cmd/game/color` | Set game LED colour | `{"game": "linegame" \| "runegame", "color": [R, G, B]}` |
+| `marvin/<id>/cmd/color/set` | Set colour parameter | `{"param": "<name>", "color": [R,G,B]}` or `{"param": "<name>", "preset": "<palette_name>"}` |
+| `marvin/<id>/cmd/color/define` | Update named palette colour | `{"name": "<palette_name>", "color": [R,G,B]}` |
 | `marvin/<id>/cmd/sync/offer` | EDD offers config version for sync | see below |
 | `marvin/<id>/cmd/#` (catch-all) | All other commands — logged only | any |
 
@@ -186,7 +186,7 @@ Phase 4 adds a fifth table status value: `Disabled`. It is EDD-commanded (via `c
 
 Two changes to `S1_Reset`:
 
-1. `_setIdleLightBehaviour`: add `elif glbs.table.status == "Disabled": setAllTableLEDs(black)` (same as `Off` handling).
+1. `_setIdleLightBehaviour`: add `elif glbs.table.status == "Disabled": setAllTableLEDs(black)`.
 2. `_setState`: extend the guard from:
    ```python
    if glbs.table.status != 'Broken':
@@ -250,9 +250,8 @@ All writes use `configparser` consistently with the existing file format.
 | `well.capacity` (state) | `state/items` | `_Items.source` | `itemconfig.txt [items] source` | Read-only in state; set via `cmd/well/size` |
 | `cmd/well/size.size` | `cmd/well/size` | `_Items.source` | `itemconfig.txt [items] source` | Writes to config on receipt |
 | `cmd/table/status.status` | `cmd/table/status` | `glbs.table.status` | `tableconfig.txt [common] status` | Writes to config on receipt |
-| idle colour RGB | `cmd/table/color/idle` | `colorsLED[name]` where name = `[State1] energyFlowColor` | `tableconfig.txt [<colorname>] rgb` | Updates named colour entry |
-| linegame colour RGB | `cmd/game/color` game=linegame | `colorsLED[name]` where name = `[LineGame] lineColor` (to add) | `tableconfig.txt [<colorname>] rgb` | Updates named colour entry |
-| runegame colour RGB | `cmd/game/color` game=runegame | `colorsLED[name]` where name = `[RuneGame] runeColorL1/L2/L3` | `tableconfig.txt [<colorname>] rgb` | Per-level; updates named colour entry |
+| colour parameter (RGB) | `cmd/color/set` | `marvinconfig.txt [section] key` (via `_COLOR_PARAMS` lookup) | `marvinconfig.txt` | Writes CSV RGB (e.g. `0,255,128`) or palette name to parameter |
+| palette colour RGB | `cmd/color/define` | `colorsLED[name]` | `tableconfig.txt [<colorname>] rgb` | Updates named colour entry in palette |
 | `item.load` | `cmd/rfid/register` | `item.load` / `itemconfig.txt [itemN] load` | `itemconfig.txt` | Written on registration |
 | `item.function` | `cmd/rfid/register` | `item.function` / `itemconfig.txt [itemN] function` | `itemconfig.txt` | Written on registration |
 | `player.skills` | `cmd/rfid/register` | `player.skillList` / `playerconfig.txt [SectionKey] skills` | `playerconfig.txt` | Comma-separated tokens |
@@ -330,8 +329,8 @@ No MQTT logic lives inside individual state files. Each state calls `glbs.mqtt.p
 | `_MQTT.py` on_message | `cmd/rfid/register` | write to config, call `reload()`, bump `config_version` |
 | `_MQTT.py` on_message | `cmd/table/status` | set `glbs.table.status`, write `tableconfig.txt`, publish `state/table` |
 | `_MQTT.py` on_message | `cmd/well/size` | set `_Items.source`, write `itemconfig.txt`, publish `state/items` |
-| `_MQTT.py` on_message | `cmd/table/color/idle` | update `colorsLED`, write `tableconfig.txt` |
-| `_MQTT.py` on_message | `cmd/game/color` | update `colorsLED`, write `tableconfig.txt` |
+| `_MQTT.py` on_message | `cmd/color/set` | write colour parameter to `marvinconfig.txt` (RGB or preset name) |
+| `_MQTT.py` on_message | `cmd/color/define` | update `colorsLED`, write `tableconfig.txt` |
 | `_MQTT.py` on_message | `cmd/sync/offer` | compare versions, accept EDD data or push MARVIN data |
 
 ---
@@ -381,7 +380,7 @@ No MQTT logic lives inside individual state files. Each state calls `glbs.mqtt.p
 | T4.12 | Old config format compatibility | ✅ | `TestOldConfigCompat` (1) |
 | T4.13 | `cmd/well/size` | ✅ | `TestCommandHandlers::test_cmd_well_size_*` (2) |
 | T4.14 | `cmd/table/status` + Disabled | ✅ | `TestCommandHandlers::test_cmd_table_status_*` |
-| T4.15 | `cmd/game/color` | ✅ | `TestColorCommands` (5) |
+| T4.15 | `cmd/color/set` + `cmd/color/define` | ✅ | `TestColorSetCommand` (9), `TestColorDefineCommand` (4) |
 | T4.16 | Sync — EDD newer | ✅ | `TestSync::test_edd_newer_*` (2) |
 | T4.17 | Sync — MARVIN newer | ✅ | `TestSync::test_marvin_newer_*`, `test_equal_versions_*` |
 | T4.18 | Item display_name in payloads | ✅ | `TestItemDisplayName` (3) |
@@ -406,10 +405,10 @@ No MQTT logic lives inside individual state files. Each state calls `glbs.mqtt.p
 **EDD integration guide:** [edd_marvin_integration.md](edd_marvin_integration.md) — step-by-step implementation plan for the EDD team adding MARVIN support, including all use/misuse scenarios, test plan, and simulation environment setup.
 
 - **S4.1 — MARVIN simulation mode + MQTT:** MARVIN already runs without hardware (pygame simulation). With `[MQTT] enabled = true` in `marvinconfig.txt` and a broker running, the full MQTT stack operates live. No separate MockMARVIN is needed — the simulation IS the mock. Verify: start broker, start MARVIN in sim mode, subscribe to `marvin/#`, use mouse clicks to trigger RFID scans and game events.
-- **S4.2 — EDD stub script (`tools/edd_stub.py`): DONE.** Standalone Python script (not part of empnode). Subscribes to `marvin/<id>/state/#`; prints received messages with timestamps. Accepts CLI commands: `register-player`, `register-item`, `set-well`, `set-status`, `set-color-idle`, `set-color-game`, `sync-offer`. Supports `--broker`, `--port`, `--node-id` CLI arguments. Usage: `py -3 tools/edd_stub.py [--broker HOST] [--port PORT] [--node-id ID]`.
+- **S4.2 — EDD stub script (`tools/edd_stub.py`): DONE.** Standalone Python script (not part of empnode). Subscribes to `marvin/<id>/state/#`; prints received messages with timestamps. Accepts CLI commands: `register-character`, `register-item`, `set-well`, `set-status`, `set-color`, `define-color`, `sync-offer`. Supports `--broker`, `--port`, `--node-id` CLI arguments. Usage: `py -3 tools/edd_stub.py [--broker HOST] [--port PORT] [--node-id ID]`.
 - **S4.3 — Sync scenario:** EDD stub starts with config version 8. MARVIN starts with version 5. On connect MARVIN publishes `state/config_version: 5`. EDD stub sends `cmd/sync/offer` with version 8 + full player/item lists. Verify MARVIN accepts and config files update. Then restart MARVIN (now at version 8) and send `sync/offer` with version 3. Verify MARVIN publishes `state/sync/push`. Also test equal versions (no action).
 - **S4.4 — Full RFID lifecycle demo:** Unknown tag scan → `state/rfid action:unknown` → EDD stub sends `cmd/rfid/register` → tag now recognised → item connect → `state/items action:connected` → connect enough to overload → `state/items action:overload`.
-- **S4.5 — Integration test (`test_mqtt_integration.py`): DONE.** Spawns an `amqtt` broker in a daemon thread (same pattern as empnode `test_protocol.py`), creates a real `_MQTT` instance (not mocked), and an EDD stub subscriber. 18 tests verify real MQTT message flow: broker connect + config_version publish, retained messages (config_version, table status), full sync exchange (EDD newer/MARVIN newer/equal), publish flow (rfid player/unknown, game failure/success, heartbeat), command flow (table status, well size, register player, idle colour), and heartbeat timer. Scoped to MQTT layer only — no pygame or game loop. Requires `amqtt` (test-only dependency).
+- **S4.5 — Integration test (`test_mqtt_integration.py`): DONE.** Spawns an `amqtt` broker in a daemon thread (same pattern as empnode `test_protocol.py`), creates a real `_MQTT` instance (not mocked), and an EDD stub subscriber. 18 tests verify real MQTT message flow: broker connect + config_version publish, retained messages (config_version, table status), full sync exchange (EDD newer/MARVIN newer/equal), publish flow (rfid player/unknown, game failure/success, heartbeat), command flow (table status, well size, register player, color set, color define), and heartbeat timer. Scoped to MQTT layer only — no pygame or game loop. Requires `amqtt` (test-only dependency).
 
 ### Known Limitations
 
@@ -480,11 +479,17 @@ mosquitto_pub -h localhost \
   -m '{"status": "disabled"}'
 # Expected: all LEDs off; RFID scan does not advance to S2
 
-# Test idle colour change:
+# Test colour parameter set (direct RGB):
 mosquitto_pub -h localhost \
-  -t "marvin/marvin-001/cmd/table/color/idle" \
-  -m '{"color": [255, 0, 128]}'
-# Expected: idle animation colour changes on next tick
+  -t "marvin/marvin-001/cmd/color/set" \
+  -m '{"param": "lineColor", "color": [255, 0, 128]}'
+# Expected: lineColor parameter updated in marvinconfig.txt
+
+# Test palette colour define:
+mosquitto_pub -h localhost \
+  -t "marvin/marvin-001/cmd/color/define" \
+  -m '{"name": "turquoise", "color": [0, 200, 180]}'
+# Expected: turquoise palette entry updated in tableconfig.txt
 
 # Test sync (EDD newer):
 mosquitto_pub -h localhost \
@@ -523,8 +528,8 @@ mosquitto_pub -h localhost \
 
 # Invalid colour (wrong length) — should reject:
 mosquitto_pub -h localhost \
-  -t "marvin/marvin-001/cmd/table/color/idle" \
-  -m '{"color": [255]}'
+  -t "marvin/marvin-001/cmd/color/set" \
+  -m '{"param": "lineColor", "color": [255]}'
 
 # Wrong topic prefix (empnode namespace) — should be silently ignored:
 mosquitto_pub -h localhost \

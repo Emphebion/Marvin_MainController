@@ -93,7 +93,7 @@ class S11_AwaitInput():
             self._setMultiLineLEDOutput()
             return
         # Line mode: advance line animation by one LED using index tracking
-        color = glbs.table.colorsLED[self._line_color_name]
+        color = glbs.table.resolve_color(self._line_color_name)
         black = glbs.table.colorsLED["black"]
         # Head: colour one LED at head_idx in the current head segment
         if glbs.ctx.currentGameRoute:
@@ -129,7 +129,7 @@ class S11_AwaitInput():
         """Advance all multiline routes by one LED each using index tracking."""
         glbs.ctx.lineCounter += 1
         for r in glbs.game.routes:
-            color = glbs.table.colorsLED[r['color']]
+            color = glbs.table.resolve_color(r['color'])
             black = glbs.table.colorsLED["black"]
             # Head: colour one LED at head_idx in the current head segment
             if r['route']:

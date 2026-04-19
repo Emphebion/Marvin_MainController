@@ -2,6 +2,8 @@
 devices=GSM,RFID_LED
 menu=main,wellsize,disconnectall,disconnect1item,connect,achtergrond
 systemTimeout=240
+overloadSparkMin=5
+overloadSparkMax=15
 
 [GSM]
 devid = 1234:5678
@@ -88,7 +90,7 @@ lineLength=28
 successTimeout=3
 
 [StateT1]
-name=TableOff
+name=TableDisabled
 
 [StateT2]
 name=TableActive
@@ -101,8 +103,8 @@ name=TableOverload
 
 [GameModes]
 level1 = line
-level2 = runes
-level3 = runes
+level2 = multiline
+level3 = multiline
 
 [RuneGame]
 revealSpeedL1 = 150

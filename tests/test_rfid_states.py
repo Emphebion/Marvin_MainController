@@ -23,6 +23,10 @@ from enum import Enum
 # ---------------------------------------------------------------------------
 
 _MARVIN_CONFIG = """
+[common]
+overloadSparkMin = 5
+overloadSparkMax = 15
+
 [State1]
 idletimeout = 30
 energyFlowCount = 2
@@ -140,6 +144,7 @@ def _build_glbs(monkeypatch, *, status="Active", active_player=None):
                        "orange": [255, 165, 0]},
             setAllTableLEDs=MagicMock(),
             segmentList=[],
+            run_spark_animation=MagicMock(),
         ),
         display=types.SimpleNamespace(
             screenOff=MagicMock(),

@@ -33,7 +33,7 @@ MARVIN and empnode share a broker but use **completely separate topic namespaces
 | **Heartbeat** | Every 10 s (firmware) / 5 s (sim) | Every 30 s |
 | **Retained messages** | `state/dmx/<room>`, `state/status` | `state/items`, `state/table`, `state/config_version` |
 | **Capabilities** | `["rfid", "dmx", "pixel"]` per node | Fixed (RFID + LED ring, no DMX) |
-| **Commands EDD sends** | DMX set/fade/update/config, pixel set/fade, minigame start/abort | rfid/register, table/status, well/size, table/color/idle, game/color, sync/offer |
+| **Commands EDD sends** | DMX set/fade/update/config, pixel set/fade, minigame start/abort | rfid/register, table/status, well/size, color/set, color/define, sync/offer |
 | **Node count** | Many (10+) | One per table (can be multiple tables) |
 
 ### Key Design Decisions
@@ -70,10 +70,11 @@ MARVIN and empnode share a broker but use **completely separate topic namespaces
 |-------|---------|--------|
 | `marvin/<id>/cmd/rfid/register` | `{"type":"character","name":"Sera","rfid":"000001869F","skills":["connect1"]}` | Register new character |
 | | `{"type":"item","name":"Amulet","rfid":"00000015B3","skills":[],"level":2,"load":15,"function":"..."}` | Register new item |
-| `marvin/<id>/cmd/table/status` | `{"status":"active"\|"broken"\|"off"\|"disabled"}` | Set table operational state |
+| `marvin/<id>/cmd/table/status` | `{"status":"active"\|"broken"\|"disabled"}` | Set table operational state |
 | `marvin/<id>/cmd/well/size` | `{"size":100}` | Set power well capacity |
-| `marvin/<id>/cmd/table/color/idle` | `{"color":[255,0,128]}` | Set idle LED colour |
-| `marvin/<id>/cmd/game/color` | `{"game":"linegame"\|"runegame","color":[R,G,B]}` | Set game LED colour |
+| `marvin/<id>/cmd/color/set` | `{"param":"lineColor","color":[R,G,B]}` | Set colour parameter to direct RGB |
+| | `{"param":"lineColor","preset":"emerald"}` | Set colour parameter to named palette colour |
+| `marvin/<id>/cmd/color/define` | `{"name":"turquoise","color":[R,G,B]}` | Update a named palette colour's RGB |
 | `marvin/<id>/cmd/sync/offer` | `{"version":45,"characters":[...],"items":[...]}` | Offer config sync |
 
 ### 3.3 Sync Protocol
@@ -138,7 +139,7 @@ public class MarvinGameModel
 // MarvinTableModel.cs
 public class MarvinTableModel
 {
-    public string Status { get; set; }   // "active" | "broken" | "off" | "disabled"
+    public string Status { get; set; }   // "active" | "broken" | "disabled"
 }
 
 // MarvinHeartbeatModel.cs
@@ -362,8 +363,8 @@ private async Task HandleMarvinSyncPushAsync(
 Task SendMarvinRegisterAsync(string nodeId, MarvinRegisterCommand command, CancellationToken ct);
 Task SendMarvinTableStatusAsync(string nodeId, MarvinTableStatusCommand command, CancellationToken ct);
 Task SendMarvinWellSizeAsync(string nodeId, MarvinWellSizeCommand command, CancellationToken ct);
-Task SendMarvinColorIdleAsync(string nodeId, MarvinColorCommand command, CancellationToken ct);
-Task SendMarvinGameColorAsync(string nodeId, MarvinGameColorCommand command, CancellationToken ct);
+Task SendMarvinColorSetAsync(string nodeId, MarvinColorSetCommand command, CancellationToken ct);
+Task SendMarvinColorDefineAsync(string nodeId, MarvinColorDefineCommand command, CancellationToken ct);
 Task SendMarvinSyncOfferAsync(string nodeId, MarvinSyncOfferCommand command, CancellationToken ct);
 ```
 
@@ -385,7 +386,7 @@ public class MarvinRegisterCommand
 // MarvinTableStatusCommand.cs
 public class MarvinTableStatusCommand
 {
-    public string Status { get; set; }   // "active" | "broken" | "off" | "disabled"
+    public string Status { get; set; }   // "active" | "broken" | "disabled"
 }
 
 // MarvinWellSizeCommand.cs
@@ -394,17 +395,19 @@ public class MarvinWellSizeCommand
     public int Size { get; set; }
 }
 
-// MarvinColorCommand.cs
-public class MarvinColorCommand
+// MarvinColorSetCommand.cs
+public class MarvinColorSetCommand
 {
-    public int[] Color { get; set; }     // [R, G, B]
+    public string Param { get; set; }     // "lineColor", "falseLineColor", "runeColorL1/L2/L3", "energyFlowColor"
+    public int[]? Color { get; set; }     // [R, G, B] — direct RGB (exclusive with Preset)
+    public string? Preset { get; set; }   // palette name (exclusive with Color)
 }
 
-// MarvinGameColorCommand.cs
-public class MarvinGameColorCommand
+// MarvinColorDefineCommand.cs
+public class MarvinColorDefineCommand
 {
-    public string Game { get; set; }     // "linegame" | "runegame"
-    public int[] Color { get; set; }     // [R, G, B]
+    public string Name { get; set; }      // palette entry name (e.g. "turquoise")
+    public int[] Color { get; set; }      // [R, G, B]
 }
 
 // MarvinSyncOfferCommand.cs
@@ -428,11 +431,11 @@ public Task SendMarvinTableStatusAsync(string nodeId, MarvinTableStatusCommand c
 public Task SendMarvinWellSizeAsync(string nodeId, MarvinWellSizeCommand cmd, CancellationToken ct)
     => PublishMarvinCommandAsync(nodeId, "well/size", cmd, ct);
 
-public Task SendMarvinColorIdleAsync(string nodeId, MarvinColorCommand cmd, CancellationToken ct)
-    => PublishMarvinCommandAsync(nodeId, "table/color/idle", cmd, ct);
+public Task SendMarvinColorSetAsync(string nodeId, MarvinColorSetCommand cmd, CancellationToken ct)
+    => PublishMarvinCommandAsync(nodeId, "color/set", cmd, ct);
 
-public Task SendMarvinGameColorAsync(string nodeId, MarvinGameColorCommand cmd, CancellationToken ct)
-    => PublishMarvinCommandAsync(nodeId, "game/color", cmd, ct);
+public Task SendMarvinColorDefineAsync(string nodeId, MarvinColorDefineCommand cmd, CancellationToken ct)
+    => PublishMarvinCommandAsync(nodeId, "color/define", cmd, ct);
 
 public Task SendMarvinSyncOfferAsync(string nodeId, MarvinSyncOfferCommand cmd, CancellationToken ct)
     => PublishMarvinCommandAsync(nodeId, "sync/offer", cmd, ct);
@@ -604,7 +607,7 @@ CREATE TABLE IF NOT EXISTS MarvinTable
 (
     Id            INTEGER PRIMARY KEY AUTOINCREMENT,
     NodeId        TEXT    NOT NULL UNIQUE,
-    Status        TEXT    NOT NULL DEFAULT 'off',
+    Status        TEXT    NOT NULL DEFAULT 'Active',
     ConfigVersion INTEGER NOT NULL DEFAULT 0,
     WellCapacity  INTEGER NOT NULL DEFAULT 0,
     WellUse       INTEGER NOT NULL DEFAULT 0,
@@ -775,7 +778,7 @@ This allows MARVIN game events to trigger empnode lighting effects — the core 
 
 **Scenario:** EDD sends `cmd/table/status` with `{"status": "exploding"}`
 **MARVIN behaviour:** Logs warning, ignores command. No state change.
-**EDD defence:** Validate status value before sending. Only `active`, `broken`, `off`, `disabled` are accepted. Reject (or don't send) `overload` — that status is set internally by MARVIN.
+**EDD defence:** Validate status value before sending. Only `active`, `broken`, `disabled` are accepted. Reject (or don't send) `overload` — that status is set internally by MARVIN.
 
 ### M-4: Invalid Well Size
 
@@ -785,9 +788,9 @@ This allows MARVIN game events to trigger empnode lighting effects — the core 
 
 ### M-5: Invalid Colour Value
 
-**Scenario:** EDD sends `cmd/table/color/idle` with `{"color": [255]}` (wrong length) or `{"color": "red"}` (wrong type)
+**Scenario:** EDD sends `cmd/color/set` with `{"param": "lineColor", "color": [255]}` (wrong length) or both `color` and `preset` fields
 **MARVIN behaviour:** Logs warning, ignores command.
-**EDD defence:** Validate `color` is array of exactly 3 integers, each 0-255.
+**EDD defence:** Validate `color` is array of exactly 3 integers (each 0-255), or `preset` is a known palette name. Never send both fields. Valid params: `lineColor`, `falseLineColor`, `runeColorL1`, `runeColorL2`, `runeColorL3`, `energyFlowColor`.
 
 ### M-6: Malformed JSON
 
@@ -965,8 +968,8 @@ You'll see `empnode/...` and `marvin/...` traffic on separate topic trees. EDD i
 | `Edd.Shared/Models/Mqtt/MarvinRegisterCommand.cs` | New | Register character/item command |
 | `Edd.Shared/Models/Mqtt/MarvinTableStatusCommand.cs` | New | Set table status command |
 | `Edd.Shared/Models/Mqtt/MarvinWellSizeCommand.cs` | New | Set well size command |
-| `Edd.Shared/Models/Mqtt/MarvinColorCommand.cs` | New | Set idle colour command |
-| `Edd.Shared/Models/Mqtt/MarvinGameColorCommand.cs` | New | Set game colour command |
+| `Edd.Shared/Models/Mqtt/MarvinColorSetCommand.cs` | New | Set colour parameter (RGB or preset) |
+| `Edd.Shared/Models/Mqtt/MarvinColorDefineCommand.cs` | New | Update named palette colour |
 | `Edd.Shared/Models/Mqtt/MarvinSyncOfferCommand.cs` | New | Sync offer command |
 | `Edd.Shared/Models/QueueElement.cs` | Modify | Add MARVIN QueueType entries |
 | `Edd.Shared/Models/QueueMessageRouter.cs` | Modify | Add `marvin/` topic routing |

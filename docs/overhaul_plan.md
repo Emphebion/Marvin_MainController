@@ -63,9 +63,8 @@ The `[common] colors` key lists all available colour names. To add a new colour:
 |---|---|---|
 | `Active` | EnergyFlow gentle pulse | Allowed |
 | `Broken` | Spark flashes | Blocked |
-| `Off` | All LEDs black | Allowed |
+| `Disabled` | All LEDs black | Blocked |
 | `Overload` | None (placeholder) | Allowed |
-| `Disabled` | All LEDs black | Blocked (Phase 4 addition, EDD-commanded) |
 
 ### Skill Tokens
 

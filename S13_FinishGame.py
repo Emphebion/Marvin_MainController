@@ -23,6 +23,10 @@ class S13_FinishGame():
                 overloaded = glbs.items.connectItem()
                 if overloaded:
                     glbs.mqtt.publish_items_overload()
+                    duration = glbs.random.randint(
+                        glbs.parser.getint('common', 'overloadSparkMin'),
+                        glbs.parser.getint('common', 'overloadSparkMax'))
+                    glbs.table.run_spark_animation(duration)
                 elif item_before is not None:
                     glbs.mqtt.publish_item_connected(item_before)
             elif glbs.ctx.returnState.value is self.states.S4.value:

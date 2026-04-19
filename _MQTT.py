@@ -196,8 +196,8 @@ class _MQTT:
             "rfid/register":   self._cmd_rfid_register,
             "table/status":    self._cmd_table_status,
             "well/size":       self._cmd_well_size,
-            "table/color/idle": self._cmd_color_idle,
-            "game/color":      self._cmd_color_game,
+            "color/set":       self._cmd_color_set,
+            "color/define":    self._cmd_color_define,
             "sync/offer":      self._cmd_sync_offer,
         }
         handler = dispatch.get(subtopic)
@@ -280,7 +280,7 @@ class _MQTT:
     def _cmd_table_status(self, payload):
         import glbs
         status_raw = payload.get("status", "").strip().lower()
-        _STATUS_MAP = {"active": "Active", "broken": "Broken", "off": "Off",
+        _STATUS_MAP = {"active": "Active", "broken": "Broken",
                        "overload": "Overload", "disabled": "Disabled"}
         status = _STATUS_MAP.get(status_raw)
         if status is None:
@@ -320,31 +320,70 @@ class _MQTT:
         self._bump_config_version()
         print(f"_MQTT: well size set to {size}")
 
-    def _cmd_color_idle(self, payload):
-        import glbs
-        color = payload.get("color")
-        if not isinstance(color, list) or len(color) != 3:
-            print(f"_MQTT color/idle: invalid color {color}")
-            return
-        color_name = glbs.parser.get("State1", "energyFlowColor").strip()
-        self._update_color(color_name, color)
+    # Colour parameter → (config section, config key)
+    _COLOR_PARAMS = {
+        "lineColor":       ("LineGame",      "lineColor"),
+        "falseLineColor":  ("MultiLineGame", "falseLineColor"),
+        "runeColorL1":     ("RuneGame",      "runeColorL1"),
+        "runeColorL2":     ("RuneGame",      "runeColorL2"),
+        "runeColorL3":     ("RuneGame",      "runeColorL3"),
+        "energyFlowColor": ("State1",        "energyFlowColor"),
+    }
 
-    def _cmd_color_game(self, payload):
+    def _cmd_color_set(self, payload):
+        """Set a game colour parameter to direct RGB or a named preset.
+
+        Payload: {"param": "<name>", "color": [R,G,B]}
+             or: {"param": "<name>", "preset": "<palette_name>"}
+        """
         import glbs
-        color = payload.get("color")
-        game  = payload.get("game", "")
-        if not isinstance(color, list) or len(color) != 3:
-            print(f"_MQTT game/color: invalid color {color}")
+        param  = payload.get("param", "")
+        color  = payload.get("color")
+        preset = payload.get("preset")
+
+        if param not in self._COLOR_PARAMS:
+            print(f"_MQTT color/set: unknown param '{param}'")
             return
-        if game == "linegame":
-            color_name = glbs.parser.get("LineGame", "lineColor", fallback="turquoise")
-            self._update_color(color_name, color)
-        elif game == "runegame":
-            for lvl in ("L1", "L2", "L3"):
-                color_name = glbs.parser.get("RuneGame", f"runeColor{lvl}", fallback=f"rune{lvl}")
-                self._update_color(color_name, color)
+
+        has_color  = isinstance(color, list) and len(color) == 3
+        has_preset = isinstance(preset, str) and preset
+
+        if has_color and has_preset:
+            print(f"_MQTT color/set: both 'color' and 'preset' given — ambiguous")
+            return
+        if not has_color and not has_preset:
+            print(f"_MQTT color/set: need 'color' or 'preset'")
+            return
+
+        section, key = self._COLOR_PARAMS[param]
+
+        if has_color:
+            value = f"{color[0]},{color[1]},{color[2]}"
         else:
-            print(f"_MQTT game/color: unknown game '{game}'")
+            if preset not in glbs.table.colorsLED:
+                print(f"_MQTT color/set: unknown preset '{preset}'")
+                return
+            value = preset
+
+        glbs.parser.set(section, key, value)
+        with open(self._config_file, "w") as f:
+            glbs.parser.write(f)
+        print(f"_MQTT color/set: {param} = {value}")
+
+    def _cmd_color_define(self, payload):
+        """Update a named palette colour's RGB.
+
+        Payload: {"name": "<palette_name>", "color": [R,G,B]}
+        """
+        name  = payload.get("name", "")
+        color = payload.get("color")
+        if not name:
+            print("_MQTT color/define: missing 'name'")
+            return
+        if not isinstance(color, list) or len(color) != 3:
+            print(f"_MQTT color/define: invalid color {color}")
+            return
+        self._update_color(name, color)
 
     def _cmd_sync_offer(self, payload):
         edd_version = int(payload.get("version", 0))

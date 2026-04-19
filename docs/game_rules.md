@@ -122,8 +122,8 @@ The table's operating mode is set in `tableconfig.txt [common] status`.
 | Status | Effect |
 |--------|--------|
 | `Active` | Normal operation. |
-| `Off` | LEDs off. No game logic runs. |
 | `Broken` | Random flickering spark effects. No player input accepted. |
+| `Disabled` | LEDs off. Tag scans ignored. |
 | `Overload` | Visual feedback for power overload. All items disconnected. |
 
 ---

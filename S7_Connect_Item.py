@@ -52,6 +52,10 @@ class S7_Connect_Item():
                         overloaded = glbs.items.connectItem()
                         if overloaded:
                             glbs.mqtt.publish_items_overload()
+                            duration = glbs.random.randint(
+                                glbs.parser.getint('common', 'overloadSparkMin'),
+                                glbs.parser.getint('common', 'overloadSparkMax'))
+                            glbs.table.run_spark_animation(duration)
                         else:
                             glbs.mqtt.publish_item_connected(item_before)
                         glbs.items.currentItemName = ""

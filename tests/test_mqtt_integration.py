@@ -605,15 +605,30 @@ class TestCommandFlow:
             edd.disconnect()
             sys.modules.pop('glbs', None)
 
-    def test_color_idle_command(self, broker_port, tmp_path):
+    def test_color_set_rgb_command(self, broker_port, tmp_path):
         edd = EddSubscriber("127.0.0.1", broker_port, _NODE_ID)
         try:
             mqtt_inst, glbs_stub = _make_mqtt(tmp_path, broker_port)
             try:
-                edd.publish_cmd("table/color/idle", {"color": [255, 0, 128]})
+                edd.publish_cmd("color/set", {"param": "lineColor", "color": [0, 255, 128]})
                 time.sleep(0.5)
 
-                assert glbs_stub.table.colorsLED["turquoise"] == [255, 0, 128]
+                assert glbs_stub.parser.get("LineGame", "lineColor") == "0,255,128"
+            finally:
+                mqtt_inst.disconnect()
+        finally:
+            edd.disconnect()
+            sys.modules.pop('glbs', None)
+
+    def test_color_define_command(self, broker_port, tmp_path):
+        edd = EddSubscriber("127.0.0.1", broker_port, _NODE_ID)
+        try:
+            mqtt_inst, glbs_stub = _make_mqtt(tmp_path, broker_port)
+            try:
+                edd.publish_cmd("color/define", {"name": "turquoise", "color": [0, 200, 180]})
+                time.sleep(0.5)
+
+                assert glbs_stub.table.colorsLED["turquoise"] == [0, 200, 180]
             finally:
                 mqtt_inst.disconnect()
         finally:
