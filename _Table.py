@@ -122,12 +122,10 @@ class _Table(object):
         Accepts either a named colour key (e.g. 'turquoise') or a
         comma-separated RGB string (e.g. '0,255,128').
         """
-        try:
-            parts = [int(x.strip()) for x in value.split(',')]
-            if len(parts) == 3:
-                return parts
-        except ValueError:
-            pass
+        if ',' in value:
+            parts = value.split(',')
+            if len(parts) == 3 and all(p.strip().isdigit() for p in parts):
+                return [int(p.strip()) for p in parts]
         return self.colorsLED.get(value, self.colorsLED.get("black", [0, 0, 0]))
 
 # OTHER TABLE FUNCTIONS
