@@ -140,3 +140,13 @@ lineColor = turquoise
 multiLineCountL2 = 2
 multiLineCountL3 = 3
 falseLineColor = red
+
+[WellSize]
+mode                  = radial
+rOuter                = 30.0
+rMiddle               = 20.8
+rInner                = 14.0
+boundaryFadeWidth     = 1.0
+boundaryFadeWidthPath = 0.02
+boundaryMinBright     = 0.0
+color                 = amethist

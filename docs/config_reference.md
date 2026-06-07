@@ -6,7 +6,7 @@
 
 All configuration files use Python's `configparser` INI format. Keys are case-insensitive. Lists are comma-separated strings.
 
-**Last updated:** Phase 3 complete. Known pending: `[State6] source` in marvinconfig.txt is dead config (Phase 3b).
+**Last updated:** Phase 3 complete, plus the WellSize LED visualisation (see `[WellSize]` below and `docs/well_size_led_design.md`). Known pending: `[State6] source` in marvinconfig.txt is dead config (Phase 3b).
 
 ---
 
@@ -85,9 +85,26 @@ One section per device listed in `[common] devices`.
 
 ### [State6] — S6_Well_Size
 
+The S6 state shows the well's current load on both the **screen** (annular ring rendered by `_Display.draw_source`) and the **LED table** (see `[WellSize]` below). Pressing **left** in S6 cycles the LED visualisation mode at runtime (for sim review).
+
 | Key | Type | Example | Description |
 |-----|------|---------|-------------|
 | ~~`source`~~ | int | `100` | **Dead config — remove from `marvinconfig.txt`.** The read is commented out in `S6_Well_Size.py`; the capacity display uses `itemconfig.txt [items] source` directly. |
+
+### [WellSize] — LED visualisation of well capacity
+
+Drives `_Table.draw_well_size()` from `S6_Well_Size.run()`. Two visualisation modes; the **left** key in S6 cycles between them at runtime. Design rationale: `docs/well_size_led_design.md`.
+
+| Key | Type | Example | Description |
+|-----|------|---------|-------------|
+| `mode` | string | `radial` | Default visualisation. `radial` (Option A: lit annulus grows from outer ring inward) or `pathflow` (Option B: light flows from each of the 8 buttons toward the centre). |
+| `rOuter` | float (cm) | `30.0` | Physical radius of the outer ring from table centre. Used by `radial` mode for the area metaphor. |
+| `rMiddle` | float (cm) | `20.8` | Physical radius of the middle ring. |
+| `rInner` | float (cm) | `14.0` | Physical radius of the inner ring. |
+| `boundaryFadeWidth` | float (cm) | `1.0` | `radial` mode only. Half-width of the linear intensity ramp at the lit/dark boundary. ~1 cm leaves a single LED in the fade band at a time. |
+| `boundaryFadeWidthPath` | float (t-units) | `0.02` | `pathflow` mode only. Half-width of the ramp in normalised wave-time. ~0.02 fades over ~1 LED on a typical leg. |
+| `boundaryMinBright` | float [0,1] | `0.0` | Minimum intensity for LEDs strictly inside the fade band. `0.0` disables the floor; positive values keep the innermost active LED visible as a partial-fill cue. |
+| `color` | string | `amethist` | Lit-LED colour. Palette key (e.g. `amethist`, `turquoise`) or comma-separated RGB (`R,G,B`). |
 
 ### [State7] — S7_Connect_Item
 

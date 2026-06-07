@@ -152,6 +152,37 @@ The sum of all connected items' `load` values must not exceed this number. If it
 
 ---
 
+### Well Size LED Display (`[WellSize]` in `marvinconfig.txt`)
+
+When a character with the **wellsize** skill enters the well-size screen (S6), the LED table lights up to mirror the on-screen power-use indicator. Two visualisation styles are available; the GM can switch between them at runtime in simulation mode by pressing **left** while the well-size screen is open.
+
+```
+[WellSize]
+mode                  = radial
+rOuter                = 30.0
+rMiddle               = 20.8
+rInner                = 14.0
+boundaryFadeWidth     = 1.0
+boundaryFadeWidthPath = 0.02
+boundaryMinBright     = 0.0
+color                 = amethist
+```
+
+| Setting | What It Does |
+|---|---|
+| `mode` | Default LED visualisation. `radial` lights a ring of LEDs that grows inward from the outer edge as more power is used. `pathflow` lights LEDs that flow inward from each of the 8 game buttons, merging in the middle as use grows. |
+| `rOuter` / `rMiddle` / `rInner` | Physical distances (in centimetres) from the table centre to each of the three LED rings. Used by `radial` mode to keep the lit area visually proportional to the well's used capacity. |
+| `boundaryFadeWidth` | How wide the lit/dark transition is in `radial` mode, in centimetres. `1.0` cm means the innermost lit LED smoothly fades in/out over roughly one LED's worth of space. |
+| `boundaryFadeWidthPath` | Same idea as above but for `pathflow` mode, expressed in wave-time units instead of centimetres. `0.02` ≈ one LED on a typical path. |
+| `boundaryMinBright` | If set above zero, the fading "edge" LED is kept at least this bright instead of being allowed to go fully dark. Use this to keep the well's edge always visible as a glow. Default `0.0` (off). |
+| `color` | Colour of the lit LEDs. Either a palette name like `amethist`, `turquoise`, or `emerald`, or three numbers `R,G,B` (each 0–255). |
+
+**Changeable via EDD:** No (yet) — change these values in the file and restart MARVIN.
+
+**Design rationale:** see `docs/well_size_led_design.md` for the math behind both modes and the open questions on tuning.
+
+---
+
 ## Game Settings
 
 **File:** `marvinconfig.txt`

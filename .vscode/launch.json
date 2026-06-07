@@ -10,7 +10,8 @@
             "type": "debugpy",
             "request": "launch",
             "module": "MARVIN",
-            "justMyCode": true
+            "justMyCode": true,
+            "python": "C:\\Users\\Edwin\\AppData\\Local\\Programs\\Python\\Python313\\python.exe"
         }
     ]
 }

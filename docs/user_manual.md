@@ -47,6 +47,8 @@ Not every character can perform every action. Your character's skills determine 
 
 The table has a power well with a fixed capacity. Each item draws a certain amount of power when connected. You can see the current usage and remaining capacity through the "view well size" menu option (if your character has that skill).
 
+When you open the well-size screen, the table itself lights up to show how much of the well is in use. As more power is consumed, more LEDs light up. The visualisation can run in two styles — a glowing ring that grows inward from the edge, or streams of light flowing in from each of the 8 buttons. In simulation mode, press **left** while the well-size screen is open to switch between them.
+
 If connecting an item would exceed the well's capacity, an **overload** occurs:
 - All connected items are immediately disconnected
 - The table plays a dramatic spark animation (approximately 5 to 15 seconds)

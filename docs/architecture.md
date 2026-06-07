@@ -112,7 +112,7 @@ stateDiagram-v2
 | S3 | Disconnect All | Menu to disconnect all connected items. Requires `disconnectall` skill. |
 | S4 | Disconnect Item | Disconnect a single item via RFID scan. Requires `disconnect1item` skill. |
 | S5 | Well | Navigation hub: show well capacity (→S6) or connect/disconnect items. |
-| S6 | Well Size | Displays current power draw vs. capacity as a circle on screen. |
+| S6 | Well Size | Displays current power draw vs. capacity as a circle on screen **and** on the LED table via `_Table.draw_well_size()`. Two modes: `radial` (area-metaphor lit annulus growing inward) and `pathflow` (light flowing from buttons toward centre); **left** key toggles at runtime. See `docs/well_size_led_design.md`. |
 | S7 | Connect Item | Connect an item via RFID scan. Validates player skill against item level. |
 | S8 | Items | Scrollable item menu for manual selection (GM override path). |
 | S9 | StartGame | Sets `glbs.ctx.gameStartTime` and `glbs.ctx.gameTimeout`; transitions immediately to S10. |

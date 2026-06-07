@@ -36,6 +36,11 @@ class _Table(object):
         self.segmentList = []
         self.buttonList = []
         self.colorsLED = {}
+        # Well-size visualisation: physical ring radii in cm. Override after
+        # construction (S6 reads them from [WellSize] in marvinconfig.txt).
+        self.r_outer = 30.0
+        self.r_middle = 20.8
+        self.r_inner = 14.0
         self.parse_config(config_file)
         self.startSegment = ''
         self.currentRoute = []
@@ -127,6 +132,236 @@ class _Table(object):
             if len(parts) == 3 and all(p.strip().isdigit() for p in parts):
                 return [int(p.strip()) for p in parts]
         return self.colorsLED.get(value, self.colorsLED.get("black", [0, 0, 0]))
+
+    # ------------------------------------------------------------------ #
+    # Well-size visualisation (radial fill — Option A)                   #
+    # ------------------------------------------------------------------ #
+    def _segment_tier(self, seg_name):
+        """Return the well-size tier for a segment, or None for unknown.
+
+        Layout follows the tableconfig.txt convention:
+        segm0–15 inner ring, 16–23 inner→middle bridges, 24–39 middle ring,
+        40–47 middle→outer bridges, 48–63 outer ring.
+        """
+        if not seg_name.startswith('segm'):
+            return None
+        try:
+            n = int(seg_name[4:])
+        except ValueError:
+            return None
+        if   0 <= n < 16:  return 'inner_ring'
+        elif 16 <= n < 24: return 'inner_bridge'
+        elif 24 <= n < 40: return 'middle_ring'
+        elif 40 <= n < 48: return 'outer_bridge'
+        elif 48 <= n < 64: return 'outer_ring'
+        return None
+
+    def _ensure_radial_map(self):
+        """Lazily build {(seg_name, led_idx): distance_cm}.
+
+        Ring LEDs collapse to their tier radius. Bridge LEDs are interpolated
+        linearly along the bridge using each segment's own nrLEDs (no tier-wide
+        assumption). Bridge orientation is auto-detected from flow/counter
+        neighbours: counterSegments side = LED index 0, flowSegments side = N−1.
+        """
+        cached = getattr(self, '_radial_map', None)
+        cached_radii = getattr(self, '_radial_map_radii', None)
+        current_radii = (self.r_outer, self.r_middle, self.r_inner)
+        if cached and cached_radii == current_radii:
+            return
+        ring_r = {
+            'inner_ring':  self.r_inner,
+            'middle_ring': self.r_middle,
+            'outer_ring':  self.r_outer,
+        }
+        radial = {}
+        for seg in self.segmentList:
+            tier = self._segment_tier(seg.name)
+            if tier in ring_r:
+                r = ring_r[tier]
+                for i in range(seg.nrLEDs):
+                    radial[(seg.name, i)] = r
+            elif tier in ('inner_bridge', 'outer_bridge'):
+                start_tier = self._segment_tier(seg.counterSegments[0])
+                end_tier   = self._segment_tier(seg.flowSegments[0])
+                if start_tier not in ring_r or end_tier not in ring_r:
+                    continue
+                r_start = ring_r[start_tier]
+                r_end   = ring_r[end_tier]
+                N = seg.nrLEDs
+                for i in range(N):
+                    frac = (i + 0.5) / N
+                    radial[(seg.name, i)] = r_start + frac * (r_end - r_start)
+        self._radial_map = radial
+        self._radial_map_radii = current_radii
+
+    def draw_well_size(self, source, use, mode='radial', color=None,
+                       fade_width=1.0, min_bright=0.0):
+        """Render a well-size visualisation onto the LED buffer.
+
+        Lit LEDs grow from the outer ring/buttons inward as use grows. At use=0
+        the table is dark; at use=source the table is fully lit. The innermost
+        active LED ramps up smoothly across a 2·fade_width band so it can
+        encode sub-LED fill state.
+
+        Args:
+            source     -- total well capacity (positive); use ≤ 0 → dark table.
+            use        -- current load; clamped to [0, source].
+            mode       -- 'radial' (Option A) or 'pathflow' (Option B).
+            color      -- [R,G,B] or palette name; defaults to 'amethist'.
+            fade_width -- Δ. cm for radial mode, t-units for pathflow.
+            min_bright -- minimum intensity for LEDs strictly inside the fade
+                          band; 0.0 disables the floor.
+        """
+        if mode == 'radial':
+            self._draw_well_size_radial(source, use, color, fade_width, min_bright)
+        elif mode == 'pathflow':
+            self._draw_well_size_pathflow(source, use, color, fade_width, min_bright)
+        else:
+            raise ValueError(f"_Table.draw_well_size: unknown mode '{mode}'")
+
+    def _draw_well_size_radial(self, source, use, color, fade_width, min_bright):
+        self._ensure_radial_map()
+
+        if color is None:
+            color = 'amethist'
+        rgb = self.resolve_color(color) if isinstance(color, str) else list(color)
+
+        if source <= 0:
+            fill_fraction = 0.0
+        else:
+            fill_fraction = max(0.0, min(1.0, use / source))
+
+        fw = max(fade_width, 1e-9)
+        # Area metaphor uses √(1-fill). The Δ·(1 − 2·fill) offset shifts the
+        # ramp centre by +Δ at fill=0 (so outer ring is dark) and −Δ at fill=1
+        # (so even d=0 is fully lit), keeping the endpoints clean without
+        # distorting the curve in the middle.
+        r_dark = self.r_outer * math.sqrt(1.0 - fill_fraction) + fw * (1.0 - 2.0 * fill_fraction)
+        two_fw = 2.0 * fw
+
+        for seg in self.segmentList:
+            for i in range(seg.nrLEDs):
+                d = self._radial_map.get((seg.name, i))
+                if d is None:
+                    continue
+                # 0 at d ≤ r_dark − Δ, 1 at d ≥ r_dark + Δ, linear between.
+                t = (d - r_dark + fw) / two_fw
+                if   t <= 0.0: t = 0.0
+                elif t >= 1.0: t = 1.0
+                elif min_bright > 0.0 and t < min_bright:
+                    t = min_bright
+                seg.setLEDValue(i, [int(rgb[0] * t), int(rgb[1] * t), int(rgb[2] * t)])
+
+    # ------------------------------------------------------------------ #
+    # Well-size visualisation (path-flow from buttons — Option B)         #
+    # ------------------------------------------------------------------ #
+
+    # Junction times: where each layer ends in the normalised wave-time t∈[0,1].
+    # Tuned so each layer's share of t roughly tracks how much of a path's life
+    # it consumes; exact values are open-question §5 in the design doc.
+    _PATHFLOW_JUNCTIONS = {
+        'outer_ring':   (0.00, 0.25),
+        'outer_bridge': (0.25, 0.50),
+        'middle_ring':  (0.50, 0.70),
+        'inner_bridge': (0.70, 0.90),
+        'inner_ring':   (0.90, 1.00),
+    }
+
+    def _segment_wave_direction(self, seg):
+        """Return +1 (LED 0 → N−1) or −1 (N−1 → 0) for the wave through seg.
+
+        Determined topologically: the side adjacent to the *upstream* tier
+        (where the wave enters) gets the smaller t; the side adjacent to the
+        *downstream* tier (where the wave exits, or away from any bridge for
+        ring midpoints) gets the larger t. flowSegments are at LED N−1 side,
+        counterSegments at LED 0 side (existing convention).
+        """
+        tier = self._segment_tier(seg.name)
+        if tier == 'outer_bridge':
+            # Outer ring → middle ring. Flow side touches outer ring (entry),
+            # counter touches middle ring (exit). Wave: N−1 → 0.
+            return -1
+        if tier == 'inner_bridge':
+            # Middle ring → inner ring. Counter side touches middle (entry),
+            # flow touches inner (exit). Wave: 0 → N−1.
+            return +1
+        if tier == 'outer_ring':
+            # Entry from button (no bridge adjacent), exit at outer-bridge side.
+            if any(self._segment_tier(n) == 'outer_bridge' for n in seg.flowSegments):
+                return +1   # bridge at flow (LED N−1) → exit there
+            return -1
+        if tier == 'middle_ring':
+            # Entry from outer-bridge, exit at inner-bridge.
+            if any(self._segment_tier(n) == 'inner_bridge' for n in seg.flowSegments):
+                return +1
+            return -1
+        if tier == 'inner_ring':
+            # Entry from inner-bridge, exit at midpoint (no bridge adjacent).
+            if any(self._segment_tier(n) == 'inner_bridge' for n in seg.counterSegments):
+                return +1   # bridge at counter (LED 0) → entry there, exit at flow
+            return -1
+        return +1   # unknown tier: harmless default
+
+    def _ensure_path_map(self):
+        """Lazily build {(seg_name, led_idx): t}.
+
+        Each segment is one leg. The leg's t range comes from its tier
+        (_PATHFLOW_JUNCTIONS). Within the leg, the position along the wave
+        is normalised by *this segment's own* nrLEDs, so bridges with
+        differing LED counts merge and split at the same t.
+        """
+        cached = getattr(self, '_path_map', None)
+        if cached:
+            return
+        path = {}
+        for seg in self.segmentList:
+            tier = self._segment_tier(seg.name)
+            if tier not in self._PATHFLOW_JUNCTIONS:
+                continue
+            t_in, t_out = self._PATHFLOW_JUNCTIONS[tier]
+            direction = self._segment_wave_direction(seg)
+            N = seg.nrLEDs
+            for i in range(N):
+                # Position along the wave (0 = entry, N−1 = exit) depends on
+                # direction. direction=+1 means LED i is wave position i;
+                # direction=−1 means LED i is wave position N−1−i.
+                j = i if direction > 0 else (N - 1 - i)
+                frac = (j + 0.5) / N
+                path[(seg.name, i)] = t_in + frac * (t_out - t_in)
+        self._path_map = path
+
+    def _draw_well_size_pathflow(self, source, use, color, fade_width, min_bright):
+        self._ensure_path_map()
+
+        if color is None:
+            color = 'amethist'
+        rgb = self.resolve_color(color) if isinstance(color, str) else list(color)
+
+        if source <= 0:
+            fill_fraction = 0.0
+        else:
+            fill_fraction = max(0.0, min(1.0, use / source))
+
+        fw = max(fade_width, 1e-9)
+        # Front = fill, biased by ±Δ_t so endpoints are clean:
+        #   fill=0 → front = −Δ_t (all LEDs above the band → dark)
+        #   fill=1 → front = 1 + Δ_t (all LEDs below the band → fully lit)
+        front = fill_fraction * (1.0 + 2.0 * fw) - fw
+        two_fw = 2.0 * fw
+
+        for seg in self.segmentList:
+            for i in range(seg.nrLEDs):
+                t_led = self._path_map.get((seg.name, i))
+                if t_led is None:
+                    continue
+                # LED lit if wave has reached it: intensity = clamp((front − t + Δ_t)/(2·Δ_t)).
+                t = (front - t_led + fw) / two_fw
+                if   t <= 0.0: t = 0.0
+                elif t >= 1.0: t = 1.0
+                elif min_bright > 0.0 and t < min_bright:
+                    t = min_bright
+                seg.setLEDValue(i, [int(rgb[0] * t), int(rgb[1] * t), int(rgb[2] * t)])
 
 # OTHER TABLE FUNCTIONS
 

@@ -86,6 +86,7 @@ Player skill tokens are stored comma-separated in `playerconfig.txt` and checked
 6. **[Phase 4](phase4_mqtt.md)** — MQTT connection | **[EDD integration guide](edd_marvin_integration.md)** | **[Phase 4b — EDD alignment](phase4b_edd_alignment.md)**
 7. **[Phase 5](phase5_multiline.md)** — MultiLineGame mode
 8. **[Phase 6](phase6_hardware_fixes.md)** — Post-hardware-test fixes
+9. **[Well Size LED display](well_size_led_design.md)** — S6 lights the table with two selectable modes (radial / pathflow); LEFT key cycles modes at runtime for sim review
 
 ---
 
