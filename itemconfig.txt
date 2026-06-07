@@ -11,7 +11,7 @@ function = Onbekend in de pilaar
 id = 00DDBC16
 level = 1
 load = 7
-connected = 1
+connected = 0
 
 [item2]
 name = Mini Verzamel Golem
@@ -43,7 +43,7 @@ function = Tijdens het verzegelen van een brief kan met dit zegel 1 aspect van d
 id = 00DD2E9F
 level = 1
 load = 7
-connected = 1
+connected = 0
 
 [item6]
 name = Vitalizer
@@ -51,7 +51,7 @@ function = Na 2 keer draaien van de sleutel gaat het kistje open. Is het kistje 
 id = 00DE2B5F
 level = 1
 load = 10
-connected = 1
+connected = 0
 
 [item7]
 name = Kristallen Feestglas
@@ -59,7 +59,7 @@ function = Onbekend in pilaar
 id = 00DD48CC
 level = 1
 load = 5
-connected = 1
+connected = 0
 
 [item8]
 name = Dryade diadeem
@@ -67,7 +67,7 @@ function = Onbekend in pilaar
 id = 00DDD428
 level = 2
 load = 30
-connected = 1
+connected = 0
 
 [item9]
 name = Vloeislag de 1ste
@@ -75,7 +75,7 @@ function = Onbekend in pilaar
 id = 00DA4274
 level = 1
 load = 10
-connected = 1
+connected = 0
 
 [item10]
 name = Berichten Stenen
@@ -83,7 +83,7 @@ function = Kan met de schaduwen van de drakenklauw communiceren
 id = 00DA1BF7
 level = 1
 load = 8
-connected = 1
+connected = 0
 
 [item11]
 name = Boek der Rituelen
@@ -91,7 +91,7 @@ function = Laat op een landkaart zien waar iets van belang gebeurd voor de kijke
 id = 00DDDD07
 level = 1
 load = 10
-connected = 1
+connected = 0
 
 [item12]
 name = Omgevingskaart
@@ -99,7 +99,7 @@ function = Communiceerd tot 2x met zijn tegenpool
 id = 00DE1384
 level = 1
 load = 12
-connected = 1
+connected = 0
 
 [item13]
 name = Drakenklauw Amulet

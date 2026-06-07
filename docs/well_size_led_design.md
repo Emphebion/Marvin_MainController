@@ -245,14 +245,14 @@ This lets us A/B the two designs visually on the simulator before committing to 
 
 ## 8. Frame Strategy
 
-Well-size display in S6 is **static while displayed** — `use` does not change while the page is up. So both options:
+S6 runs a continuous animation loop (~30 FPS, `frameRate` knob) while the well-size screen is displayed:
 
-1. On entering S6, compute the current front for the active mode.
-2. Compute every LED's intensity and write to the LED buffer once.
-3. Call `glbs.devices.transmitLED(...)` once.
-4. Re-render only on mode toggle (sim) or on re-entry to S6.
+1. **Intro ramp (pathflow only)**: the wave grows from the buttons at a **constant speed** — `introSeconds` is the time it would take to travel from buttons all the way to the centre. The wave **stops** as soon as it reaches the usage-relative position, so light loads complete proportionally faster; only a fully-loaded well takes the full `introSeconds`.
+2. **Palette pulse**: every frame advances a global `cycle_phase ∈ [0, 1)` driven by `(elapsed / cyclePeriod) mod 1`. Each LED gets its own phase as `(cycle_phase + position_offset · pulsePhaseScale) mod 1`, then linearly interpolates the configured palette. `position_offset` is the LED's `t` (pathflow) or `d / r_outer` (radial), giving smooth colour ripples along the wave.
+3. **Mode toggle (LEFT)**: cycles `radial` ↔ `pathflow` and resets the intro timer so the new mode replays its entry animation.
+4. **Exit cleanup**: when S6's `run()` exits (back to S5, S1 timeout, …), the LED buffer is blanked to black and transmitted once. This stops the well visualisation from bleeding into menus that don't touch the LEDs.
 
-No animation loop is required.
+LEDs at intensity 0 are written as `[0, 0, 0]` directly (palette lookup is skipped for the dark zone — see `_draw_well_size_*` in `_Table.py`).
 
 ## 9. Data Flow
 
@@ -280,7 +280,8 @@ Both maps are built lazily on first call and cached for the life of the program 
    - **Proportional to radial distance crossed by each leg** (paths feel constant radial-velocity, like Option A's ramp through a leg).
    - **Equal 6-way split**: `(0, 0.2, 0.4, 0.6, 0.8, 1.0)`.
    Decide after seeing the sim A/B.
-6. **Default mode for hardware** — to be decided after sim A/B review.
+6. ~~**Default mode for hardware**~~ — **Decided**: `pathflow`. LEFT in S6 still toggles to radial for comparison.
+7. **Palette / pulse tuning** — current defaults `palette = amethist,purple,runeL2`, `cyclePeriod = 3 s`, `pulsePhaseScale = 1.5`. Subjective; tune after sustained viewing.
 
 ## 11. Not in Scope (yet)
 

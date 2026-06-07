@@ -142,7 +142,7 @@ multiLineCountL3 = 3
 falseLineColor = red
 
 [WellSize]
-mode                  = radial
+mode                  = pathflow
 rOuter                = 30.0
 rMiddle               = 20.8
 rInner                = 14.0
@@ -150,3 +150,8 @@ boundaryFadeWidth     = 1.0
 boundaryFadeWidthPath = 0.02
 boundaryMinBright     = 0.0
 color                 = amethist
+palette               = amethist,purple,runeL2
+cyclePeriod           = 3.0
+pulsePhaseScale       = 1.5
+introSeconds          = 15.0
+frameRate             = 30

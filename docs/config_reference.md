@@ -93,18 +93,23 @@ The S6 state shows the well's current load on both the **screen** (annular ring 
 
 ### [WellSize] — LED visualisation of well capacity
 
-Drives `_Table.draw_well_size()` from `S6_Well_Size.run()`. Two visualisation modes; the **left** key in S6 cycles between them at runtime. Design rationale: `docs/well_size_led_design.md`.
+Drives `_Table.draw_well_size()` from `S6_Well_Size.run()`. Two visualisation modes; the **left** key in S6 cycles between them at runtime. S6 runs an animation loop (~`frameRate` FPS) so the LEDs pulsate through the palette while displayed, and clears the LED buffer on exit so the visualisation doesn't bleed into the next state. Design rationale: `docs/well_size_led_design.md`.
 
 | Key | Type | Example | Description |
 |-----|------|---------|-------------|
-| `mode` | string | `radial` | Default visualisation. `radial` (Option A: lit annulus grows from outer ring inward) or `pathflow` (Option B: light flows from each of the 8 buttons toward the centre). |
+| `mode` | string | `pathflow` | Default visualisation. `radial` (Option A: lit annulus grows from outer ring inward) or `pathflow` (Option B: light flows from each of the 8 buttons toward the centre). |
 | `rOuter` | float (cm) | `30.0` | Physical radius of the outer ring from table centre. Used by `radial` mode for the area metaphor. |
 | `rMiddle` | float (cm) | `20.8` | Physical radius of the middle ring. |
 | `rInner` | float (cm) | `14.0` | Physical radius of the inner ring. |
 | `boundaryFadeWidth` | float (cm) | `1.0` | `radial` mode only. Half-width of the linear intensity ramp at the lit/dark boundary. ~1 cm leaves a single LED in the fade band at a time. |
 | `boundaryFadeWidthPath` | float (t-units) | `0.02` | `pathflow` mode only. Half-width of the ramp in normalised wave-time. ~0.02 fades over ~1 LED on a typical leg. |
 | `boundaryMinBright` | float [0,1] | `0.0` | Minimum intensity for LEDs strictly inside the fade band. `0.0` disables the floor; positive values keep the innermost active LED visible as a partial-fill cue. |
-| `color` | string | `amethist` | Lit-LED colour. Palette key (e.g. `amethist`, `turquoise`) or comma-separated RGB (`R,G,B`). |
+| `color` | string | `amethist` | Fallback lit-LED colour when `palette` is empty. Palette key (e.g. `amethist`, `turquoise`) or comma-separated RGB (`R,G,B`). |
+| `palette` | list | `amethist,purple,runeL2` | Comma-separated palette the LEDs cycle through over time. Each entry is a palette key or RGB. Leave empty for a static `color`. |
+| `cyclePeriod` | float (s) | `3.0` | Seconds for one full pass through `palette`. `0` disables time cycling. |
+| `pulsePhaseScale` | float | `1.5` | How strongly each LED's path/radial position offsets its phase. `0` → whole table pulses in sync; larger values produce visible colour waves rippling across the lit zone. |
+| `introSeconds` | float (s) | `15.0` | `pathflow` only: time the wave would take to travel from buttons to the centre at constant speed. The wave **stops** at the usage-relative position, so partial loads finish before `introSeconds`. `0` disables the intro ramp. |
+| `frameRate` | float (Hz) | `30` | Animation refresh rate while on screen. Higher = smoother pulse, more LED transmissions per second. |
 
 ### [State7] — S7_Connect_Item
 

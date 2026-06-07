@@ -196,7 +196,8 @@ class _Table(object):
         self._radial_map_radii = current_radii
 
     def draw_well_size(self, source, use, mode='radial', color=None,
-                       fade_width=1.0, min_bright=0.0):
+                       fade_width=1.0, min_bright=0.0,
+                       palette=None, cycle_phase=0.0, pulse_phase_scale=1.0):
         """Render a well-size visualisation onto the LED buffer.
 
         Lit LEDs grow from the outer ring/buttons inward as use grows. At use=0
@@ -205,27 +206,81 @@ class _Table(object):
         encode sub-LED fill state.
 
         Args:
-            source     -- total well capacity (positive); use ≤ 0 → dark table.
-            use        -- current load; clamped to [0, source].
-            mode       -- 'radial' (Option A) or 'pathflow' (Option B).
-            color      -- [R,G,B] or palette name; defaults to 'amethist'.
-            fade_width -- Δ. cm for radial mode, t-units for pathflow.
-            min_bright -- minimum intensity for LEDs strictly inside the fade
-                          band; 0.0 disables the floor.
+            source            -- total well capacity (positive); use ≤ 0 → dark.
+            use               -- current load; clamped to [0, source].
+            mode              -- 'radial' (Option A) or 'pathflow' (Option B).
+            color             -- [R,G,B] or palette name; used when ``palette``
+                                 is None. Defaults to 'amethist'.
+            fade_width        -- Δ. cm for radial, t-units for pathflow.
+            min_bright        -- minimum intensity for LEDs in the fade band.
+            palette           -- optional list of colours (names or [R,G,B]) to
+                                 cycle through. When provided, each LED
+                                 interpolates the palette by phase, giving a
+                                 "pulsating energy" feel. None → solid colour.
+            cycle_phase       -- global palette phase in [0, 1); typically
+                                 driven from elapsed time by the caller.
+            pulse_phase_scale -- how strongly per-LED position offsets the
+                                 phase. 0 = whole table pulses in sync;
+                                 1 = waves of colour run across the lit zone.
         """
         if mode == 'radial':
-            self._draw_well_size_radial(source, use, color, fade_width, min_bright)
+            self._draw_well_size_radial(source, use, color, fade_width, min_bright,
+                                         palette, cycle_phase, pulse_phase_scale)
         elif mode == 'pathflow':
-            self._draw_well_size_pathflow(source, use, color, fade_width, min_bright)
+            self._draw_well_size_pathflow(source, use, color, fade_width, min_bright,
+                                           palette, cycle_phase, pulse_phase_scale)
         else:
             raise ValueError(f"_Table.draw_well_size: unknown mode '{mode}'")
 
-    def _draw_well_size_radial(self, source, use, color, fade_width, min_bright):
-        self._ensure_radial_map()
+    # ------------------------------------------------------------------ #
+    # Palette helpers (shared by both well-size modes)                   #
+    # ------------------------------------------------------------------ #
+    def _resolve_palette(self, palette, fallback_color):
+        """Return a list of [R,G,B] tuples from a palette spec.
 
-        if color is None:
-            color = 'amethist'
-        rgb = self.resolve_color(color) if isinstance(color, str) else list(color)
+        ``palette`` may be None (use fallback_color as a 1-element palette),
+        a single colour name or [R,G,B], or a list of names / [R,G,B] entries.
+        """
+        if palette is None:
+            seed = fallback_color if fallback_color is not None else 'amethist'
+            return [self.resolve_color(seed) if isinstance(seed, str) else list(seed)]
+        if isinstance(palette, str) or (isinstance(palette, (list, tuple))
+                                         and len(palette) == 3
+                                         and all(isinstance(x, (int, float)) for x in palette)):
+            # Treat as a single colour given directly.
+            return [self.resolve_color(palette) if isinstance(palette, str) else list(palette)]
+        out = []
+        for entry in palette:
+            if isinstance(entry, str):
+                out.append(self.resolve_color(entry))
+            else:
+                out.append(list(entry))
+        return out if out else [[0, 0, 0]]
+
+    def _palette_color(self, palette_rgb, phase):
+        """Return the [R,G,B] at the given phase ∈ [0,1) through a cyclic palette."""
+        n = len(palette_rgb)
+        if n == 1:
+            return palette_rgb[0]
+        # Wrap phase into [0,1).
+        phase = phase - math.floor(phase)
+        # Position along a cyclic palette of length n (wraps back to entry 0).
+        pos = phase * n
+        i0 = int(pos) % n
+        i1 = (i0 + 1) % n
+        frac = pos - int(pos)
+        a = palette_rgb[i0]
+        b = palette_rgb[i1]
+        return [a[0] + (b[0] - a[0]) * frac,
+                a[1] + (b[1] - a[1]) * frac,
+                a[2] + (b[2] - a[2]) * frac]
+
+    def _draw_well_size_radial(self, source, use, color, fade_width, min_bright,
+                                palette=None, cycle_phase=0.0, pulse_phase_scale=1.0):
+        self._ensure_radial_map()
+        palette_rgb = self._resolve_palette(palette, color)
+        solid = (len(palette_rgb) == 1)
+        solid_rgb = palette_rgb[0] if solid else None
 
         if source <= 0:
             fill_fraction = 0.0
@@ -239,6 +294,7 @@ class _Table(object):
         # distorting the curve in the middle.
         r_dark = self.r_outer * math.sqrt(1.0 - fill_fraction) + fw * (1.0 - 2.0 * fill_fraction)
         two_fw = 2.0 * fw
+        inv_r_outer = 1.0 / self.r_outer if self.r_outer > 0 else 0.0
 
         for seg in self.segmentList:
             for i in range(seg.nrLEDs):
@@ -251,6 +307,17 @@ class _Table(object):
                 elif t >= 1.0: t = 1.0
                 elif min_bright > 0.0 and t < min_bright:
                     t = min_bright
+                if t == 0.0:
+                    seg.setLEDValue(i, [0, 0, 0])
+                    continue
+                if solid:
+                    rgb = solid_rgb
+                else:
+                    # Use the LED's radial position (0 at centre, 1 at outer
+                    # ring) as a phase offset, so colour ripples outward.
+                    pos = d * inv_r_outer
+                    rgb = self._palette_color(palette_rgb,
+                                               cycle_phase + pos * pulse_phase_scale)
                 seg.setLEDValue(i, [int(rgb[0] * t), int(rgb[1] * t), int(rgb[2] * t)])
 
     # ------------------------------------------------------------------ #
@@ -331,12 +398,12 @@ class _Table(object):
                 path[(seg.name, i)] = t_in + frac * (t_out - t_in)
         self._path_map = path
 
-    def _draw_well_size_pathflow(self, source, use, color, fade_width, min_bright):
+    def _draw_well_size_pathflow(self, source, use, color, fade_width, min_bright,
+                                  palette=None, cycle_phase=0.0, pulse_phase_scale=1.0):
         self._ensure_path_map()
-
-        if color is None:
-            color = 'amethist'
-        rgb = self.resolve_color(color) if isinstance(color, str) else list(color)
+        palette_rgb = self._resolve_palette(palette, color)
+        solid = (len(palette_rgb) == 1)
+        solid_rgb = palette_rgb[0] if solid else None
 
         if source <= 0:
             fill_fraction = 0.0
@@ -361,6 +428,16 @@ class _Table(object):
                 elif t >= 1.0: t = 1.0
                 elif min_bright > 0.0 and t < min_bright:
                     t = min_bright
+                if t == 0.0:
+                    seg.setLEDValue(i, [0, 0, 0])
+                    continue
+                if solid:
+                    rgb = solid_rgb
+                else:
+                    # Use t_led (0 at button, 1 at centre) as the LED phase
+                    # offset → colour ripples inward along the flow.
+                    rgb = self._palette_color(palette_rgb,
+                                               cycle_phase + t_led * pulse_phase_scale)
                 seg.setLEDValue(i, [int(rgb[0] * t), int(rgb[1] * t), int(rgb[2] * t)])
 
 # OTHER TABLE FUNCTIONS

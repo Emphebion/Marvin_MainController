@@ -512,3 +512,142 @@ class TestWellSizePathflowDraw:
         first = real_table._path_map
         real_table._ensure_path_map()
         assert real_table._path_map is first
+
+
+# ---------------------------------------------------------------------------
+# Palette / colour-shift helpers (shared by both modes)
+# ---------------------------------------------------------------------------
+
+class TestPaletteHelpers:
+    def test_resolve_palette_none_uses_fallback(self, real_table):
+        out = real_table._resolve_palette(None, 'turquoise')
+        assert out == [[64, 224, 208]]
+
+    def test_resolve_palette_none_with_no_fallback_uses_amethist(self, real_table):
+        out = real_table._resolve_palette(None, None)
+        assert out == [[153, 67, 140]]   # amethist
+
+    def test_resolve_palette_single_name(self, real_table):
+        out = real_table._resolve_palette('turquoise', None)
+        assert out == [[64, 224, 208]]
+
+    def test_resolve_palette_list_of_names(self, real_table):
+        out = real_table._resolve_palette(['turquoise', 'amethist'], None)
+        assert out == [[64, 224, 208], [153, 67, 140]]
+
+    def test_resolve_palette_mixed(self, real_table):
+        out = real_table._resolve_palette(['turquoise', [10, 20, 30]], None)
+        assert out == [[64, 224, 208], [10, 20, 30]]
+
+    def test_palette_color_single_returns_same(self, real_table):
+        assert real_table._palette_color([[10, 20, 30]], 0.0) == [10, 20, 30]
+        assert real_table._palette_color([[10, 20, 30]], 0.7) == [10, 20, 30]
+
+    def test_palette_color_two_colors_endpoints(self, real_table):
+        pal = [[0, 0, 0], [100, 200, 50]]
+        # phase 0 → palette[0]
+        c0 = real_table._palette_color(pal, 0.0)
+        assert c0 == [0.0, 0.0, 0.0]
+        # phase 0.5 → palette[1] (because index = 0.5*2 = 1)
+        c5 = real_table._palette_color(pal, 0.5)
+        assert c5 == [100.0, 200.0, 50.0]
+
+    def test_palette_color_two_colors_midpoint(self, real_table):
+        pal = [[0, 0, 0], [100, 200, 50]]
+        # phase 0.25 → index = 0.5 → halfway between palette[0] and palette[1]
+        c = real_table._palette_color(pal, 0.25)
+        assert c[0] == pytest.approx(50.0)
+        assert c[1] == pytest.approx(100.0)
+        assert c[2] == pytest.approx(25.0)
+
+    def test_palette_color_wraps_phase(self, real_table):
+        pal = [[0, 0, 0], [100, 200, 50]]
+        # phase 1.0 should wrap to 0.0
+        c = real_table._palette_color(pal, 1.0)
+        assert c == [0.0, 0.0, 0.0]
+        # phase 1.5 should wrap to 0.5
+        c = real_table._palette_color(pal, 1.5)
+        assert c == [100.0, 200.0, 50.0]
+
+    def test_palette_color_three_colors_cycle(self, real_table):
+        pal = [[255, 0, 0], [0, 255, 0], [0, 0, 255]]
+        # phase 0 → red
+        assert real_table._palette_color(pal, 0.0) == [255, 0, 0]
+        # phase 1/3 → green (pos = 1.0, i0=1, i1=2, frac=0)
+        c = real_table._palette_color(pal, 1.0 / 3.0)
+        assert c[0] == pytest.approx(0.0)
+        assert c[1] == pytest.approx(255.0)
+        assert c[2] == pytest.approx(0.0)
+        # phase 2/3 → blue
+        c = real_table._palette_color(pal, 2.0 / 3.0)
+        assert c[0] == pytest.approx(0.0, abs=0.01)
+        assert c[1] == pytest.approx(0.0, abs=0.01)
+        assert c[2] == pytest.approx(255.0)
+
+
+class TestDrawWithPalette:
+    def test_palette_at_full_intensity_uses_palette_zero(self, real_table):
+        """At cycle_phase=0, fully-lit LEDs draw palette[0] (modulated by per-LED phase if scale>0)."""
+        # Disable per-LED phase by setting pulse_phase_scale = 0
+        real_table.draw_well_size(source=100, use=100, mode='pathflow',
+                                   palette=['turquoise', 'red'],
+                                   cycle_phase=0.0,
+                                   pulse_phase_scale=0.0,
+                                   fade_width=0.02)
+        turquoise = [64, 224, 208]
+        for row in real_table.getLEDData():
+            assert row == turquoise
+
+    def test_palette_at_half_phase_uses_palette_one(self, real_table):
+        """At cycle_phase=0.5 with pulse_phase_scale=0, all LEDs draw palette[1] (full)."""
+        real_table.draw_well_size(source=100, use=100, mode='pathflow',
+                                   palette=['turquoise', 'red'],
+                                   cycle_phase=0.5,
+                                   pulse_phase_scale=0.0,
+                                   fade_width=0.02)
+        red = [200, 0, 0]
+        for row in real_table.getLEDData():
+            assert row == red
+
+    def test_palette_per_led_phase_produces_variation(self, real_table):
+        """With pulse_phase_scale > 0, LEDs at different positions get different colours."""
+        real_table.draw_well_size(source=100, use=100, mode='pathflow',
+                                   palette=['turquoise', 'red'],
+                                   cycle_phase=0.0,
+                                   pulse_phase_scale=1.0,
+                                   fade_width=0.02)
+        # An outer-ring LED (t ≈ 0.01) and an inner-ring LED (t ≈ 0.95) should differ.
+        outer_v = real_table.getSegment('segm48').getLEDvalues()[0]
+        inner_v = real_table.getSegment('segm0').getLEDvalues()[0]
+        assert outer_v != inner_v
+
+    def test_dark_leds_stay_black_with_palette(self, real_table):
+        """A dark LED stays [0,0,0] regardless of palette/phase."""
+        real_table.draw_well_size(source=100, use=0, mode='pathflow',
+                                   palette=['turquoise', 'red'],
+                                   cycle_phase=0.3,
+                                   pulse_phase_scale=1.5,
+                                   fade_width=0.02)
+        for row in real_table.getLEDData():
+            assert row == [0, 0, 0]
+
+    def test_palette_works_with_radial_mode(self, real_table):
+        """Radial mode also picks up palette + per-LED phase."""
+        real_table.draw_well_size(source=100, use=100, mode='radial',
+                                   palette=['turquoise', 'red'],
+                                   cycle_phase=0.0,
+                                   pulse_phase_scale=1.0,
+                                   fade_width=1.0)
+        outer_v = real_table.getSegment('segm48').getLEDvalues()[0]
+        inner_v = real_table.getSegment('segm0').getLEDvalues()[0]
+        # Outer (d=30, pos=1.0, phase ≈ 1.0 → wraps to 0 → palette[0] = turquoise)
+        # Inner (d=14, pos=0.467, phase ≈ 0.467 → close to palette[1] crossover)
+        assert outer_v != inner_v
+
+    def test_backward_compat_color_only(self, real_table):
+        """Calling without a palette still uses the solid colour (existing behaviour)."""
+        real_table.draw_well_size(source=100, use=100, mode='pathflow',
+                                   color='turquoise', fade_width=0.02)
+        turquoise = [64, 224, 208]
+        for row in real_table.getLEDData():
+            assert row == turquoise

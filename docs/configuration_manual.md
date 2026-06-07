@@ -154,11 +154,13 @@ The sum of all connected items' `load` values must not exceed this number. If it
 
 ### Well Size LED Display (`[WellSize]` in `marvinconfig.txt`)
 
-When a character with the **wellsize** skill enters the well-size screen (S6), the LED table lights up to mirror the on-screen power-use indicator. Two visualisation styles are available; the GM can switch between them at runtime in simulation mode by pressing **left** while the well-size screen is open.
+When a character with the **wellsize** skill enters the well-size screen (S6), the LED table lights up to mirror the on-screen power-use indicator. The default visualisation is **pathflow** (streams of light flowing inward from each of the 8 buttons); pressing **left** while the well-size screen is open switches between the two styles for review.
+
+On entry to the well-size screen, pathflow mode grows the wave from the buttons to the current capacity over `introSeconds` (default 15 s). While on screen, the LEDs continuously pulse through the configured `palette`, with each LED slightly out of phase based on its position so the table feels alive. On exit the LEDs are cleared so the visualisation doesn't bleed into the next menu.
 
 ```
 [WellSize]
-mode                  = radial
+mode                  = pathflow
 rOuter                = 30.0
 rMiddle               = 20.8
 rInner                = 14.0
@@ -166,6 +168,11 @@ boundaryFadeWidth     = 1.0
 boundaryFadeWidthPath = 0.02
 boundaryMinBright     = 0.0
 color                 = amethist
+palette               = amethist,purple,runeL2
+cyclePeriod           = 3.0
+pulsePhaseScale       = 1.5
+introSeconds          = 15.0
+frameRate             = 30
 ```
 
 | Setting | What It Does |
@@ -175,7 +182,12 @@ color                 = amethist
 | `boundaryFadeWidth` | How wide the lit/dark transition is in `radial` mode, in centimetres. `1.0` cm means the innermost lit LED smoothly fades in/out over roughly one LED's worth of space. |
 | `boundaryFadeWidthPath` | Same idea as above but for `pathflow` mode, expressed in wave-time units instead of centimetres. `0.02` ≈ one LED on a typical path. |
 | `boundaryMinBright` | If set above zero, the fading "edge" LED is kept at least this bright instead of being allowed to go fully dark. Use this to keep the well's edge always visible as a glow. Default `0.0` (off). |
-| `color` | Colour of the lit LEDs. Either a palette name like `amethist`, `turquoise`, or `emerald`, or three numbers `R,G,B` (each 0–255). |
+| `color` | Fallback colour when `palette` is empty. Either a palette name like `amethist`, `turquoise`, or `emerald`, or three numbers `R,G,B` (each 0–255). |
+| `palette` | Comma-separated list of colours the LEDs cycle through over time. Set to a single colour (or empty) for a static look; use 2–4 related colours for the pulsating-energy effect. |
+| `cyclePeriod` | Seconds for one full pass through the palette. Smaller = faster pulse. Set to `0` to freeze on the first palette colour. |
+| `pulsePhaseScale` | How much each LED's position shifts its colour phase relative to its neighbours. `0` makes the whole table pulse in sync; `1.5` produces visible waves of colour rippling across the lit zone. |
+| `introSeconds` | Pathflow only: time for the wave to travel from the buttons all the way to the centre at constant speed. The wave **stops** when it reaches the position corresponding to current usage, so partial loads finish before this time. `0` skips the intro animation. |
+| `frameRate` | How many times per second the LED state is redrawn while on screen. `30` gives a smooth pulse; lower values save processing. |
 
 **Changeable via EDD:** No (yet) — change these values in the file and restart MARVIN.
 
