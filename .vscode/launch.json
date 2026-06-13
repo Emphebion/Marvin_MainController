@@ -9,9 +9,13 @@
             "name": "Python: MARVIN Main Launcher",
             "type": "debugpy",
             "request": "launch",
-            "module": "MARVIN",
+            // Launch the MARVIN entry script unambiguously using workspace paths
+            // Update the path if your MARVIN entry file is located elsewhere in the workspace
+            "program": "${workspaceFolder}/MARVIN.py",
+            "cwd": "${workspaceFolder}",
             "justMyCode": true,
-            "python": "C:\\Users\\Edwin\\AppData\\Local\\Programs\\Python\\Python313\\python.exe"
+            // Use the currently selected Python interpreter in VS Code
+            "python": "${command:python.interpreterPath}"
         }
     ]
 }
