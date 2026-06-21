@@ -4,14 +4,15 @@ _InputHandler.py — Input abstraction layer for MARVIN.
 Polls the RFID_LED Arduino for serial data (buttons and RFID tags) and
 falls back to keyboard input when no hardware is connected (desktop mode).
 
-Serial message types handled:
-    'B' -- button bitmask (byte 1: screen buttons, byte 2: game buttons)
-    'T' -- RFID tag ID (bytes 1-4, big-endian 32-bit integer)
-    'quit' -- hardware shutdown request
+Decoded payload types handed up by Device.read() (type byte + body):
+    'B' -- button bitmask (byte 1: screen buttons, byte 2: game buttons).
+           Bit 0 of the screen-button mask = shutdown.
+    'T' -- RFID tag ID (4 big-endian bytes — left-padded to 10 hex chars
+           on the controller for cross-system consistency).
 
 All input is normalised into event dicts and appended to self.elist:
     {"event": "keydown", "data": "left"|"right"|"up"|"down"|"east"|...}
-    {"event": "rfid",    "data": <8-char uppercase hex tag ID string, e.g. "00CCA97F">}
+    {"event": "rfid",    "data": <10-char uppercase hex tag ID string, e.g. "0000CCA97F">}
     {"event": "serial",  "data": <raw bytes>}
 
 The 1 ms pygame.time.wait(1) at the end of event_handler() is intentional:
@@ -19,7 +20,6 @@ it rate-limits the polling loop to prevent missed or double button triggers.
 """
 
 import glbs
-import os
 
 class _InputHandler(object):
     """Input handler: normalises hardware serial input and keyboard input into event dicts."""
@@ -32,74 +32,130 @@ class _InputHandler(object):
                                glbs.pygame.USEREVENT, self.SERIAL]
         glbs.pygame.event.set_allowed(self.allowed_events)
 
-    def event_handler(self):
-        """Poll for input and return the accumulated event list.
+    # ------------------------------------------------------------------ #
+    # C7 — controller-side button debounce (paired with F1+C1)            #
+    #                                                                     #
+    # The firmware already debounces each button at 200 ms (F2-lite).     #
+    # This second-line debounce drops a 'B' frame whose mask exactly      #
+    # matches the previous one within 100 ms.  100 ms < the firmware      #
+    # debounce, so legitimate fast taps still pass; identical-mask        #
+    # repeats inside that window can only be phantoms.                    #
+    #                                                                     #
+    # Remove once hardware confirms #3 (double-trigger) is gone after     #
+    # F1+C1+F2-lite land.                                                 #
+    # ------------------------------------------------------------------ #
+    _BUTTON_DEBOUNCE_S = 0.10
 
-        If a hardware device is available, reads one serial frame.
+    def event_handler(self):
+        """Poll for input and return the events produced by *this* call.
+
+        After returning, ``self.elist`` is reset to empty so a subsequent
+        state never sees leftover events from a prior session. Each caller
+        gets a fresh snapshot.
+
+        If a hardware device is available, drains one decoded frame from it.
         Otherwise falls back to keyboard events.
         Clears the pygame event queue after each call.
 
         Returns:
             list of event dicts (may be empty if no input occurred)
         """
-        tempTime = glbs.time.time()
         dev = glbs.devices.get_device("RFID_LED")
         if dev:
             data = dev.read()
-            if data:
-                glbs.pygame.event.post(glbs.pygame.event.Event(self.SERIAL, {'line': data}))
-                print("SERIAL EVENT DETECTED")
-                self.serial_event_handler()
+            if data and not self._is_duplicate_button(dev, data):
+                self.serial_event_handler(data)
         else:
             self.keyboard_event_handler()
 
         glbs.pygame.event.clear()
         glbs.pygame.time.wait(1)    #serves to slowdown the reading loop, improving input responce
-        #overallTime = glbs.time.time() - glbs.handlerTime
-        #glbs.handlerTime = glbs.time.time() - tempTime
-        #print("Elapsed handler time: {}".format(glbs.handlerTime))
-        #print("Elapsed total time: {}".format(overallTime))
-        return self.elist
-            
+        # Return per-call snapshot; reset so the next state starts clean.
+        result = self.elist
+        self.elist = []
+        return result
+
+    def _is_duplicate_button(self, dev, data):
+        """C7: True if ``data`` is a 'B' frame whose mask repeats within the
+        debounce window for the given device.
+
+        State is stored on the Device instance (lazy attributes) so a
+        future second button-providing device gets its own history.
+        Non-'B' frames always pass through.
+        """
+        if len(data) < 3 or data[0] != ord('B'):
+            return False
+        mask = (data[1], data[2])
+        now = glbs.time.time()
+        last_mask = getattr(dev, '_last_button_mask', None)
+        last_time = getattr(dev, '_last_button_time', 0.0)
+        if mask == last_mask and (now - last_time) < self._BUTTON_DEBOUNCE_S:
+            return True
+        dev._last_button_mask = mask
+        dev._last_button_time = now
+        return False
+
     #***************************************************#
     # Function handeling serial data form Arduino Mega  #
     # Types of data:                                    #
     # * B - Button data for inner and outer ring        #
     # * T - Item tag data                               #
-    # * quit - Shutdown button was pressed              #
+    # Shutdown is signalled as bit 0 of the screen mask #
+    # in a 'B' frame.                                   #
     #***************************************************#
-    def serial_event_handler(self):
-        """Parse a serial event already posted to the pygame event queue.
+    def serial_event_handler(self, data):
+        """Convert one decoded serial frame into entries on self.elist.
 
-        Reads the pending pygame event, extracts the 'line' bytes, and
-        converts them to keydown or rfid events appended to self.elist.
+        Args:
+            data -- bytes of [type][body...] as produced by Device.read()
+                    (CRC already validated and stripped).
         """
-        event = glbs.pygame.event.peek()
-        data = event.dict["line"]
-        # Parse screen buttons
-        if (chr(data[0]) == 'B') and (int(data[1]) != 0):
-            bits = [(data[1] >> bit) & 1 for bit in range(8 - 1, -1, -1)]
-            for index, bit in enumerate(bits):
-                if bit:
+        type_byte = data[0]
+
+        # 'B' — button mask. Screen buttons in byte 1, game buttons in byte 2.
+        # Both are normalised to keydown events so the game-state machine
+        # consumes them uniformly with the keyboard-simulation path.
+        if type_byte == ord('B'):
+            scrn = data[1] if len(data) > 1 else 0
+            game = data[2] if len(data) > 2 else 0
+            print(f"FRAME B scrn=0x{scrn:02X} game=0x{game:02X}")
+            if scrn != 0:
+                bits = [(scrn >> bit) & 1 for bit in range(8 - 1, -1, -1)]
+                for index, bit in enumerate(bits):
+                    if not bit:
+                        continue
                     button = glbs.table.screenButtons[index]
                     if button == "left":
                         self.elist.append({"event": "keydown", "data": "left"})
-                    if button == "right":
+                    elif button == "right":
                         self.elist.append({"event": "keydown", "data": "right"})
-                    if button == "bottom":
+                    elif button == "bottom":
                         self.elist.append({"event": "keydown", "data": "down"})
-                    if button == "top":
+                    elif button == "top":
                         self.elist.append({"event": "keydown", "data": "up"})
-                    if button == "shutdown":
+                    elif button == "shutdown":
                         glbs.pygame.quit()
+            if game != 0:
+                bits = [(game >> bit) & 1 for bit in range(8 - 1, -1, -1)]
+                for index, bit in enumerate(bits):
+                    if not bit:
+                        continue
+                    if index < len(glbs.table.gameButtons):
+                        button = glbs.table.gameButtons[index]
+                        self.elist.append({"event": "keydown", "data": button})
+            return
 
-        elif chr(data[0]) == 'T':
+        # 'T' — RFID tag (4 raw tag bytes, big-endian).
+        if type_byte == ord('T'):
             IDtag = int.from_bytes(data[1:], "big")
-            self.elist.append({"event": "rfid", "data": f"{IDtag:08X}"})
-        elif "quit" in str(data):
-            os.system("sudo shutdown -h now")
-        else:
-            self.elist.append({"event": "serial", "data": data})
+            tag_str = f"{IDtag:010X}"
+            print(f"FRAME T id={tag_str}")
+            self.elist.append({"event": "rfid", "data": tag_str})
+            return
+
+        # Anything else is unexpected on the wire. Log it so we can see what
+        # the firmware is actually emitting; do not propagate as an input.
+        print(f"FRAME ? type=0x{type_byte:02X} len={len(data)} body={list(data[1:])}")
 
     #***************************************************#
     # Function handeling keyboard data (backup)         #

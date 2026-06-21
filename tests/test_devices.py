@@ -1,8 +1,11 @@
 """
-test_devices.py — unit tests for Device.format_msg CRC correctness
-and _Devices.get_device behaviour.
+test_devices.py — unit tests for the COBS + CRC-8 framing in _Devices.Device
+and _Devices.get_device behaviour. Matches the wire format produced by the
+IOBoardMega firmware F1 commit (see docs/plans/firmware_changes.md §F1).
 """
 
+import os
+import random
 import pytest
 from unittest.mock import MagicMock, patch
 from _Devices import Device, _Devices
@@ -13,6 +16,7 @@ from _Devices import Device, _Devices
 # ---------------------------------------------------------------------------
 
 def make_device(name='TEST'):
+    """Build a Device whose ser is a MagicMock so no real port is opened."""
     with patch('serial.Serial') as mock_ser_cls:
         mock_ser = MagicMock()
         mock_ser.is_open = False
@@ -30,47 +34,187 @@ def make_device(name='TEST'):
     return dev
 
 
+def _set_rx_chunks(dev, *chunks):
+    """Wire up ``dev.ser`` so that successive read() calls drain the given
+    chunks of bytes (one chunk per read() invocation).
+    """
+    dev.ser.is_open = True
+    queue = list(chunks)
+    state = {'pending': b''}
+
+    def in_waiting_getter():
+        # Pop the next pending chunk for this read() call, if any.
+        if not state['pending'] and queue:
+            state['pending'] = queue.pop(0)
+        return len(state['pending'])
+
+    def read_n(n):
+        out = state['pending'][:n]
+        state['pending'] = state['pending'][n:]
+        return out
+
+    type(dev.ser).in_waiting = property(lambda self: in_waiting_getter())
+    dev.ser.read.side_effect = read_n
+
+
 # ---------------------------------------------------------------------------
-# format_msg / CRC
+# COBS round-trip
+# ---------------------------------------------------------------------------
+
+class TestCOBS:
+    @pytest.mark.parametrize("payload", [
+        b'',
+        b'\x00',
+        b'\x0A\x0D\x00\x42',
+        b'\xFF' * 10,
+        bytes(range(256)),
+    ])
+    def test_round_trip(self, payload):
+        encoded = Device._cobs_encode(payload)
+        assert 0 not in encoded                 # no in-band 0x00 ever
+        assert Device._cobs_decode(encoded) == payload
+
+    def test_round_trip_large_random_buffer(self):
+        # Approx. one LED frame: type + 494*3 + crc = 1484 bytes.
+        rnd = random.Random(0xC0B5)
+        payload = bytes(rnd.randrange(256) for _ in range(1485))
+        encoded = Device._cobs_encode(payload)
+        assert 0 not in encoded
+        assert Device._cobs_decode(encoded) == payload
+
+    def test_decode_malformed_raises(self):
+        with pytest.raises(ValueError):
+            Device._cobs_decode(b'\x00')        # leading 0 code is invalid
+        with pytest.raises(ValueError):
+            Device._cobs_decode(b'\x05\x01\x02') # code claims 4 more bytes
+
+
+# ---------------------------------------------------------------------------
+# CRC-8 (poly 0x07, init 0x00)
+# ---------------------------------------------------------------------------
+
+class TestCRC8:
+    @pytest.mark.parametrize("data, expected", [
+        (b'', 0x00),
+        (b'\x00', 0x00),
+        (b'\x01', 0x07),
+        (b'123456789', 0xF4),   # CRC-8/SMBUS canonical test vector
+        (b'\x00\x01\x02\x03', 0x48),
+    ])
+    def test_known_vectors(self, data, expected):
+        assert Device._crc8(data) == expected
+
+    def test_crc_changes_with_input(self):
+        assert Device._crc8(b'foo') != Device._crc8(b'bar')
+
+
+# ---------------------------------------------------------------------------
+# format_msg — outbound 'L' frame
 # ---------------------------------------------------------------------------
 
 class TestFormatMsg:
-    def test_starts_with_start_byte(self):
+    def test_frame_is_terminated_by_zero(self):
         dev = make_device()
         msg = dev.format_msg([[10, 20, 30]])
-        assert msg[0] == ord(dev.startByte)
+        assert msg.endswith(b'\x00')
 
-    def test_ends_with_stop_byte_then_crc(self):
+    def test_no_inband_zero(self):
+        """COBS guarantees the encoded body contains no 0x00."""
         dev = make_device()
-        data = [[10, 20, 30]]
+        msg = dev.format_msg([[0, 0, 0]] * 4)
+        assert msg.count(b'\x00') == 1          # only the terminator
+
+    def test_round_trip_through_decode(self):
+        """Encode an 'L' frame, strip the terminator, COBS-decode, CRC-check,
+        and confirm the type byte and the RGB payload survive unchanged.
+        """
+        dev = make_device()
+        data = [[10, 20, 30], [40, 50, 60], [70, 80, 90]]
         msg = dev.format_msg(data)
-        assert msg[-2] == ord(dev.stopByte)
+        assert msg[-1] == 0
+        decoded = Device._cobs_decode(msg[:-1])
+        assert decoded[0] == ord('L')
+        assert Device._crc8(decoded[:-1]) == decoded[-1]
+        body = decoded[1:-1]
+        assert list(body) == [10, 20, 30, 40, 50, 60, 70, 80, 90]
 
-    def test_crc_xor_of_all_rgb(self):
+    def test_round_trip_with_zero_bytes_in_payload(self):
+        """The old framing broke whenever an RGB byte was 0x0A or 0x0D.
+        Under COBS, byte values are payload-transparent."""
         dev = make_device()
-        data = [[10, 20, 30], [1, 2, 3]]
+        data = [[0x0A, 0x0D, 0x00], [0x00, 0xFF, 0x00]]
         msg = dev.format_msg(data)
-        expected_crc = 10 ^ 20 ^ 30 ^ 1 ^ 2 ^ 3
-        assert msg[-1] == expected_crc
+        decoded = Device._cobs_decode(msg[:-1])
+        assert list(decoded[1:-1]) == [0x0A, 0x0D, 0x00, 0x00, 0xFF, 0x00]
 
-    def test_crc_single_black_led(self):
-        dev = make_device()
-        msg = dev.format_msg([[0, 0, 0]])
-        assert msg[-1] == 0   # XOR of zeros is zero
 
-    def test_message_length(self):
-        """Frame = 1 (start) + 3*n (RGB) + 1 (stop) + 1 (CRC)."""
-        dev = make_device()
-        n = 5
-        data = [[i, i, i] for i in range(n)]
-        msg = dev.format_msg(data)
-        assert len(msg) == 1 + 3 * n + 2
+# ---------------------------------------------------------------------------
+# read() — inbound framing accumulator
+# ---------------------------------------------------------------------------
 
-    def test_crc_changes_with_data(self):
+def _build_frame(type_byte, body):
+    """Build the on-wire bytes for one frame: COBS([type|body|crc]) + 0x00."""
+    payload = bytes([type_byte]) + bytes(body)
+    payload = payload + bytes([Device._crc8(payload)])
+    return Device._cobs_encode(payload) + b'\x00'
+
+
+class TestRead:
+    def test_decodes_b_frame(self):
         dev = make_device()
-        msg1 = dev.format_msg([[100, 0, 0]])   # CRC = 100
-        msg2 = dev.format_msg([[0, 200, 0]])   # CRC = 200
-        assert msg1[-1] != msg2[-1]
+        frame = _build_frame(ord('B'), [0x80, 0x00])
+        _set_rx_chunks(dev, frame)
+        out = dev.read()
+        assert out == bytes([ord('B'), 0x80, 0x00])
+
+    def test_decodes_t_frame(self):
+        dev = make_device()
+        frame = _build_frame(ord('T'), [0xCC, 0xA9, 0x7F, 0x42])
+        _set_rx_chunks(dev, frame)
+        out = dev.read()
+        assert out == bytes([ord('T'), 0xCC, 0xA9, 0x7F, 0x42])
+
+    def test_two_frames_in_one_chunk(self):
+        dev = make_device()
+        f1 = _build_frame(ord('B'), [0x01, 0x00])
+        f2 = _build_frame(ord('T'), [0xDE, 0xAD, 0xBE, 0xEF])
+        _set_rx_chunks(dev, f1 + f2)
+        out1 = dev.read()
+        out2 = dev.read()
+        assert out1 == bytes([ord('B'), 0x01, 0x00])
+        assert out2 == bytes([ord('T'), 0xDE, 0xAD, 0xBE, 0xEF])
+
+    def test_frame_split_across_two_chunks(self):
+        dev = make_device()
+        frame = _build_frame(ord('B'), [0x40, 0x00])
+        split = len(frame) // 2
+        _set_rx_chunks(dev, frame[:split], frame[split:])
+        assert dev.read() is None                    # partial — no frame yet
+        out = dev.read()
+        assert out == bytes([ord('B'), 0x40, 0x00])
+
+    def test_bad_crc_dropped_next_frame_recovers(self):
+        dev = make_device()
+        good = _build_frame(ord('B'), [0x02, 0x00])
+        # Build a frame whose CRC is deliberately wrong.
+        payload = bytes([ord('B'), 0x04, 0x00, 0xFF])  # last byte = bad CRC
+        bad = Device._cobs_encode(payload) + b'\x00'
+        _set_rx_chunks(dev, bad + good)
+        # Bad frame is silently dropped; the good one is returned next.
+        out = dev.read()
+        assert out == bytes([ord('B'), 0x02, 0x00])
+
+    def test_spurious_zero_between_frames_skipped(self):
+        dev = make_device()
+        frame = _build_frame(ord('B'), [0x08, 0x00])
+        _set_rx_chunks(dev, b'\x00\x00' + frame)
+        out = dev.read()
+        assert out == bytes([ord('B'), 0x08, 0x00])
+
+    def test_returns_none_when_no_data(self):
+        dev = make_device()
+        _set_rx_chunks(dev)                          # nothing buffered
+        assert dev.read() is None
 
 
 # ---------------------------------------------------------------------------
@@ -79,19 +223,6 @@ class TestFormatMsg:
 
 class TestGetDevice:
     def _make_devices_no_hw(self):
-        """Return a _Devices instance with no hardware, using a minimal config."""
-        import configparser, io
-        config_text = """
-[common]
-devices = FAKE
-[FAKE]
-devid = FFFF:FFFF
-baudrate = 9600
-startByte = \\r
-stopByte = \\n
-"""
-        parser = configparser.ConfigParser()
-        parser.read_string(config_text)
         with patch('_Devices._Devices.port_by_id', return_value=None), \
              patch('_Devices._Devices._start_reconnect_watcher'):
             devices = _Devices.__new__(_Devices)

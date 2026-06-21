@@ -3,20 +3,30 @@ _Devices.py — Serial device manager for MARVIN.
 
 Detects USB serial devices by VID:PID at startup and opens connections.
 Currently manages:
-    RFID_LED  -- Arduino Micro (2A03:0042) at 500000 baud
-                 Handles RFID tag reading, button input, and NeoPixel output.
+    RFID_LED  -- Arduino Mega handling RFID tag reading, button input,
+                 and NeoPixel output.
     GSM       -- Placeholder (1234:5678) -- not yet in use.
 
 The primary runtime interface is:
     transmitLED(ledData)  -- send the full LED frame to RFID_LED
     get_device(name)      -- retrieve a Device object by name for direct read/write
 
-Message frame format (transmit):
-    [\\r] [R G B] [R G B] ... [\\n] [CRC]
-    CRC = XOR of all R, G, B bytes
+Wire format (in lockstep with IOBoardMega firmware F1):
+    [COBS-encoded payload] [0x00]
 
-Message frame format (receive, via Device.read/parse_status_response):
-    [startByte] [payload bytes] [stopByte] [CRC]
+    The 0x00 byte is the only frame delimiter and never appears inside the
+    COBS-encoded payload, so the parser is self-synchronising.
+
+Decoded payload layout (same in both directions):
+    [type] [body ...] [CRC-8]
+
+    Outbound (host -> Mega):
+        'L' + 494 * [R G B]     (1482-byte body)
+    Inbound  (Mega -> host):
+        'B' + [scrnButtons][gameButtons]   (2-byte body)
+        'T' + [tag0 tag1 tag2 tag3]        (4-byte body)
+
+    CRC-8 polynomial 0x07, init 0x00, computed over type || body.
 
 Reconnection:
     A background daemon thread watches for disconnected devices every 5 s.
@@ -25,13 +35,10 @@ Reconnection:
     Devices that were absent at startup are also picked up by the watcher.
 """
 
-import re
 import serial
 import serial.tools.list_ports
 import time
 import threading
-import subprocess
-from sys import platform
 
 
 class _Devices(object):
@@ -155,31 +162,19 @@ class _Devices(object):
                 return device
         return None
 
-    def connected_serial_devices(self):
-        device_re = re.compile(
-            b'Bus\\s+(?P<bus>\\d+)\\s+Device\\s+(?P<device>\\d+).+ID\\s(?P<id>\\w+:\\w+)\\s(?P<tag>.+)',
-            re.I)
-        df = subprocess.check_output("lsusb").decode().strip()
-        foundDevices = []
-        if df:
-            for i in df:
-                info = device_re.match(i)
-                if info:
-                    dinfo = info.groupdict()
-                    dinfo['device'] = '/dev/bus/%s/%s' % (
-                        dinfo.pop('bus'), dinfo.pop('device'))
-                    foundDevices.append(dinfo)
-        for device in foundDevices:
-            print(device)
-        return foundDevices
-
-
 class Device(object):
-    """A single serial device with framed message protocol and CRC validation.
+    """A single serial device using the COBS + CRC-8 framing protocol.
 
     The `offline` flag is set True when a send/read raises SerialException.
     The reconnect watcher in _Devices checks this flag and re-opens the port.
+
+    Reception is byte-stream-based: each `read()` call drains whatever bytes
+    are available, accumulates them in `_rx_buf`, and returns the first
+    fully-validated frame (`type + body`, CRC stripped). Partial frames
+    survive across calls.
     """
+
+    LED_FRAME_TYPE = ord('L')
 
     def __init__(self, name, port, devID, baudrate, startByte, stopByte):
         self.name = name
@@ -188,8 +183,12 @@ class Device(object):
         self.ser = serial.Serial()
         self.ser.port = port
         self.ser.baudrate = baudrate
+        # startByte/stopByte come from the legacy config schema; the COBS
+        # protocol uses 0x00 as the only delimiter so these are not used
+        # in framing. Kept on the instance for backward-compat introspection.
         self.startByte = startByte.decode("unicode_escape")
         self.stopByte = stopByte.decode("unicode_escape")
+        self._rx_buf = bytearray()
         self.connect()
 
     def connect(self, timeout=0.1):
@@ -219,73 +218,133 @@ class Device(object):
                     pass
 
     def format_msg(self, data):
-        """Build a framed serial message with XOR CRC.
+        """Build one COBS-framed `'L'` (LED) message.
 
         Args:
-            data -- list of [R, G, B] triples
+            data -- iterable of [R, G, B] triples (one per LED, in segment order)
 
         Returns:
-            list of ints ready to pass to ser.write()
+            bytes — COBS-encoded payload terminated by a single 0x00 byte,
+                    ready to hand to ser.write().
         """
-        crc = 0
-        msg = [ord(self.startByte)]
-        for d in data:
-            crc = (crc ^ d[0] ^ d[1] ^ d[2])
-            msg += [d[0], d[1], d[2]]
-        msg += [ord(self.stopByte), crc]
-        return msg
+        payload = bytearray(1 + 3 * len(data))
+        payload[0] = self.LED_FRAME_TYPE
+        i = 1
+        for rgb in data:
+            payload[i]     = rgb[0] & 0xFF
+            payload[i + 1] = rgb[1] & 0xFF
+            payload[i + 2] = rgb[2] & 0xFF
+            i += 3
+        payload.append(self._crc8(payload))
+        return self._cobs_encode(payload) + b'\x00'
 
     def read(self):
-        """Read one framed message from the serial port if data is available.
-
-        Returns the validated payload bytes, or None if no data is waiting.
-        Note: this method is not called during active game states (S10/S11).
-        Input during the game is handled directly by _InputHandler.event_handler()
-        via pygame serial events.
-        """
-        self.open()
-        if self.ser.in_waiting:
-            try:
-                data = self.ser.read_until()
-                crc = self.ser.read()
-                result = self.parse_status_response(data, crc)
-                return result
-            except serial.SerialException as e:
-                print(f"Device {self.name}: read failed ({e}), marking offline")
-                self.offline = True
-                try:
-                    self.ser.close()
-                except Exception:
-                    pass
-
-    def parse_status_response(self, data, crc):
-        """Validate CRC and extract the payload from a received message.
+        """Drain the serial port and return one decoded frame, or None.
 
         Returns:
-            bytes between startByte and stopByte if CRC matches, else [].
+            bytes of `[type] + [body]` (CRC stripped) for the next complete,
+            CRC-valid frame in the buffer.  None if no complete frame is
+            ready yet.
         """
-        calculatedCrc = 0
-        startFound = False
-        endFound = False
-        startIndex = 0
-        endIndex = 0
-
-        pos = 0
-        for d in data:
-            dataByte = chr(d)
-            if dataByte == self.startByte:
-                startIndex = pos
-                startFound = True
-            elif dataByte == self.stopByte and not endFound:
-                endIndex = pos
-                endFound = True
-            else:
-                if startFound and not endFound:
-                    calculatedCrc ^= ord(dataByte)
-            pos += 1
-
+        self.open()
+        if not self.ser.is_open:
+            return None
         try:
-            if calculatedCrc == ord(crc):
-                return data[startIndex + 1:endIndex]
-        except Exception:
-            return []
+            n = self.ser.in_waiting
+            if n:
+                self._rx_buf.extend(self.ser.read(n))
+        except serial.SerialException as e:
+            print(f"Device {self.name}: read failed ({e}), marking offline")
+            self.offline = True
+            try:
+                self.ser.close()
+            except Exception:
+                pass
+            return None
+
+        while True:
+            idx = self._rx_buf.find(b'\x00')
+            if idx < 0:
+                return None
+            frame = bytes(self._rx_buf[:idx])
+            del self._rx_buf[:idx + 1]
+            if not frame:
+                continue                       # spurious 0x00, resync
+            try:
+                decoded = self._cobs_decode(frame)
+            except ValueError:
+                print(f"RX drop: COBS decode failed (encoded={len(frame)}B)")
+                continue
+            if len(decoded) < 2:
+                print(f"RX drop: frame too short (decoded={len(decoded)}B)")
+                continue
+            crc_expected = self._crc8(decoded[:-1])
+            crc_actual = decoded[-1]
+            if crc_expected != crc_actual:
+                type_hex = f"0x{decoded[0]:02X}"
+                print(f"RX drop: CRC mismatch (type={type_hex} "
+                      f"len={len(decoded)} got=0x{crc_actual:02X} "
+                      f"want=0x{crc_expected:02X})")
+                continue
+            return decoded[:-1]                # type + body, CRC removed
+
+    # ------------------------------------------------------------------ #
+    # COBS + CRC-8 helpers                                                 #
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _cobs_encode(data):
+        """Consistent Overhead Byte Stuffing (no terminator).
+
+        Returns bytes guaranteed not to contain 0x00.
+        """
+        out = bytearray()
+        code_idx = 0
+        code = 1
+        out.append(0)
+        for b in data:
+            if b == 0:
+                out[code_idx] = code
+                code_idx = len(out)
+                out.append(0)
+                code = 1
+            else:
+                out.append(b)
+                code += 1
+                if code == 0xFF:
+                    out[code_idx] = code
+                    code_idx = len(out)
+                    out.append(0)
+                    code = 1
+        out[code_idx] = code
+        return bytes(out)
+
+    @staticmethod
+    def _cobs_decode(data):
+        """Inverse of _cobs_encode. Raises ValueError on malformed input."""
+        out = bytearray()
+        i = 0
+        n = len(data)
+        while i < n:
+            code = data[i]
+            if code == 0 or i + code > n:
+                raise ValueError("malformed COBS frame")
+            i += 1
+            end = i + code - 1
+            out.extend(data[i:end])
+            i = end
+            if code < 0xFF and i < n:
+                out.append(0)
+        return bytes(out)
+
+    @staticmethod
+    def _crc8(data):
+        """CRC-8, polynomial 0x07, init 0x00 (matches firmware F1)."""
+        crc = 0
+        for b in data:
+            crc ^= b
+            for _ in range(8):
+                if crc & 0x80:
+                    crc = ((crc << 1) ^ 0x07) & 0xFF
+                else:
+                    crc = (crc << 1) & 0xFF
+        return crc

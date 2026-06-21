@@ -62,28 +62,17 @@ class S11_AwaitInput():
             glbs.devices.transmitLED(glbs.table.getLEDData())
             self.state = self.states.S1
 
-    # State specific functions:
-    # Rework to operate similar to inner buttons (See Input Handler)
     def _checkInput(self):
-        input_list = glbs.handler.event_handler()
-        if input_list:
-            new_input = input_list.pop()
-            if new_input["event"] == "serial":
-                data = new_input["data"]
-                if (chr(data[0]) == 'B') and (int(data[2]) != 0):
-                    if not (input_list in glbs.table.gameButtons):
-                        bits = [(data[2] >> bit) & 1 for bit in range(8 - 1, -1, -1)]
-                        result = []
-                        for index, bit in enumerate(bits):
-                            if bit:
-                                result.append(glbs.table.buttonList[index].name)
-                        glbs.ctx.currentRoundInputs += result
-                elif input_list:
-                    glbs.ctx.currentRoundInputs.append(input_list.pop())
-            elif new_input["event"] == "keydown":
-                # Simulation: outer button clicks arrive as keydown events
-                if new_input["data"] in glbs.table.gameButtons:
-                    glbs.ctx.currentRoundInputs.append(new_input["data"])
+        """Record every game-button keydown event from this poll.
+
+        Both serial (hardware) and keyboard (simulation) game-button
+        presses arrive as keydown events with the button's name as data
+        (see _InputHandler.serial_event_handler / keyboard_event_handler).
+        """
+        for new_input in glbs.handler.event_handler():
+            if (new_input["event"] == "keydown"
+                    and new_input["data"] in glbs.table.gameButtons):
+                glbs.ctx.currentRoundInputs.append(new_input["data"])
 
     def _setLEDOutput(self):
         if glbs.game.mode == 'runes':
@@ -134,7 +123,13 @@ class S11_AwaitInput():
             # Head: colour one LED at head_idx in the current head segment
             if r['route']:
                 seg, direction = r['route'][-1]
-                if r['head_idx'] < seg.nrLEDs:
+                # When this line's button-adjacent segment overlaps with
+                # another route, leave the very last LED dark so the
+                # player can see where this line stops.
+                head_cap = seg.nrLEDs
+                if len(r['route']) == 1 and r.get('gap_at_end'):
+                    head_cap -= 1
+                if r['head_idx'] < head_cap:
                     self.setLEDatIndex(seg, direction, r['head_idx'], color)
                     r['head_idx'] += 1
                 else:
@@ -149,7 +144,12 @@ class S11_AwaitInput():
             r['counter'] += 1
             if (r['counter'] > self.lineLength) and r['done']:
                 seg, direction = r['done'][0]
-                if r['tail_idx'] < seg.nrLEDs:
+                # Final-segment gap: don't touch the LED the head skipped,
+                # otherwise we'd decRefCount on a LED owned by another route.
+                tail_cap = seg.nrLEDs
+                if len(r['done']) == 1 and not r['route'] and r.get('gap_at_end'):
+                    tail_cap -= 1
+                if r['tail_idx'] < tail_cap:
                     self.setLEDatIndex(seg, direction, r['tail_idx'], black)
                     r['tail_idx'] += 1
                 else:

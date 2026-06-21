@@ -27,6 +27,7 @@ class S10_IdleGame():        #S10_GameMaster
         print("current state is {}".format(self.state))
 
         if glbs.game.mode == 'line':
+            print("inputs received: " + str(list(glbs.ctx.currentRoundInputs)))
             self.checkForFailures()
             print("failures: %s" % glbs.ctx.gameFailures)
             # Reset game variables
@@ -38,13 +39,17 @@ class S10_IdleGame():        #S10_GameMaster
             print("current input required: " + str(self.currentGoal))
             glbs.ctx.lineCounter = 0
         elif glbs.game.mode == 'multiline':
+            print("inputs received: " + str(list(glbs.ctx.currentRoundInputs)))
             self.checkForMultiLineFailures()
             print("failures: %s" % glbs.ctx.gameFailures)
             glbs.ctx.currentRoundInputs.clear()
             glbs.game.start(None)  # MultiLineGame picks its own goals
-            print("current goals: " + str(glbs.game.goal_buttons))
+            false_goals = [r['goal'] for r in glbs.game.routes if r['is_false']]
+            print("current goals: " + str(glbs.game.goal_buttons)
+                  + "   (avoid: " + str(false_goals) + ")")
         else:
             # Rune mode: RuneGame handles sequences internally
+            print("inputs received: " + str(list(glbs.ctx.currentRoundInputs)))
             print("failures: %s" % glbs.ctx.gameFailures)
             glbs.ctx.currentRoundInputs.clear()
             glbs.game.start(None)

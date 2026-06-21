@@ -1,46 +1,46 @@
 [items]
-names = item1,item2,item3,item4,item5,item6,item7,item8,item9,item10,item11,item12,item99
+names = item2,item3,item4,item5,item6,item7,item8,item9,item10,item11,item12,item13,item14,item15,item9999
 folder = items
 source = 85
 item_location = 120,80
 config_version = 0
 
 [item1]
-name = Hand Spinner
+name = Zuiver Geweten
 function = Onbekend in de pilaar
-id = 00DDBC16
-level = 1
-load = 7
+id = 0000DD48D0
+level = 2
+load = 30
 connected = 0
 
 [item2]
 name = Mini Verzamel Golem
 function = Zoekt een gebied af naar grondstoffen. Een keer per dag deel moet de grondstof opgehaal worden. (aangepaste ruling!)
-id = 00DD29D4
+id = 0000DD29D4
 level = 2
 load = 25
-connected = 1
+connected = 0
 
 [item3]
 name = Inspiratie Amulet
 function = Wijst naar de put waar op dit construct is aangesloten. Als dit wordt gebruikt om te woudlopen verliest de groep items, 1 LP en komt uitgeput aan.
-id = 00DD42B7
+id = 0000DD42B7
 level = 1
 load = 5
-connected = 1
+connected = 0
 
 [item4]
 name = Zelfreparerend Pantser
 function = Repareert met X punten per Y tijd
-id = 00DDA51D
+id = 0000DE1ECC
 level = 2
 load = 21
-connected = 1
+connected = 0
 
 [item5]
 name = Zegel van Intentie
 function = Tijdens het verzegelen van een brief kan met dit zegel 1 aspect van de brief feilloos worden overgebracht op de persoon die het zegel breekt. Voorbeelden: Emotie tijdens verzegelen, Leest zig zelf voor, Vertaald naar andere taal, etc
-id = 00DD2E9F
+id = 0000DD2E9F
 level = 1
 load = 7
 connected = 0
@@ -48,7 +48,7 @@ connected = 0
 [item6]
 name = Vitalizer
 function = Na 2 keer draaien van de sleutel gaat het kistje open. Is het kistje leeg neemt het direct 2 LP op als energie. Als er al energie in zit kan dit er uitgehaald worden per LP.
-id = 00DE2B5F
+id = 0000DE2B5F
 level = 1
 load = 10
 connected = 0
@@ -56,7 +56,7 @@ connected = 0
 [item7]
 name = Kristallen Feestglas
 function = Onbekend in pilaar
-id = 00DD48CC
+id = 0000DD48CC
 level = 1
 load = 5
 connected = 0
@@ -64,7 +64,7 @@ connected = 0
 [item8]
 name = Dryade diadeem
 function = Onbekend in pilaar
-id = 00DDD428
+id = 0000DDD428
 level = 2
 load = 30
 connected = 0
@@ -72,23 +72,23 @@ connected = 0
 [item9]
 name = Vloeislag de 1ste
 function = Onbekend in pilaar
-id = 00DA4274
+id = 0000DA4274
 level = 1
 load = 10
 connected = 0
 
 [item10]
-name = Berichten Stenen
-function = Kan met de schaduwen van de drakenklauw communiceren
-id = 00DA1BF7
+name = Drakenklauw Amulet
+function = Onbekend in de pilaar
+id = 0000DCBF27
 level = 1
 load = 8
 connected = 0
 
 [item11]
-name = Boek der Rituelen
-function = Laat op een landkaart zien waar iets van belang gebeurd voor de kijker
-id = 00DDDD07
+name = Berichten Stenen
+function = Kan met korte berichten met zijn tweeling communiceren. Duurt net zo lang als een bode.
+id = 0000DA1BF7
 level = 1
 load = 10
 connected = 0
@@ -96,24 +96,40 @@ connected = 0
 [item12]
 name = Omgevingskaart
 function = Communiceerd tot 2x met zijn tegenpool
-id = 00DE1384
+id = 0000DE1384
+level = 1
+load = 10
+connected = 0
+
+[item13]
+name = Herhaalpaal
+function = Onbekend in de pilaar
+id = 0000DD48D0
 level = 1
 load = 12
 connected = 0
 
-[item13]
-name = Drakenklauw Amulet
-function = Spintol Vonne TEMP function tbd
-id = 00DCBF27
+[item14]
+name = Hand Spinner
+function = Onbekend in de pilaar
+id = 0000DD48D0
 level = 1
-load = 8
+load = 7
 connected = 0
 
-[item99]
-name = TEST
+[item15]
+name = Boek der Rituelen
+function = Laat op een landkaart zien waar iets van belang gebeurd voor de kijker
+id = 0000DDDD07
+level = 2
+load = 30
+connected = 0
+
+[item9999]
+name = OVERLOADTEST
 function = This is just for test purposes
-id = F0DEAD0F
+id = 0000DD2BB4
 level = 3
-load = 99
+load = 9999
 connected = 0
 

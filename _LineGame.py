@@ -296,12 +296,15 @@ class MultiLineGame(LineGame):
         line_color = self._parser.get('LineGame', 'lineColor', fallback='turquoise')
         false_color = self._parser.get('MultiLineGame', 'falseLineColor', fallback='red')
 
+        # Each level gets its own real-line count; every level gets one red
+        # false line whose goal button must NOT be pressed for a win.
         if level >= 3:
             real_count = self._parser.getint('MultiLineGame', 'multiLineCountL3', fallback=3)
-            has_false = True
-        else:
+        elif level == 2:
             real_count = self._parser.getint('MultiLineGame', 'multiLineCountL2', fallback=2)
-            has_false = False
+        else:
+            real_count = self._parser.getint('MultiLineGame', 'multiLineCountL1', fallback=1)
+        has_false = True
 
         # Pick unique goal buttons for each line
         available = list(self._table.gameButtons)
@@ -324,9 +327,14 @@ class MultiLineGame(LineGame):
                 'counter': 0,
                 'head_idx': 0,
                 'tail_idx': 0,
+                'gap_at_end': True,
             })
             if not is_false:
                 self.goal_buttons.append(g)
+
+        # Every multiline route leaves the LED nearest its goal button dark,
+        # so a player can see where each line stops even when several lines
+        # are running together through shared segments.
 
         # Store the first real route in ctx for S11 compatibility
         # (S11's line-mode check uses ctx.currentGameRoute)

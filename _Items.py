@@ -17,6 +17,8 @@ import configparser
 import os
 import threading
 
+from _Characters import _normalize_id, _scrub_id_in_parser, scrub_id_from_config
+
 class _Items(object):
     """Item inventory: menu navigation, connection state, and overload protection.
 
@@ -108,18 +110,22 @@ class _Items(object):
     def write_tag(self, item_name, new_id):
         """Write a new RFID tag ID for the given item to disk.
 
-        Updates in-memory state immediately and advances the mtime sentinel
-        so the watcher does not trigger a redundant reload.
+        Enforces cross-file uniqueness: any other item or character that
+        held ``new_id`` is rewritten to the sentinel id so a tag is owned
+        by at most one entity. The mtime sentinels on both stores are
+        advanced so the watchers don't redundantly reload right after.
 
         Args:
             item_name -- config section / item name key (e.g. 'item3')
-            new_id    -- new hex string tag ID (e.g. '00DDBC16')
+            new_id    -- new hex string tag ID (e.g. '0000DDBC16')
         """
+        new_id = _normalize_id(new_id)
         self.parser.read(self.config_file)
-        old_id = None
-        if item_name in self.items:
-            old_id = self.items[item_name].ID
-        self.parser.set(item_name, 'id', str(new_id))
+
+        # Scrub any other item that currently holds new_id (same parser,
+        # one write) and assign new_id to the target section.
+        _scrub_id_in_parser(self.parser, new_id, skip_section=item_name)
+        self.parser.set(item_name, 'id', new_id)
         with open(self.config_file, 'w') as f:
             self.parser.write(f)
 
@@ -128,13 +134,29 @@ class _Items(object):
         except OSError:
             pass
 
-        # Update in-memory immediately
-        if old_id is not None and old_id in self.itemsIDs:
-            item = self.itemsIDs.pop(old_id)
-            item.ID = new_id
-            self.itemsIDs[new_id] = item
-        if item_name in self.items:
-            self.items[item_name].ID = new_id
+        # Cross-file scrub: clear new_id from characterconfig if present.
+        characters_changed = False
+        try:
+            import glbs
+            characters_changed = scrub_id_from_config(
+                glbs.characters.config_file, new_id)
+            if characters_changed:
+                try:
+                    glbs.characters._mtime = os.path.getmtime(
+                        glbs.characters.config_file)
+                except OSError:
+                    pass
+        except (ImportError, AttributeError):
+            pass  # glbs.characters unavailable (e.g. unit tests)
+
+        # Reload so in-memory state matches disk exactly across both stores.
+        self.reload()
+        if characters_changed:
+            try:
+                import glbs
+                glbs.characters.reload()
+            except (ImportError, AttributeError):
+                pass
 
     def _start_watcher(self):
         """Start the background file-change watcher thread (daemon)."""

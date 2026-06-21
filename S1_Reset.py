@@ -67,6 +67,9 @@ class S1_Reset():
             glbs.mqtt.tick_heartbeat()
             self._setState()
 
+        # Fade the idle animation out before handing off to the next state.
+        # Harmless if Disabled/Overload left the table already dark.
+        glbs.table.fade_to_black(2.0)
         return self.state.value
 
     # ------------------------------------------------------------------ #
@@ -116,7 +119,10 @@ class S1_Reset():
             return
 
         sel_idx = 0
-        updated = {}   # entry index → new_id assigned this session
+        # Keyed by section (not index) so the highlight survives re-indexing
+        # after a write triggers a cross-file scrub + entries rebuild.
+        updated_by_section = {}
+        updated = {}
 
         glbs.display.draw_gm_assign(entries, sel_idx, updated)
 
@@ -138,8 +144,21 @@ class S1_Reset():
                         glbs.characters.write_tag(entry["section"], new_id)
                     else:
                         glbs.items.write_tag(entry["section"], new_id)
-                    updated[sel_idx] = new_id
-                    entry["current_id"] = new_id
+                    updated_by_section[entry["section"]] = new_id
+
+                    # Rebuild entries from the now-mutated stores so a scrubbed
+                    # previous owner is reflected in the list.
+                    entries = self._build_gm_entries()
+                    updated = {
+                        i: updated_by_section[e["section"]]
+                        for i, e in enumerate(entries)
+                        if e["section"] in updated_by_section
+                    }
+                    sel_idx = next(
+                        (i for i, e in enumerate(entries)
+                         if e["section"] == entry["section"]),
+                        sel_idx,
+                    )
                     print(f"GM assign: {entry['label']} → {new_id}")
                 glbs.display.draw_gm_assign(entries, sel_idx, updated)
 
@@ -279,12 +298,10 @@ class S1_Reset():
     # Spark animation (Broken)                                             #
     # ------------------------------------------------------------------ #
     def _runSparkBehaviour(self):
-        """Run one spark animation across the table using shared _Table methods."""
-        color = glbs.table.colorsLED["turquoise"]
-        chosen = glbs.random.choice(glbs.table._sparklist)
-        chosen.resetSpark()
-        sparks = [chosen]
+        """Run a short lightning-spark burst across the table.
 
-        while sparks:
-            glbs.table._advance_sparks(sparks, color)
-            glbs.devices.transmitLED(glbs.table.getLEDData())
+        Each Broken-idle interval fires one burst of bluewhite arc-flash
+        sparks (see _Table.run_lightning_sparks). The inter-burst pause is
+        governed by self.idleTimeout in run().
+        """
+        glbs.table.run_lightning_sparks(1.0)

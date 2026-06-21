@@ -69,6 +69,20 @@ class TestMultiLineInterface:
 # ---------------------------------------------------------------------------
 
 class TestMultiLineRoutes:
+    def test_level1_creates_one_real_plus_false(self, multiline_table_config_file,
+                                                  multiline_marvin_config, monkeypatch):
+        table = make_table(multiline_table_config_file)
+        parser = make_parser(multiline_marvin_config)
+        game = MultiLineGame(table, parser)
+        ctx = make_ctx()
+        monkeypatch.setitem(sys.modules, 'glbs', make_glbs_stub(ctx, items_level=1))
+
+        game.start(None)
+        # multiLineCountL1 = 1 real + 1 false = 2 total
+        assert len(game.routes) == 2
+        assert sum(1 for r in game.routes if r['is_false']) == 1
+        assert sum(1 for r in game.routes if not r['is_false']) == 1
+
     def test_level2_creates_configured_route_count(self, multiline_table_config_file,
                                                      multiline_marvin_config, monkeypatch):
         table = make_table(multiline_table_config_file)
@@ -78,8 +92,10 @@ class TestMultiLineRoutes:
         monkeypatch.setitem(sys.modules, 'glbs', make_glbs_stub(ctx, items_level=2))
 
         game.start(None)
-        assert len(game.routes) == 2  # multiLineCountL2 = 2
-        assert all(not r['is_false'] for r in game.routes)
+        # multiLineCountL2 = 2 real + 1 false = 3 total
+        assert len(game.routes) == 3
+        assert sum(1 for r in game.routes if r['is_false']) == 1
+        assert sum(1 for r in game.routes if not r['is_false']) == 2
 
     def test_level3_creates_routes_plus_false(self, multiline_table_config_file,
                                                multiline_marvin_config, monkeypatch):

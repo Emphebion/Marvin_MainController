@@ -102,7 +102,7 @@ name=TableBroken
 name=TableOverload
 
 [GameModes]
-level1 = line
+level1 = multiline
 level2 = multiline
 level3 = multiline
 
@@ -137,6 +137,7 @@ node_id  = marvin-001
 lineColor = turquoise
 
 [MultiLineGame]
+multiLineCountL1 = 1
 multiLineCountL2 = 2
 multiLineCountL3 = 3
 falseLineColor = red

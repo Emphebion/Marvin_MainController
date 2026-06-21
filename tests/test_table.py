@@ -6,8 +6,12 @@ LED data output, colour management.
 import configparser
 import math
 import os
+import sys
+import types
 import pytest
-from _Table import _Table, _Segment, _Button
+from unittest.mock import MagicMock
+from _Table import _Table, _Segment, _Button, Spark
+import _Table as _Table_module
 
 
 REAL_TABLE_CONFIG = os.path.join(os.path.dirname(__file__), '..', 'tableconfig.txt')
@@ -651,3 +655,458 @@ class TestDrawWithPalette:
         turquoise = [64, 224, 208]
         for row in real_table.getLEDData():
             assert row == turquoise
+
+
+# ---------------------------------------------------------------------------
+# Fade-to-black helper
+# ---------------------------------------------------------------------------
+
+class TestFadeToBlack:
+    """fade_to_black is used at the tail of non-game state exits.
+
+    It snapshots the current LED buffer, linearly scales every triple to
+    black across N frames, then forces a final black + transmit.
+
+    Tests stub `glbs.devices.transmitLED` and patch `_Table.time.sleep`
+    so the suite stays fast.
+    """
+
+    def _install_glbs_stub(self, monkeypatch):
+        captured = []
+
+        def capture(data):
+            # Snapshot each transmitted frame as a deep copy.
+            captured.append([list(rgb) for rgb in data])
+
+        stub = types.SimpleNamespace(
+            devices=types.SimpleNamespace(transmitLED=capture)
+        )
+        monkeypatch.setitem(sys.modules, 'glbs', stub)
+        monkeypatch.setattr(_Table_module.time, 'sleep',
+                            lambda *_a, **_k: None)
+        return captured
+
+    def test_instant_blank_when_seconds_zero(self, table_config_file, monkeypatch):
+        captured = self._install_glbs_stub(monkeypatch)
+        table = make_table(table_config_file)
+        table.setAllTableLEDs([200, 100, 50])
+        table.fade_to_black(0)
+        # Every LED is now black.
+        for seg in table.segmentList:
+            assert all(v == [0, 0, 0] for v in seg.getLEDvalues())
+        # Exactly one transmit for the instant blank.
+        assert len(captured) == 1
+        assert all(rgb == [0, 0, 0] for rgb in captured[0])
+
+    def test_negative_seconds_treated_as_instant(self, table_config_file, monkeypatch):
+        self._install_glbs_stub(monkeypatch)
+        table = make_table(table_config_file)
+        table.setAllTableLEDs([200, 100, 50])
+        table.fade_to_black(-1)
+        for seg in table.segmentList:
+            assert all(v == [0, 0, 0] for v in seg.getLEDvalues())
+
+    def test_fade_ends_black(self, table_config_file, monkeypatch):
+        self._install_glbs_stub(monkeypatch)
+        table = make_table(table_config_file)
+        table.setAllTableLEDs([200, 100, 50])
+        table.fade_to_black(1, frame_rate=4)
+        for seg in table.segmentList:
+            assert all(v == [0, 0, 0] for v in seg.getLEDvalues())
+
+    def test_fade_intermediate_steps_strictly_decreasing(self, table_config_file, monkeypatch):
+        """Captured per-frame brightness must monotonically decrease to zero."""
+        captured = self._install_glbs_stub(monkeypatch)
+        table = make_table(table_config_file)
+        table.setAllTableLEDs([200, 100, 50])
+        table.fade_to_black(1, frame_rate=4)
+
+        # n_frames = 4 animated frames + 1 final safety blank = 5 transmits.
+        assert len(captured) == 5
+
+        # Examine the first LED in each frame.
+        sequence = [frame[0] for frame in captured]
+        # Expected scale factors: 0.75, 0.5, 0.25, 0.0, then explicit black.
+        assert sequence[0] == [int(200 * 0.75), int(100 * 0.75), int(50 * 0.75)]
+        assert sequence[1] == [int(200 * 0.5),  int(100 * 0.5),  int(50 * 0.5)]
+        assert sequence[2] == [int(200 * 0.25), int(100 * 0.25), int(50 * 0.25)]
+        assert sequence[3] == [0, 0, 0]
+        assert sequence[4] == [0, 0, 0]
+
+        # Every LED in every frame moved in lockstep — pick channel R.
+        reds = [frame[0][0] for frame in captured]
+        assert reds == sorted(reds, reverse=True)
+
+    def test_fade_preserves_already_black(self, table_config_file, monkeypatch):
+        """Fading an already-dark table is a no-op visually."""
+        captured = self._install_glbs_stub(monkeypatch)
+        table = make_table(table_config_file)
+        # Default state is already all-black.
+        table.fade_to_black(1, frame_rate=2)
+        for frame in captured:
+            assert all(rgb == [0, 0, 0] for rgb in frame)
+
+
+# ---------------------------------------------------------------------------
+# Spark.resetSpark
+# ---------------------------------------------------------------------------
+
+class TestSparkReset:
+    def test_reset_clears_user_tags_from_previous_run(self, table_config_file):
+        """A re-run of the same Spark must not see stale 'Done' tags
+        left over from its previous animation cycle."""
+        table = make_table(table_config_file)
+        seg = table.getSegment('segm0')
+        spark = Spark('spark0', [seg])
+        # Simulate leftover state from a previous run.
+        seg.setUser(0, 'spark0')
+        seg.setUser(2, 'Done')
+
+        spark.resetSpark()
+
+        assert all(u == 'Unused' for u in seg.getLEDUsers())
+
+    def test_reset_clears_segments_done_list(self, table_config_file):
+        """resetSpark must clear segmentsDone so a re-run starts cleanly."""
+        table = make_table(table_config_file)
+        seg = table.getSegment('segm0')
+        spark = Spark('spark0', [seg])
+        spark.segmentsDone = [seg]
+        spark.segmentDoneDirection = [1]
+
+        spark.resetSpark()
+
+        assert spark.segmentsDone == []
+        assert spark.segmentDoneDirection == []
+        assert spark.lengthCounter == 0
+        assert spark.segmentsActive == [seg]
+
+    def test_reset_no_segments_is_noop(self):
+        """An empty-segments Spark must return silently rather than
+        spin-loop (the dead-code bug fixed in S3)."""
+        spark = Spark.__new__(Spark)
+        spark.segments = []
+        spark.segmentsActive = []
+        spark.segmentActiveDirection = []
+        spark.segmentsDone = []
+        spark.segmentDoneDirection = []
+        spark.lengthCounter = 0
+        # Must return immediately without raising or hanging.
+        spark.resetSpark()
+
+
+# ---------------------------------------------------------------------------
+# _Table.run_chaos_sparks
+# ---------------------------------------------------------------------------
+
+class TestRunChaosSparks:
+    """Multi-spark chaos engine. Tests stub glbs.time/glbs.devices so the
+    suite stays fast and deterministic."""
+
+    def _install_glbs_stub(self, monkeypatch, frames_to_run):
+        """Stub glbs.time so .time() returns synthetic timestamps that
+        cap the chaos loop at a known number of frames.
+
+        Each frame consumes two time() reads (loop guard + frame_start).
+        Plus one read at start (last_time) and one at top before the loop.
+        We emit a long tail of 'past end_time' values to guarantee exit.
+        """
+        captured_frames = []
+
+        def capture(data):
+            captured_frames.append([list(rgb) for rgb in data])
+
+        # Pre-build a time sequence: enough sub-end_time values to run
+        # frames_to_run, then jump well past end_time.
+        # Each iteration of the while loop calls time.time() at the guard
+        # AND at frame_start; we want both to read 'now < end_time' during
+        # the frame, and the guard to read 'now >= end_time' to exit.
+        # Use a simple monotonic float counter advanced by sleep().
+        clock = [0.0]
+
+        def fake_time():
+            return clock[0]
+
+        def fake_sleep(seconds):
+            if seconds and seconds > 0:
+                clock[0] += seconds
+
+        stub_time = types.SimpleNamespace(time=fake_time, sleep=fake_sleep)
+        stub = types.SimpleNamespace(
+            time=stub_time,
+            devices=types.SimpleNamespace(transmitLED=capture),
+        )
+        monkeypatch.setitem(sys.modules, 'glbs', stub)
+        return captured_frames, clock
+
+    def test_paces_with_target_fps(self, table_config_file, monkeypatch):
+        """Sleep is called per frame to honour target_fps."""
+        captured, clock = self._install_glbs_stub(monkeypatch, frames_to_run=5)
+        table = make_table(table_config_file)
+        # 0.5 s @ 10 fps → 5 frames + 1 trailing final-black transmit.
+        table.run_chaos_sparks(0.5, target_fps=10, concurrent=2, spawn_rate=10.0)
+        # Loop runs until clock advances past end_time; with sleep=1/10 per
+        # frame, expect ~5 frames in-loop + 1 final transmit at the end.
+        assert len(captured) == 6
+        # Final frame is all-black (final clear-and-transmit).
+        assert all(rgb == [0, 0, 0] for rgb in captured[-1])
+
+    def test_caps_concurrent_sparks(self, table_config_file, monkeypatch):
+        """Active spark count never exceeds the `concurrent` cap."""
+        captured, clock = self._install_glbs_stub(monkeypatch, frames_to_run=10)
+        table = make_table(table_config_file)
+        # Sample the active list by patching random.choice to count calls.
+        original_choice = _Table_module.random.choice
+        spawn_log = []
+
+        def logging_choice(seq):
+            picked = original_choice(seq)
+            spawn_log.append(picked)
+            return picked
+
+        monkeypatch.setattr(_Table_module.random, 'choice', logging_choice)
+        # High spawn_rate, low cap: the cap must hold the line.
+        table.run_chaos_sparks(0.5, target_fps=10, concurrent=3,
+                                spawn_rate=100.0)
+        # We can't observe `active` directly post-hoc, but the captured
+        # frames let us bound it: each frame lights at most one LED per
+        # active spark (head step). Total lit LEDs per frame ≤ concurrent.
+        for frame in captured[:-1]:  # skip trailing all-black
+            lit = sum(1 for rgb in frame if rgb != [0, 0, 0])
+            assert lit <= 3
+
+    def test_finished_sparks_are_retired(self, table_config_file, monkeypatch):
+        """Sparks whose segments are fully consumed leave the active list."""
+        captured, clock = self._install_glbs_stub(monkeypatch, frames_to_run=200)
+        table = make_table(table_config_file)
+        # Force a single short-lived spark, spawn once, no further spawns.
+        table.run_chaos_sparks(5.0, target_fps=10, concurrent=1,
+                                spawn_rate=0.2)
+        # With spawn_rate 0.2 and 5 s runtime, at most ~1 spark spawns.
+        # All frames after the spark dies must be all-black (no active sparks).
+        # The final transmit is always all-black; check that a tail of
+        # consecutive all-black frames exists before the final one.
+        all_black = lambda frame: all(rgb == [0, 0, 0] for rgb in frame)
+        # Find a black tail of at least 5 frames (≥ 0.5 s of quiet).
+        tail_black = 0
+        for frame in reversed(captured):
+            if all_black(frame):
+                tail_black += 1
+            else:
+                break
+        assert tail_black >= 5
+
+    def test_emits_at_least_one_frame(self, table_config_file, monkeypatch):
+        """Even a zero-ish duration must transmit the final-black frame."""
+        captured, clock = self._install_glbs_stub(monkeypatch, frames_to_run=0)
+        table = make_table(table_config_file)
+        table.run_chaos_sparks(0.0, target_fps=10, concurrent=2,
+                                spawn_rate=10.0)
+        # One trailing all-black transmit.
+        assert len(captured) >= 1
+        assert all(rgb == [0, 0, 0] for rgb in captured[-1])
+
+
+# ---------------------------------------------------------------------------
+# _Table.run_lightning_sparks
+# ---------------------------------------------------------------------------
+
+class TestRunLightningSparks:
+    """Compositied buffer engine for lightning-arc sparks. Same glbs stub
+    pattern as TestRunChaosSparks: synthetic clock so the loop is bounded."""
+
+    def _install_glbs_stub(self, monkeypatch):
+        captured_frames = []
+
+        def capture(data):
+            captured_frames.append([list(rgb) for rgb in data])
+
+        clock = [0.0]
+
+        def fake_time():
+            return clock[0]
+
+        def fake_sleep(seconds):
+            if seconds and seconds > 0:
+                clock[0] += seconds
+
+        stub_time = types.SimpleNamespace(time=fake_time, sleep=fake_sleep)
+        stub = types.SimpleNamespace(
+            time=stub_time,
+            devices=types.SimpleNamespace(transmitLED=capture),
+        )
+        monkeypatch.setitem(sys.modules, 'glbs', stub)
+        return captured_frames, clock
+
+    def test_decay_fades_stamped_led_toward_black(self, table_config_file, monkeypatch):
+        """A stamped LED falls toward black under repeated decay-only frames."""
+        captured, clock = self._install_glbs_stub(monkeypatch)
+        table = make_table(table_config_file)
+
+        # Suppress all stamping after the first call so the buffer only ever
+        # receives one fresh stamp, then decays uninterrupted for the
+        # remainder of the run.
+        stamp_count = [0]
+        real_stamp = table._stamp_lightning
+
+        def stamp_once(buf, offsets, spark, base, tint):
+            stamp_count[0] += 1
+            if stamp_count[0] == 1:
+                real_stamp(buf, offsets, spark, base, tint)
+
+        monkeypatch.setattr(table, '_stamp_lightning', stamp_once)
+
+        table.run_lightning_sparks(0.7, target_fps=10, concurrent=4,
+                                    spawn_rate=10.0,
+                                    life_min=1, life_max=1,
+                                    length_min=3, length_max=3,
+                                    streak_ratio=0.0, decay=0.5,
+                                    tint_range=0)
+        # At least one stamp landed.
+        assert stamp_count[0] >= 1
+        # Final frame is the explicit all-black tail.
+        assert all(rgb == [0, 0, 0] for rgb in captured[-1])
+        # The frame just before — after several decay-only steps — should
+        # sit well below the bluewhite base [120, 170, 255] on every channel.
+        before_final = captured[-2]
+        for rgb in before_final:
+            assert rgb[0] < 60 and rgb[1] < 85 and rgb[2] < 128
+
+    def test_per_pixel_tint_varies_between_frames(self, table_config_file, monkeypatch):
+        """Same LED takes different RGB values across consecutive frames."""
+        captured, clock = self._install_glbs_stub(monkeypatch)
+        table = make_table(table_config_file)
+        # Force a single flash spark stamped each frame. concurrent=1 cap
+        # prevents new spawns once filled; life_max keeps it alive several frames.
+        # Use a high tint_range and zero decay so we observe stamp variation
+        # without prior values bleeding in via the per-channel max.
+        table.run_lightning_sparks(0.5, target_fps=10, concurrent=1,
+                                    spawn_rate=100.0, life_min=4, life_max=4,
+                                    length_min=3, length_max=3,
+                                    streak_ratio=0.0, decay=0.0,
+                                    tint_range=60)
+        # Collect frames that aren't all-black and aren't the trailing clear.
+        lit_frames = [f for f in captured[:-1]
+                      if any(rgb != [0, 0, 0] for rgb in f)]
+        assert len(lit_frames) >= 2
+        # For each LED position, look at the (non-black) values across frames.
+        # At least one LED must show ≥ 2 distinct RGB triples (re-randomised tint).
+        n = len(lit_frames[0])
+        any_varied = False
+        for i in range(n):
+            seen = {tuple(f[i]) for f in lit_frames if f[i] != [0, 0, 0]}
+            if len(seen) >= 2:
+                any_varied = True
+                break
+        assert any_varied
+
+    def test_streak_head_advances_by_stride(self, table_config_file, monkeypatch):
+        """A streak's start_index moves by direction*stride each frame."""
+        captured, clock = self._install_glbs_stub(monkeypatch)
+        table = make_table(table_config_file)
+
+        # Capture (spark_obj, start_index) at each stamp. Holding the
+        # object refs in `observed` prevents GC + id-reuse from merging
+        # successive sparks together.
+        observed = []
+        real_stamp = table._stamp_lightning
+
+        def capture_stamp(buf, offsets, spark, base, tint):
+            observed.append((spark, spark.start_index))
+            real_stamp(buf, offsets, spark, base, tint)
+
+        monkeypatch.setattr(table, '_stamp_lightning', capture_stamp)
+
+        # Force streak mode; fixed stride=2, length=2.
+        table.run_lightning_sparks(1.0, target_fps=10, concurrent=1,
+                                    spawn_rate=100.0,
+                                    length_min=2, length_max=2,
+                                    life_min=20, life_max=20,
+                                    streak_ratio=1.0,
+                                    streak_stride_min=2, streak_stride_max=2,
+                                    decay=0.0, tint_range=0)
+        # Find the longest run of consecutive same-object stamps.
+        runs = []  # list[list[int]] of start_index per spark
+        current = None
+        current_obj = None
+        for obj, idx in observed:
+            if obj is not current_obj:
+                current = [idx]
+                current_obj = obj
+                runs.append(current)
+            else:
+                current.append(idx)
+        # At least one spark must have stamped twice (proving the head moved).
+        long_runs = [r for r in runs if len(r) >= 2]
+        assert long_runs, f"no spark stamped twice; runs={[len(r) for r in runs]}"
+        for run in long_runs:
+            deltas = [run[i + 1] - run[i] for i in range(len(run) - 1)]
+            assert all(d == 2 or d == -2 for d in deltas), \
+                f"unexpected deltas {deltas} (run {run})"
+            assert len({d > 0 for d in deltas}) == 1
+
+    def test_concurrent_cap_honoured(self, table_config_file, monkeypatch):
+        """Total active sparks stamped per frame never exceeds the cap."""
+        captured, clock = self._install_glbs_stub(monkeypatch)
+        table = make_table(table_config_file)
+
+        per_frame_stamps = [0]
+        frame_id = [0]
+        real_stamp = table._stamp_lightning
+
+        def counting_stamp(buf, offsets, spark, base, tint):
+            per_frame_stamps[0] += 1
+            real_stamp(buf, offsets, spark, base, tint)
+
+        monkeypatch.setattr(table, '_stamp_lightning', counting_stamp)
+
+        max_active = [0]
+        real_transmit = sys.modules['glbs'].devices.transmitLED
+
+        def transmit_and_reset(data):
+            if per_frame_stamps[0] > max_active[0]:
+                max_active[0] = per_frame_stamps[0]
+            per_frame_stamps[0] = 0
+            frame_id[0] += 1
+            real_transmit(data)
+
+        sys.modules['glbs'].devices.transmitLED = transmit_and_reset
+
+        table.run_lightning_sparks(1.0, target_fps=10, concurrent=4,
+                                    spawn_rate=1000.0,
+                                    life_min=10, life_max=10,
+                                    streak_ratio=0.0,
+                                    decay=0.5, tint_range=0)
+        assert max_active[0] <= 4
+        assert max_active[0] >= 1  # sanity: something did fire
+
+    def test_buffer_reaches_black_after_duration(self, table_config_file, monkeypatch):
+        """Final transmitted frame is all-black (explicit tail clear)."""
+        captured, clock = self._install_glbs_stub(monkeypatch)
+        table = make_table(table_config_file)
+        table.run_lightning_sparks(0.3, target_fps=10, concurrent=4,
+                                    spawn_rate=20.0)
+        assert all(rgb == [0, 0, 0] for rgb in captured[-1])
+
+    def test_length_range_respected(self, table_config_file, monkeypatch):
+        """Spawned sparks have length in [length_min, length_max]."""
+        captured, clock = self._install_glbs_stub(monkeypatch)
+        table = make_table(table_config_file)
+
+        spawned = []
+        real_make = table._make_lightning_spark
+
+        def capture_make(*args, **kwargs):
+            s = real_make(*args, **kwargs)
+            spawned.append(s)
+            return s
+
+        monkeypatch.setattr(table, '_make_lightning_spark', capture_make)
+
+        table.run_lightning_sparks(2.0, target_fps=10, concurrent=8,
+                                    spawn_rate=25.0,
+                                    length_min=3, length_max=10)
+        assert len(spawned) >= 10
+        lengths = [s.length for s in spawned]
+        assert min(lengths) >= 3
+        assert max(lengths) <= 10

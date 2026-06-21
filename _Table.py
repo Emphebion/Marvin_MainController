@@ -121,6 +121,35 @@ class _Table(object):
             for i,prevColor in enumerate(segment.LEDvalues):
                 segment.setLEDValue(i,color)
 
+    def fade_to_black(self, seconds, frame_rate=30):
+        """Smoothly fade every LED to black over ``seconds`` seconds.
+
+        Snapshots the current per-LED RGB values, then scales them down by
+        a linearly decreasing factor each frame until fully black. Blocks
+        the caller for the fade duration.
+
+        seconds <= 0 → instant blank (single transmit).
+        """
+        import glbs
+        if seconds <= 0:
+            self.setAllTableLEDs(self.colorsLED["black"])
+            glbs.devices.transmitLED(self.getLEDData())
+            return
+        snapshot = [list(seg.getLEDvalues()) for seg in self.segmentList]
+        n_frames = max(1, int(seconds * frame_rate))
+        frame_interval = 1.0 / frame_rate
+        for k in range(1, n_frames + 1):
+            factor = 1.0 - (k / n_frames)
+            for seg_idx, seg in enumerate(self.segmentList):
+                for i, rgb in enumerate(snapshot[seg_idx]):
+                    seg.setLEDValue(i, [int(rgb[0] * factor),
+                                        int(rgb[1] * factor),
+                                        int(rgb[2] * factor)])
+            glbs.devices.transmitLED(self.getLEDData())
+            time.sleep(frame_interval)
+        self.setAllTableLEDs(self.colorsLED["black"])
+        glbs.devices.transmitLED(self.getLEDData())
+
     def resolve_color(self, value):
         """Resolve a colour parameter value to [R,G,B].
 
@@ -464,12 +493,8 @@ class _Table(object):
     def run_spark_animation(self, duration, color=None):
         """Run spark animations across the table for the given duration (seconds).
 
-        Blocks the main loop for the duration. Used for Broken idle state
-        and overload events.
-
-        Args:
-            duration -- how long to animate (seconds)
-            color    -- spark colour [R,G,B]; defaults to turquoise
+        Deprecated: production callers use run_lightning_sparks. Kept for
+        hardware A/B comparison; will be removed in a follow-up cleanup.
         """
         if color is None:
             color = self.colorsLED["turquoise"]
@@ -486,6 +511,201 @@ class _Table(object):
             while sparks:
                 self._advance_sparks(sparks, color)
                 glbs.devices.transmitLED(self.getLEDData())
+
+        self.setAllTableLEDs(black)
+        glbs.devices.transmitLED(self.getLEDData())
+
+    def run_chaos_sparks(self, duration, color=None, target_fps=18,
+                         concurrent=8, spawn_rate=12.0):
+        """Render multiple sparks per frame for a chaotic-flash look.
+
+        Deprecated: production callers use run_lightning_sparks. Kept for
+        hardware A/B comparison; will be removed in a follow-up cleanup.
+        """
+        if color is None:
+            color = self.colorsLED["turquoise"]
+        black = self.colorsLED["black"]
+        self._ensure_sparklist()
+        self.setAllTableLEDs(black)
+
+        import glbs
+        frame_interval = 1.0 / target_fps
+        active = []
+        spawn_accum = 0.0
+        end_time = glbs.time.time() + duration
+        last_time = glbs.time.time()
+
+        while glbs.time.time() < end_time:
+            frame_start = glbs.time.time()
+            dt = frame_start - last_time
+            last_time = frame_start
+
+            spawn_accum += spawn_rate * dt
+            while spawn_accum >= 1.0 and len(active) < concurrent:
+                spark = random.choice(self._sparklist)
+                if spark not in active:
+                    spark.resetSpark()
+                    active.append(spark)
+                spawn_accum -= 1.0
+
+            self.setAllTableLEDs(black)
+            for spark in active:
+                self._advance_sparks([spark], color)
+
+            active = [s for s in active if s.segmentsActive or s.segmentsDone]
+
+            glbs.devices.transmitLED(self.getLEDData())
+
+            elapsed = glbs.time.time() - frame_start
+            sleep_for = frame_interval - elapsed
+            if sleep_for > 0:
+                glbs.time.sleep(sleep_for)
+
+        self.setAllTableLEDs(black)
+        glbs.devices.transmitLED(self.getLEDData())
+
+    # ------------------------------------------------------------------ #
+    # Lightning sparks — composited frame-buffer engine                  #
+    # ------------------------------------------------------------------ #
+    def _total_leds(self):
+        return sum(s.nrLEDs for s in self.segmentList)
+
+    def _segment_offsets(self):
+        """Return {seg.name: starting_global_index} matching getLEDData() order."""
+        offsets = {}
+        cum = 0
+        for s in self.segmentList:
+            offsets[s.name] = cum
+            cum += s.nrLEDs
+        return offsets
+
+    def _buffer_to_segments(self, buf, offsets):
+        """Copy the flat RGB buffer back into each _Segment.LEDvalues."""
+        for s in self.segmentList:
+            off = offsets[s.name]
+            for i in range(s.nrLEDs):
+                px = buf[off + i]
+                s.setLEDValue(i, [px[0], px[1], px[2]])
+
+    def _make_lightning_spark(self, length_min, length_max,
+                              life_min, life_max,
+                              streak_ratio,
+                              stride_min, stride_max):
+        seg = random.choice(self.segmentList)
+        length = random.randint(length_min, length_max)
+        life = random.randint(life_min, life_max)
+        start_index = random.randint(0, max(0, seg.nrLEDs - 1))
+        if random.random() < streak_ratio:
+            direction = 1 if random.random() < 0.5 else -1
+            stride = random.randint(stride_min, stride_max)
+            return _LightningSpark('streak', length, life, seg, start_index,
+                                   direction, stride)
+        return _LightningSpark('flash', length, life, seg, start_index)
+
+    def _stamp_lightning(self, buf, offsets, spark, base_color, tint_range):
+        """Composite one spark onto the buffer with per-pixel random tint.
+
+        Per-channel max keeps fresh bright stamps from being dimmed by the
+        decaying value beneath, and lets overlapping sparks brighten rather
+        than overwrite. Indices outside the segment are silently clipped.
+        """
+        off = offsets[spark.segment.name]
+        n = spark.segment.nrLEDs
+        if spark.mode == 'streak' and spark.direction < 0:
+            first = spark.start_index
+            last = spark.start_index + spark.length - 1
+        elif spark.mode == 'streak':
+            first = spark.start_index - spark.length + 1
+            last = spark.start_index
+        else:  # flash
+            first = spark.start_index
+            last = spark.start_index + spark.length - 1
+        br, bg, bb = base_color[0], base_color[1], base_color[2]
+        for idx in range(first, last + 1):
+            if 0 <= idx < n:
+                r = br + random.randint(-tint_range, tint_range)
+                g = bg + random.randint(-tint_range, tint_range)
+                b = bb + random.randint(-tint_range, tint_range)
+                if r < 0: r = 0
+                elif r > 255: r = 255
+                if g < 0: g = 0
+                elif g > 255: g = 255
+                if b < 0: b = 0
+                elif b > 255: b = 255
+                px = buf[off + idx]
+                if r > px[0]: px[0] = r
+                if g > px[1]: px[1] = g
+                if b > px[2]: px[2] = b
+
+    def _lightning_spark_alive(self, spark):
+        if spark.frames_remaining <= 0:
+            return False
+        if spark.mode != 'streak':
+            return True
+        n = spark.segment.nrLEDs
+        if spark.direction > 0:
+            return spark.start_index - (spark.length - 1) < n
+        return spark.start_index + (spark.length - 1) >= 0
+
+    def run_lightning_sparks(self, duration, base_color=None, target_fps=18,
+                             spawn_rate=25.0, concurrent=16,
+                             length_min=3, length_max=10,
+                             life_min=3, life_max=6,
+                             decay=0.35, tint_range=60,
+                             streak_ratio=0.10,
+                             streak_stride_min=2, streak_stride_max=5):
+        """Bluewhite arc-flash sparks across the table.
+
+        Maintains a per-LED RGB buffer that decays each frame, then stamps
+        short randomly-tinted flashes (and the occasional moving streak)
+        on top. Replaces the worm-like look of run_chaos_sparks with
+        sustained lightning crackle. See docs/plans/260620_improve_sparks_plan.md.
+        """
+        import glbs
+        if base_color is None:
+            base_color = self.colorsLED["bluewhite"]
+        black = self.colorsLED["black"]
+        buf = [[0, 0, 0] for _ in range(self._total_leds())]
+        offsets = self._segment_offsets()
+
+        active = []
+        spawn_accum = 0.0
+        frame_interval = 1.0 / target_fps
+        end_time = glbs.time.time() + duration
+        last_time = glbs.time.time()
+
+        while glbs.time.time() < end_time:
+            frame_start = glbs.time.time()
+            dt = frame_start - last_time
+            last_time = frame_start
+
+            for px in buf:
+                px[0] = int(px[0] * decay)
+                px[1] = int(px[1] * decay)
+                px[2] = int(px[2] * decay)
+
+            spawn_accum += spawn_rate * dt
+            while spawn_accum >= 1.0 and len(active) < concurrent:
+                active.append(self._make_lightning_spark(
+                    length_min, length_max, life_min, life_max,
+                    streak_ratio, streak_stride_min, streak_stride_max))
+                spawn_accum -= 1.0
+
+            for spark in active:
+                self._stamp_lightning(buf, offsets, spark, base_color, tint_range)
+                spark.frames_remaining -= 1
+                if spark.mode == 'streak':
+                    spark.start_index += spark.direction * spark.stride
+
+            active = [s for s in active if self._lightning_spark_alive(s)]
+
+            self._buffer_to_segments(buf, offsets)
+            glbs.devices.transmitLED(self.getLEDData())
+
+            elapsed = glbs.time.time() - frame_start
+            sleep_for = frame_interval - elapsed
+            if sleep_for > 0:
+                glbs.time.sleep(sleep_for)
 
         self.setAllTableLEDs(black)
         glbs.devices.transmitLED(self.getLEDData())
@@ -743,13 +963,14 @@ class Spark(object):
                 segment.setUser(index,"Unused")
 
     def resetSpark(self):
-        if self.segments:
-            self.segmentsActive = self.segments.copy()
-            self.segmentActiveDirection = self.segmentDirection.copy()
-            self.lengthCounter = 0
-        else:
-            while True:
-                temp = 1
+        if not self.segments:
+            return
+        self._resetUsers()
+        self.segmentsActive = self.segments.copy()
+        self.segmentActiveDirection = self.segmentDirection.copy()
+        self.segmentsDone = []
+        self.segmentDoneDirection = []
+        self.lengthCounter = 0
 
 
 class EnergyFlow(object):
@@ -839,3 +1060,24 @@ class EnergyFlow(object):
             t = i / max(1, self.length - 1)
             factor = 0.5 * (1.0 + math.cos(math.pi * t))
             seg.setLEDValue(led_idx, self._scale_color(self.base_color, factor))
+
+
+class _LightningSpark(object):
+    """One stamp used by _Table.run_lightning_sparks.
+
+    mode='flash'  -- pinned at start_index, stamped each frame for frames_remaining.
+    mode='streak' -- head moves by direction*stride per frame; a length-LED trail
+                     extends behind the head along the segment.
+    """
+    __slots__ = ('mode', 'length', 'frames_remaining',
+                 'segment', 'start_index', 'direction', 'stride')
+
+    def __init__(self, mode, length, frames_remaining, segment, start_index,
+                 direction=0, stride=0):
+        self.mode = mode
+        self.length = length
+        self.frames_remaining = frames_remaining
+        self.segment = segment
+        self.start_index = start_index
+        self.direction = direction
+        self.stride = stride

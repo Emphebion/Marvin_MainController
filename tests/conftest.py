@@ -68,7 +68,7 @@ status = Active
 segments = segm0,segm1,segm2
 gamebuttons = east
 screenbuttons = bottom,right,top,left,null,null,tag,shutdown
-colors = black,turquoise
+colors = black,turquoise,bluewhite
 maxRouteLength = 10
 nrOfStartSegments = 1
 
@@ -96,6 +96,9 @@ rgb = 0,0,0
 
 [turquoise]
 rgb = 64,224,208
+
+[bluewhite]
+rgb = 120,170,255
 """
 
 
@@ -225,12 +228,13 @@ MULTILINE_MARVIN_CONFIG = """
 lineColor = turquoise
 
 [MultiLineGame]
+multiLineCountL1 = 1
 multiLineCountL2 = 2
 multiLineCountL3 = 3
 falseLineColor = red
 
 [GameModes]
-level1 = line
+level1 = multiline
 level2 = multiline
 level3 = multiline
 """

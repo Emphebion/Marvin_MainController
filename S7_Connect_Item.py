@@ -55,7 +55,7 @@ class S7_Connect_Item():
                             duration = glbs.random.randint(
                                 glbs.parser.getint('common', 'overloadSparkMin'),
                                 glbs.parser.getint('common', 'overloadSparkMax'))
-                            glbs.table.run_spark_animation(duration)
+                            glbs.table.run_lightning_sparks(duration)
                         else:
                             glbs.mqtt.publish_item_connected(item_before)
                         glbs.items.currentItemName = ""

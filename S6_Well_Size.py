@@ -71,11 +71,10 @@ class S6_Well_Size(object):
                 last_frame_time = now
             self._setState()
 
-        # Clear the LED buffer so the well visualisation does not bleed into
-        # the next state's display (e.g. returning to S5_Well, which does not
-        # touch the LEDs).
-        glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
-        glbs.devices.transmitLED(glbs.table.getLEDData())
+        # Fade the well visualisation out so it doesn't bleed into the next
+        # state's display (e.g. returning to S5_Well, which does not touch
+        # the LEDs).
+        glbs.table.fade_to_black(2.0)
         return self.state.value
 
     def _draw_well_leds(self, elapsed):

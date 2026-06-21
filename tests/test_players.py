@@ -4,12 +4,19 @@ active character, ID=0 exclusion, and write_tag.
 """
 
 import configparser
+import sys
+import types
 import pytest
 from _Characters import _Characters, _Character
+from _Items import _Items
 
 
 def make_characters(character_config_file):
     return _Characters(character_config_file)
+
+
+def make_items(item_config_file):
+    return _Items(item_config_file)
 
 
 # ---------------------------------------------------------------------------
@@ -127,3 +134,127 @@ class TestWriteTag:
         characters = make_characters(character_config_file)
         characters.reload()
         assert "0000000000" not in characters.characterDict
+
+
+# ---------------------------------------------------------------------------
+# Cross-file unique-tag scrub (C4)
+# ---------------------------------------------------------------------------
+
+class TestUniqueTagScrub:
+    """A tag must be owned by at most one entity across characterconfig and
+    itemconfig. write_tag scrubs the previous owner (in either file) to the
+    sentinel id.
+    """
+
+    def _install_glbs_stub(self, monkeypatch, characters=None, items=None):
+        stub = types.SimpleNamespace()
+        if characters is not None:
+            stub.characters = characters
+        if items is not None:
+            stub.items = items
+        monkeypatch.setitem(sys.modules, 'glbs', stub)
+        return stub
+
+    def test_assigning_existing_character_tag_clears_previous_owner(
+            self, character_config_file, item_config_file, monkeypatch):
+        characters = make_characters(character_config_file)
+        items = make_items(item_config_file)
+        self._install_glbs_stub(monkeypatch, characters=characters, items=items)
+
+        # Hero currently owns 00000007D1; write it onto boss.
+        characters.write_tag('boss', '00000007D1')
+
+        # boss now has it, hero is sentinel'd.
+        assert characters._character_sections['boss'].ID == '00000007D1'
+        assert characters._character_sections['hero'].ID == '0000000000'
+
+    def test_assigning_existing_item_tag_to_character_clears_item(
+            self, character_config_file, item_config_file, monkeypatch):
+        characters = make_characters(character_config_file)
+        items = make_items(item_config_file)
+        self._install_glbs_stub(monkeypatch, characters=characters, items=items)
+
+        # widget currently owns 000003E9 (padded to 00000003E9); reassign to hero.
+        characters.write_tag('hero', '00000003E9')
+
+        assert characters._character_sections['hero'].ID == '00000003E9'
+        # widget should have been sentinel'd in the item store.
+        assert items.items['widget'].ID == '0000000000'
+
+    def test_assigning_existing_character_tag_to_item_clears_character(
+            self, character_config_file, item_config_file, monkeypatch):
+        characters = make_characters(character_config_file)
+        items = make_items(item_config_file)
+        self._install_glbs_stub(monkeypatch, characters=characters, items=items)
+
+        # hero currently owns 00000007D1; reassign to gadget.
+        items.write_tag('gadget', '00000007D1')
+
+        assert items.items['gadget'].ID == '00000007D1'
+        assert characters._character_sections['hero'].ID == '0000000000'
+
+    def test_assigning_existing_item_tag_to_other_item_clears_first(
+            self, item_config_file, monkeypatch):
+        items = make_items(item_config_file)
+        # No characters in this scenario — stub only items so the cross-file
+        # branch in _Items.write_tag finds nothing.
+        self._install_glbs_stub(monkeypatch, items=items)
+
+        # widget owns 000003E9; reassign to gadget.
+        items.write_tag('gadget', '00000003E9')
+
+        assert items.items['gadget'].ID == '00000003E9'
+        assert items.items['widget'].ID == '0000000000'
+
+    def test_writing_same_tag_to_current_owner_is_noop(
+            self, character_config_file, item_config_file, monkeypatch):
+        characters = make_characters(character_config_file)
+        items = make_items(item_config_file)
+        self._install_glbs_stub(monkeypatch, characters=characters, items=items)
+
+        # hero owns 00000007D1 — write it back onto hero.
+        characters.write_tag('hero', '00000007D1')
+
+        assert characters._character_sections['hero'].ID == '00000007D1'
+        # boss should still hold its own id.
+        assert characters._character_sections['boss'].ID == '000000000A'
+        # widget unchanged.
+        assert items.items['widget'].ID == '00000003E9'
+
+
+# ---------------------------------------------------------------------------
+# GM tag-assign entries rebuild (C3)
+# ---------------------------------------------------------------------------
+
+class TestGMAssignRebuild:
+    """After write_tag scrubs a previous owner, _build_gm_entries must surface
+    the sentinel id on that owner's entry — proving the GM screen will show
+    the change rather than a stale cached id.
+    """
+
+    def test_rebuild_reflects_scrubbed_previous_owner(
+            self, character_config_file, item_config_file, monkeypatch):
+        characters = make_characters(character_config_file)
+        items = make_items(item_config_file)
+        stub = types.SimpleNamespace(characters=characters, items=items)
+        monkeypatch.setitem(sys.modules, 'glbs', stub)
+
+        # Import S1_Reset *after* the glbs stub is installed, then rebind the
+        # module-level glbs symbol so _build_gm_entries uses our stub even if
+        # an earlier test in this run already imported the module against the
+        # real glbs.
+        import S1_Reset as _S1_module
+        monkeypatch.setattr(_S1_module, 'glbs', stub, raising=False)
+        s1 = _S1_module.S1_Reset.__new__(_S1_module.S1_Reset)
+
+        # Reassign hero's id to boss; hero should now be sentinel'd.
+        characters.write_tag('boss', '00000007D1')
+
+        rebuilt = s1._build_gm_entries()
+        by_section = {e['section']: e for e in rebuilt}
+
+        # boss reflects the new id.
+        assert by_section['boss']['current_id'] == '00000007D1'
+        # hero is excluded from rebuild because its id is now the sentinel
+        # (sentinel ids are filtered out in _build_gm_entries).
+        assert 'hero' not in by_section

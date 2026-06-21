@@ -23,6 +23,50 @@ import threading
 import configparser as _cp
 
 
+SENTINEL_ID = '0000000000'
+
+
+def _normalize_id(value):
+    """Canonicalise an RFID id to 10-char uppercase hex (left-zero-padded)."""
+    return str(value).strip().upper().zfill(10)
+
+
+def _scrub_id_in_parser(parser, new_id, skip_section=None):
+    """In-place: rewrite every section's `id` to SENTINEL_ID where it currently
+    matches ``new_id``, skipping ``skip_section``. Returns the count of sections
+    rewritten.
+    """
+    new_id = _normalize_id(new_id)
+    changed = 0
+    for sec in parser.sections():
+        if sec == skip_section:
+            continue
+        if not parser.has_option(sec, 'id'):
+            continue
+        if _normalize_id(parser.get(sec, 'id')) == new_id:
+            parser.set(sec, 'id', SENTINEL_ID)
+            changed += 1
+    return changed
+
+
+def scrub_id_from_config(config_file, new_id, skip_section=None):
+    """Read ``config_file``, scrub any section (≠ ``skip_section``) whose `id`
+    equals ``new_id``, and rewrite the file if anything changed.
+
+    Used to guarantee an RFID tag is owned by at most one entity across both
+    characterconfig.txt and itemconfig.txt.
+
+    Returns True if the file was rewritten.
+    """
+    parser = _cp.ConfigParser()
+    parser.read(config_file)
+    if _scrub_id_in_parser(parser, new_id, skip_section) > 0:
+        with open(config_file, 'w') as f:
+            parser.write(f)
+        return True
+    return False
+
+
 class _Characters(object):
     """Character registry: maps RFID IDs to _Character objects and tracks the active character."""
 
@@ -107,34 +151,52 @@ class _Characters(object):
     def write_tag(self, section, new_id):
         """Write a new RFID tag ID for the given character section to disk.
 
-        Updates in-memory state immediately and advances the mtime sentinel
-        so the watcher does not trigger a redundant reload.
+        Enforces cross-file uniqueness: any other character or item that held
+        ``new_id`` is rewritten to ``SENTINEL_ID`` so a tag is owned by at
+        most one entity. The mtime sentinels on both stores are advanced so
+        the watchers don't redundantly reload right after our writes.
 
         Args:
             section -- config section name (e.g. 'SL1')
             new_id  -- new hex string tag ID (e.g. '0000CCA97F')
         """
+        new_id = _normalize_id(new_id)
         parser = _cp.ConfigParser()
         parser.read(self.config_file)
-        old_id_raw = parser.get(section, 'id', fallback=None)
-        old_id = old_id_raw.strip().upper().zfill(10) if old_id_raw else None
-        parser.set(section, 'id', str(new_id))
+
+        # Scrub any other character that currently holds new_id (same parser,
+        # one write) and assign new_id to the target section.
+        _scrub_id_in_parser(parser, new_id, skip_section=section)
+        parser.set(section, 'id', new_id)
         with open(self.config_file, 'w') as f:
             parser.write(f)
 
-        # Advance sentinel so watcher skips the change we just made
         try:
             self._mtime = os.path.getmtime(self.config_file)
         except OSError:
             pass
 
-        # Update in-memory immediately
-        if old_id is not None and old_id in self.characterDict:
-            character = self.characterDict.pop(old_id)
-            character.ID = new_id
-            self.characterDict[new_id] = character
-        if section in self._character_sections:
-            self._character_sections[section].ID = new_id
+        # Cross-file scrub: clear new_id from itemconfig if present.
+        items_changed = False
+        try:
+            import glbs
+            items_changed = scrub_id_from_config(glbs.items.config_file, new_id)
+            if items_changed:
+                try:
+                    glbs.items._mtime = os.path.getmtime(glbs.items.config_file)
+                except OSError:
+                    pass
+        except (ImportError, AttributeError):
+            pass  # glbs.items unavailable (e.g. unit tests)
+
+        # Reload so in-memory state matches disk exactly across both stores.
+        self.reload()
+        if items_changed:
+            try:
+                import glbs
+                glbs.items.reload()
+            except (ImportError, AttributeError):
+                pass
 
     def _start_watcher(self):
         """Start the background file-change watcher thread (daemon)."""

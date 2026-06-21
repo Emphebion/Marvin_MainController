@@ -26,7 +26,7 @@ class S13_FinishGame():
                     duration = glbs.random.randint(
                         glbs.parser.getint('common', 'overloadSparkMin'),
                         glbs.parser.getint('common', 'overloadSparkMax'))
-                    glbs.table.run_spark_animation(duration)
+                    glbs.table.run_lightning_sparks(duration)
                 elif item_before is not None:
                     glbs.mqtt.publish_item_connected(item_before)
             elif glbs.ctx.returnState.value is self.states.S4.value:
@@ -49,9 +49,8 @@ class S13_FinishGame():
 
         glbs.ctx.reset()  # Reset all round variables for the next game
 
-        #reset table to off
-        glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
-        glbs.devices.transmitLED(glbs.table.getLEDData())
+        #fade table to off — last fade after a game finishes
+        glbs.table.fade_to_black(2.0)
         
         #start the finish timer again
         stopTime = self.successTimeout + glbs.time.time()
