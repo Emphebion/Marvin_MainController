@@ -9,15 +9,6 @@ Hardware note: serial devices are detected at import time via glbs.py.
 Run without hardware to enter keyboard/simulation mode automatically.
 """
 
-import tkinter as tk
-from tkinter.ttk import Frame, Button, Style
-
-#from devices import Devices
-#from users import Users
-#from pages import Menu
-#from items import Items
-#from game import Game
-
 from states_enum import StatesEnum
 import S1_Reset
 import S2_Welcome
@@ -33,8 +24,6 @@ import S11_AwaitInput
 import S12_ChangeGame
 import S13_FinishGame
 import glbs
-
-SERIAL_BAUD_RATE = 57600
 
 #############################################
 # Main function
@@ -72,7 +61,6 @@ def main():
 
     state = all_states.S1_Reset.value
     new_state = all_states.S1_Reset.value
-    prev_state = all_states.S1_Reset.value
 
     while(True):
 
@@ -104,7 +92,6 @@ def main():
             new_state = S13_State.run()
         if(state == all_states.Sx_Quit.value):
             quit()
-        prev_state = state
         state = new_state
 
 if __name__ == '__main__':

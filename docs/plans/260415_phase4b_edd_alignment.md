@@ -1,8 +1,9 @@
 # Phase 4b — EDD Alignment Changes
 
-**Overview:** [overhaul_plan.md](overhaul_plan.md)
-**Parent phase:** [Phase 4 — MQTT](phase4_mqtt.md)
-**EDD integration guide:** [edd_marvin_integration.md](edd_marvin_integration.md)
+**Created:** 2026-04-15
+**Overview:** [overhaul_plan.md](260407_overhaul_plan.md)
+**Parent phase:** [Phase 4 — MQTT](260411_phase4_mqtt.md)
+**EDD integration guide:** [edd_marvin_integration.md](../edd_marvin_integration.md)
 **Status:** DONE
 
 ---
@@ -100,7 +101,7 @@ All RFID assertions in `test_mqtt.py`, `test_mqtt_integration.py`, `test_players
 
 ### 4b.3 Skill Token Documentation
 
-MARVIN uses shorthand skill tokens that map 1:1 to actual Emphebion LARP skills in the Constructeurs category. This mapping is documented here and in [edd_marvin_integration.md](edd_marvin_integration.md) Step 6.1 so that EDD can resolve MARVIN tokens to `SkillEntity` records.
+MARVIN uses shorthand skill tokens that map 1:1 to actual Emphebion LARP skills in the Constructeurs category. This mapping is documented here and in [edd_marvin_integration.md](../edd_marvin_integration.md) Step 6.1 so that EDD can resolve MARVIN tokens to `SkillEntity` records.
 
 > **Unverified:** The skill name mapping below is based on best-effort matching and has not been verified against a live Nexus export. Confirm the exact EDD skill names with a Nexus data dump before implementing the mapping in EDD.
 

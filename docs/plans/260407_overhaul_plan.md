@@ -1,5 +1,7 @@
 # MARVIN MainController — Overhaul Plan
 
+**Created:** 2026-04-07
+
 ## Context
 
 MARVIN is a Python-based game controller running on a Raspberry Pi 4. It drives a physical octagonal table with ~400 NeoPixel LEDs (64 segments across 3 rings), 8 outer game buttons, an RFID scanner, and a display screen. The system uses a 13-state state machine. The codebase (~2,180 lines, 22 modules) works but has accumulated technical debt, missing features, no tests, and a minimal desktop simulation.
@@ -78,15 +80,15 @@ Player skill tokens are stored comma-separated in `playerconfig.txt` and checked
 
 ## Execution Order
 
-1. **[Phase 1](phase1_documentation.md)** — Documentation + inline docstrings + quick bug fixes
-2. **[Phase 1b](phase1_documentation.md#phase-1b--energy-flow-idle-animation)** — Energy flow idle animation (part of Phase 1 work)
-3. **[Phase 2](phase2_architecture.md)** — Architecture refactor + test suite
-4. **[Phase 3](phase3_runegame.md)** — RuneGame mode
-5. **[Phase 3b](phase3_runegame.md#phase-3b--dead-code--unused-parameter-cleanup--performance-optimisation)** — Dead code cleanup + performance optimisation
-6. **[Phase 4](phase4_mqtt.md)** — MQTT connection | **[EDD integration guide](edd_marvin_integration.md)** | **[Phase 4b — EDD alignment](phase4b_edd_alignment.md)**
-7. **[Phase 5](phase5_multiline.md)** — MultiLineGame mode
-8. **[Phase 6](phase6_hardware_fixes.md)** — Post-hardware-test fixes
-9. **[Well Size LED display](well_size_led_design.md)** — S6 lights the table with two selectable modes (radial / pathflow); LEFT key cycles modes at runtime for sim review
+1. **[Phase 1](260411_phase1_documentation.md)** — Documentation + inline docstrings + quick bug fixes
+2. **[Phase 1b](260411_phase1_documentation.md#phase-1b--energy-flow-idle-animation)** — Energy flow idle animation (part of Phase 1 work)
+3. **[Phase 2](260411_phase2_architecture.md)** — Architecture refactor + test suite
+4. **[Phase 3](260411_phase3_runegame.md)** — RuneGame mode
+5. **[Phase 3b](260411_phase3_runegame.md#phase-3b--dead-code--unused-parameter-cleanup--performance-optimisation)** — Dead code cleanup + performance optimisation
+6. **[Phase 4](260411_phase4_mqtt.md)** — MQTT connection | **[EDD integration guide](../edd_marvin_integration.md)** | **[Phase 4b — EDD alignment](260415_phase4b_edd_alignment.md)**
+7. **[Phase 5](260415_phase5_multiline.md)** — MultiLineGame mode
+8. **[Phase 6](260411_phase6_hardware_fixes.md)** — Post-hardware-test fixes
+9. **[Well Size LED display](../well_size_led_design.md)** — S6 lights the table with two selectable modes (radial / pathflow); LEFT key cycles modes at runtime for sim review
 
 ---
 

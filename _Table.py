@@ -5,24 +5,21 @@ The physical table has 64 LED segments across three concentric octagonal
 rings connected by radial bridges. This module provides:
 
   _Table       -- the segment graph (loaded from tableconfig.txt) and
-                  all operations on it: LED colour management, spark
-                  effect generation, and segment/button lookups.
+                  all operations on it: LED colour management, well-size
+                  visualisation, lightning-spark engine, and segment/button
+                  lookups.
 
   _Segment     -- one physical LED strip segment (5–11 LEDs). Tracks LED
-                  colours, the users of each LED, and the traversal direction
-                  (flow) when part of a route.
+                  colours and per-LED reference counts (used by
+                  MultiLineGame for shared segments).
 
   _Button      -- one of the 8 outer game buttons. Holds the two associated
                   outer-ring segment names.
 
-  Spark        -- a short animated LED effect used during idle/broken states.
-                  Travels along a random 1–5 segment path.
-
   EnergyFlow   -- softly glowing energy trail for the Active idle state.
 
-Line routing is handled by LineGame in _LineGame.py.
-_Table.createCurrentLine() is a backward-compatible wrapper that delegates
-to the active glbs.game instance.
+Line routing is handled by LineGame in _LineGame.py; states call
+glbs.game.start(goal) directly to build a new route.
 """
 
 import random
@@ -32,7 +29,6 @@ import math
 class _Table(object):
     """LED segment graph: loads topology from config, owns all routing and animation helpers."""
     def __init__(self, config_file):
-        self.LEDsArray = []                     #unused?
         self.segmentList = []
         self.buttonList = []
         self.colorsLED = {}
@@ -42,7 +38,6 @@ class _Table(object):
         self.r_middle = 20.8
         self.r_inner = 14.0
         self.parse_config(config_file)
-        self.startSegment = ''
         self.currentRoute = []
 
     def parse_config(self, config_file):
@@ -103,16 +98,6 @@ class _Table(object):
             
     def getRandomSegment(self):
         return random.choice(self.segmentList)
-
-    def createCurrentLine(self, goal):
-        """Backward-compatible wrapper: delegates to glbs.game (LineGame).
-
-        Kept so existing call sites in S10 continue to work unchanged.
-        New code should call glbs.game.start(goal) directly.
-        """
-        import glbs
-        glbs.game.start(goal)
-        return glbs.ctx.currentGameRoute
 
     def clearRoute(self):
         """Clear the current route list."""
@@ -560,101 +545,6 @@ class _Table(object):
                                                cycle_phase + t_led * pulse_phase_scale)
                 seg.setLEDValue(i, [int(rgb[0] * t), int(rgb[1] * t), int(rgb[2] * t)])
 
-# OTHER TABLE FUNCTIONS
-
-    # Ensures the LEDs in the final segment are run in the correct order/direction
-    def setSegmentFlowRandom(self,segment):
-        rnd = 0
-        while rnd == 0:
-            rnd = random.randint(-1,1)
-        segment.addSegmentFlow(rnd)
-        return rnd
-    
-    # ------------------------------------------------------------------ #
-    # Spark animation (reusable)                                           #
-    # ------------------------------------------------------------------ #
-    def _ensure_sparklist(self):
-        """Lazily build the pool of 666 pre-generated Spark objects."""
-        if not hasattr(self, '_sparklist') or not self._sparklist:
-            self._sparklist = []
-            while len(self._sparklist) < 666:
-                name = "spark" + str(len(self._sparklist))
-                self._sparklist.append(self.createRandomSpark(name))
-
-    def run_spark_animation(self, duration, color=None):
-        """Run spark animations across the table for the given duration (seconds).
-
-        Deprecated: production callers use run_lightning_sparks. Kept for
-        hardware A/B comparison; will be removed in a follow-up cleanup.
-        """
-        if color is None:
-            color = self.colorsLED["turquoise"]
-        black = self.colorsLED["black"]
-        self._ensure_sparklist()
-        self.setAllTableLEDs(black)
-
-        import glbs
-        end_time = glbs.time.time() + duration
-        while glbs.time.time() < end_time:
-            chosen = random.choice(self._sparklist)
-            chosen.resetSpark()
-            sparks = [chosen]
-            while sparks:
-                self._advance_sparks(sparks, color)
-                glbs.devices.transmitLED(self.getLEDData())
-
-        self.setAllTableLEDs(black)
-        glbs.devices.transmitLED(self.getLEDData())
-
-    def run_chaos_sparks(self, duration, color=None, target_fps=18,
-                         concurrent=8, spawn_rate=12.0):
-        """Render multiple sparks per frame for a chaotic-flash look.
-
-        Deprecated: production callers use run_lightning_sparks. Kept for
-        hardware A/B comparison; will be removed in a follow-up cleanup.
-        """
-        if color is None:
-            color = self.colorsLED["turquoise"]
-        black = self.colorsLED["black"]
-        self._ensure_sparklist()
-        self.setAllTableLEDs(black)
-
-        import glbs
-        frame_interval = 1.0 / target_fps
-        active = []
-        spawn_accum = 0.0
-        end_time = glbs.time.time() + duration
-        last_time = glbs.time.time()
-
-        while glbs.time.time() < end_time:
-            frame_start = glbs.time.time()
-            dt = frame_start - last_time
-            last_time = frame_start
-
-            spawn_accum += spawn_rate * dt
-            while spawn_accum >= 1.0 and len(active) < concurrent:
-                spark = random.choice(self._sparklist)
-                if spark not in active:
-                    spark.resetSpark()
-                    active.append(spark)
-                spawn_accum -= 1.0
-
-            self.setAllTableLEDs(black)
-            for spark in active:
-                self._advance_sparks([spark], color)
-
-            active = [s for s in active if s.segmentsActive or s.segmentsDone]
-
-            glbs.devices.transmitLED(self.getLEDData())
-
-            elapsed = glbs.time.time() - frame_start
-            sleep_for = frame_interval - elapsed
-            if sleep_for > 0:
-                glbs.time.sleep(sleep_for)
-
-        self.setAllTableLEDs(black)
-        glbs.devices.transmitLED(self.getLEDData())
-
     # ------------------------------------------------------------------ #
     # Lightning sparks — composited frame-buffer engine                  #
     # ------------------------------------------------------------------ #
@@ -749,8 +639,7 @@ class _Table(object):
 
         Maintains a per-LED RGB buffer that decays each frame, then stamps
         short randomly-tinted flashes (and the occasional moving streak)
-        on top. Replaces the worm-like look of run_chaos_sparks with
-        sustained lightning crackle. See docs/plans/260620_improve_sparks_plan.md.
+        on top. See docs/plans/260620_improve_sparks_plan.md.
         """
         import glbs
         if base_color is None:
@@ -801,99 +690,6 @@ class _Table(object):
         self.setAllTableLEDs(black)
         glbs.devices.transmitLED(self.getLEDData())
 
-    def _advance_sparks(self, sparks, color):
-        """Advance each spark by one LED; erase tail when length is reached."""
-        black = self.colorsLED["black"]
-        for spark in sparks[:]:
-            if spark.segmentsActive:
-                spark.lengthCounter += 1
-                done = self._set_spark_led(
-                    spark.name,
-                    spark.segmentsActive[-1],
-                    spark.segmentActiveDirection[-1],
-                    color,
-                )
-                if done:
-                    spark.segmentsDone.append(spark.segmentsActive.pop())
-                    spark.segmentDoneDirection.append(spark.segmentActiveDirection.pop())
-            elif not spark.segmentsDone:
-                sparks.remove(spark)
-
-            if spark.lengthCounter >= spark.length and spark.segmentsDone:
-                done = self._set_spark_led(
-                    spark.name,
-                    spark.segmentsDone[0],
-                    spark.segmentDoneDirection[0],
-                    black,
-                )
-                if done:
-                    spark.segmentsDone.pop(0)
-                    spark.segmentDoneDirection.pop(0)
-
-    def _set_spark_led(self, name, segment, direction, color):
-        """Set the next LED in segment for spark. Returns 1 when segment is done."""
-        black = self.colorsLED["black"]
-        users = segment.getLEDUsers()
-        if name in users:
-            if direction > 0:
-                if color == black:
-                    idx = users.index(name)
-                    segment.setLEDValue(idx, color)
-                    segment.setUser(idx, "Done")
-                    return 1 if (idx >= len(users) - 1 or users.count("Done") == len(users)) else 0
-                else:
-                    idx = len(users) - 1 - users[::-1].index(name)
-                    if idx + 1 < len(users):
-                        segment.setLEDValue(idx + 1, color)
-                        segment.setUser(idx + 1, name)
-                    return 1 if idx + 1 >= len(users) - 1 else 0
-            else:
-                if color == black:
-                    idx = len(users) - 1 - users[::-1].index(name)
-                    segment.setLEDValue(idx, color)
-                    segment.setUser(idx, "Done")
-                    return 1 if idx <= 0 else 0
-                else:
-                    idx = users.index(name)
-                    if idx - 1 >= 0:
-                        segment.setLEDValue(idx - 1, color)
-                        segment.setUser(idx - 1, name)
-                    return 1 if idx - 1 <= 0 else 0
-        else:
-            if direction > 0:
-                segment.setLEDValue(0, color)
-                segment.setUser(0, name)
-            else:
-                segment.setLEDValue(len(users) - 1, color)
-                segment.setUser(len(users) - 1, name)
-        return 0
-
-    def createRandomSpark(self, name):
-        route = []
-        routeLength = random.randint(1,5)
-        namelist = []
-
-        route.append(self.getRandomSegment())
-        namelist.append(route[0].name)
-        randomStartDirection = random.randint(1,2)
-
-        if (len(route) < routeLength):
-            if (randomStartDirection > 1):
-                route.append(self.getSegment(route[0].flowSegments[random.randint(0,len(route[0].flowSegments)-1)]))
-            else:
-                route.append(self.getSegment(route[0].counterSegments[random.randint(0,len(route[0].counterSegments)-1)]))
-            namelist.append(route[-1].name)
-
-            while(len(route) < routeLength):
-                if (route[-2].name in route[-1].flowSegments):
-                    route.append(self.getSegment(route[-1].counterSegments[random.randint(0,len(route[-1].counterSegments)-1)]))
-                else:
-                    route.append(self.getSegment(route[-1].flowSegments[random.randint(0,len(route[-1].flowSegments)-1)]))
-                namelist.append(route[-1].name)
-
-        spark = Spark(name, route)
-        return spark
-    
 
 class _Segment(object):
     """One physical LED strip segment on the table.
@@ -903,15 +699,10 @@ class _Segment(object):
         nrLEDs          -- number of physical NeoPixels
         flowSegments    -- neighbour names in the forward (strip index 0→N) direction
         counterSegments -- neighbour names in the reverse (strip index N→0) direction
-        flow            -- list of direction values recorded during route building
-                           (+1 = forward, -1 = reverse). Legacy — kept for Spark
-                           compatibility; LineGame now stores direction per route entry.
         LEDvalues       -- list of [R, G, B] triples, one per LED
-        LEDUsers        -- list of owner strings per LED ('Unused', 'line', 'spark', ...)
         LEDRefCounts    -- per-LED reference counter; tracks how many active lines
                            are colouring each LED. Only erase to black when count
                            reaches 0. Used by MultiLineGame for shared segments.
-        timesInRoute    -- number of times this segment appears in the current route
     """
 
     def __init__(self, name, nrLEDs, flowSegs, counterSegs, defaultColor):
@@ -919,24 +710,8 @@ class _Segment(object):
         self.nrLEDs = nrLEDs
         self.flowSegments = flowSegs
         self.counterSegments = counterSegs
-        self.flow = []
-        self.LEDvalues = []
-        self.LEDUsers = []
+        self.LEDvalues = [defaultColor for _ in range(nrLEDs)]
         self.LEDRefCounts = [0] * nrLEDs
-        self.timesInRoute = 0
-        for x in range(nrLEDs):
-            self.LEDvalues.append(defaultColor)
-        for LED in range(nrLEDs):
-            self.LEDUsers.append("Unused")
-
-    def addSegmentFlow(self, flow):
-        self.flow.append(flow)
-
-    def removeSegmentFlow(self):
-        self.flow.remove()
-
-    def getLastSegmentFlow(self):
-        return self.flow[-1]
 
     def incRefCount(self, index):
         """Increment the LED reference counter at index."""
@@ -954,31 +729,19 @@ class _Segment(object):
         """Reset all LED reference counters to 0."""
         self.LEDRefCounts = [0] * self.nrLEDs
 
-    def clearSegment(self,color):
-        self.flow.clear()
-        self.timesInRoute = 0
+    def clearSegment(self, color):
         self.resetRefCounts()
-        for index,prevColor in enumerate(self.LEDvalues):
-            self.setLEDValue(index,color)
-        
-    def setLEDValue(self,index,color):
+        for index in range(len(self.LEDvalues)):
+            self.setLEDValue(index, color)
+
+    def setLEDValue(self, index, color):
         if index < len(self.LEDvalues):
             self.LEDvalues[index] = color
 
-    def setUser(self,index,name):
-        if index < len(self.LEDvalues):
-            self.LEDUsers[index] = name
-
     def getLEDvalues(self):
         return self.LEDvalues
-    
-    def getLEDUsers(self):
-        return self.LEDUsers
 
-    def getRouteCount(self):
-        return self.timesInRoute
-                
-    
+
 class _Button(object):
     """One of the 8 outer game buttons.
 
@@ -994,74 +757,6 @@ class _Button(object):
         list = self.flowSegments + self.counterSegments
         index = random.randint(0,len(list)-1)
         return list[index]
-
-
-class Spark(object):
-    """A short random LED animation used during idle/broken table states.
-
-    Travels along a 1–5 segment path with a random length (5–20 LEDs).
-    resetSpark() must be called before each animation cycle.
-    """
-
-    def __init__(self, name, segments):
-        self.name = name
-        self.segments = segments
-        self.segmentDirection = self._setSegmentDirection()
-        self.segmentsActive = []
-        self.segmentActiveDirection = []
-        self.segmentsDone = []
-        self.segmentDoneDirection = []
-        self.startLEDIndex = random.randint(0,self.segments[0].nrLEDs-1)
-        self.endLEDIndex = random.randint(0,self.segments[-1].nrLEDs-1)
-        self.lengthCounter = 0
-        self._setSparkLength()
-        self._resetUsers()
-
-    # Set the length of the spark between 5 LEDs and the minimum of 20 vs maxLEDs in the spark
-    def _setSparkLength(self):
-        maxLength = 0
-        for seg in self.segments:
-            maxLength = maxLength + seg.nrLEDs
-        self.length = random.randint(5,min(maxLength,20))
-
-    def _setSegmentDirection(self):
-        sparkDirection = []
-        if len(self.segments) > 1:
-            for index, segment in enumerate(self.segments):
-                if index < len(self.segments)-1:
-                    nextSegment = self.segments[index + 1]
-                    if segment.name in nextSegment.flowSegments:
-                        sparkDirection.append(1)
-                    elif segment.name in nextSegment.counterSegments:
-                        sparkDirection.append(-1)
-                else:
-                    prevSegment = self.segments[index - 1]
-                    if segment.name in prevSegment.flowSegments:
-                        sparkDirection.append(-1)
-                    elif segment.name in prevSegment.counterSegments:
-                        sparkDirection.append(1)
-        elif len(self.segments) == 1:
-            sparkDirection.append(1)
-        else:
-            print("ERROR: No segment in spark!")
-        if not(len(sparkDirection) == len(self.segments)):
-            print("ERROR: Segments length NOT equal to Directions Length!")
-        return sparkDirection
-
-    def _resetUsers(self):
-        for segment in self.segments:
-            for index, user in enumerate(segment.LEDUsers):
-                segment.setUser(index,"Unused")
-
-    def resetSpark(self):
-        if not self.segments:
-            return
-        self._resetUsers()
-        self.segmentsActive = self.segments.copy()
-        self.segmentActiveDirection = self.segmentDirection.copy()
-        self.segmentsDone = []
-        self.segmentDoneDirection = []
-        self.lengthCounter = 0
 
 
 class EnergyFlow(object):

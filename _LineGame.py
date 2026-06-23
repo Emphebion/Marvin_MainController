@@ -143,7 +143,7 @@ class LineGame(BaseGame):
         self.route.clear()
 
     # ------------------------------------------------------------------ #
-    # Route building (extracted from _Table.createCurrentLine)            #
+    # Route building                                                       #
     # ------------------------------------------------------------------ #
 
     def _build_route(self, goal):
@@ -287,11 +287,6 @@ class MultiLineGame(LineGame):
         return self._parser.getint(
             'MultiLineGame', 'multiLineCountL1', fallback=1)
 
-    # BUG: Game not starting for a new item (item99) I've just added manually. I have exited the game and restarted it, so that is not the issue. I thought it might 
-    # be the level (the new item is level 3), but changing the level of an existing item to 3 does not cause the issue, so that is not it either. 
-    # If I click the item in the simulation menu before anything else, the last input shows the correct code, so there is something else wrong.
-    # In noticed that after another item was connected, the game for the new item did start. However, after restarting the program, the same issue occurs again, 
-    # so it is not a one-time glitch.
     def start(self, goal):
         """Build multiple routes to different goal buttons.
 

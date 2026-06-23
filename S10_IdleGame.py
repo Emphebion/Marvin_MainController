@@ -35,7 +35,7 @@ class S10_IdleGame():        #S10_GameMaster
             glbs.ctx.currentRoundInputs.clear()
             # Create route for current round
             self.setCurrentGoal()
-            glbs.ctx.currentGameRoute = glbs.table.createCurrentLine(self.currentGoal)
+            glbs.game.start(self.currentGoal)
             print("current input required: " + str(self.currentGoal))
             glbs.ctx.lineCounter = 0
         elif glbs.game.mode == 'multiline':

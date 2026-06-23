@@ -1,6 +1,7 @@
 # Phase 6 — Post-Hardware-Test Fixes
 
-**Overview:** [overhaul_plan.md](overhaul_plan.md)
+**Created:** 2026-04-11
+**Overview:** [overhaul_plan.md](260407_overhaul_plan.md)
 **Depends on:** Physical hardware testing (after Phase 3 at the earliest; after Phase 5 before final sign-off)
 **Note:** Do not attempt implementation before hardware comparison is done. The root cause may not exist on the physical table.
 
@@ -12,7 +13,7 @@ Address issues that require comparison between the desktop simulation and the ph
 
 ## Relevant Context
 
-- **BFS algorithm:** the segment-directed BFS used by `RuneGame._bfs_order()` is fully specified in [docs/rune_bfs_fix.md](rune_bfs_fix.md). Read that document before making any changes to `_bfs_order()`.
+- **BFS algorithm:** the segment-directed BFS used by `RuneGame._bfs_order()` is fully specified in [docs/rune_bfs_fix.md](260406_rune_bfs_fix.md). Read that document before making any changes to `_bfs_order()`.
 - **Segment direction:** within each segment, traversal direction is determined by which end was entered. If `entry_b == leds_b[0]`, traverse ascending (LED index 0 → n-1). If `entry_b == leds_b[-1]`, traverse descending. Reverse edges are added to the segment connection graph for bidirectional traversal.
 - **`flowSegments` / `counterSegments`:** defined per segment in `tableconfig.txt`. The physical LED order is hardware-wired (LED 0 is the first LED soldered in the strip); the simulation derives geometry from `_Display._place_arc()` / `_place_radial()`. These two orderings may differ for some segments.
 
@@ -46,7 +47,7 @@ Address issues that require comparison between the desktop simulation and the ph
 **Action during hardware test:** Evaluate both game modes against the same flow parameter understanding:
 
 1. **RuneGame** — the `_bfs_order()` entry-LED comparison (`entry_b == leds_b[0]` vs `leds_b[-1]`) must derive traversal direction from the flow/counter neighbour relationship, the same way LineGame's `_set_route_flow()` does. The current approach infers direction from LED index positions within the rune definition, which can disagree with the physical strip order. This is the likely root cause of the reversed reveals.
-2. **MultiLineGame** — Phase 5 refactors the flow parameter from a shared segment stack to per-route `(segment, direction)` tuples (see [phase5_multiline.md](phase5_multiline.md#shared-segment-handling)). Validate that the per-route direction logic produces correct traversal on hardware, especially for shared segments where two lines enter from opposite sides.
+2. **MultiLineGame** — Phase 5 refactors the flow parameter from a shared segment stack to per-route `(segment, direction)` tuples (see [phase5_multiline.md](260415_phase5_multiline.md#shared-segment-handling)). Validate that the per-route direction logic produces correct traversal on hardware, especially for shared segments where two lines enter from opposite sides.
 
 **Key insight:** LineGame proves the `tableconfig.txt` flow/counter definitions are correct. RuneGame should derive its traversal direction from those same definitions rather than from rune LED index positions.
 

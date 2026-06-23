@@ -2,7 +2,7 @@
 
 ## Theme
 
-The table channels an ancient life force. The runes are visual manifestations of this energy — geometric symbols that appear on the LED rings when power flows through the table's pathways. Their design draws from interconnected angular patterns that follow the concentric ring structure: arcs along rings, straight lines through bridges, forming shapes that feel organic yet structured (see `Runes/Capture4.PNG` for the primary visual reference).
+The table channels an ancient life force. The runes are visual manifestations of this energy — geometric symbols that appear on the LED rings when power flows through the table's pathways. Their design draws from interconnected angular patterns that follow the concentric ring structure: arcs along rings, straight lines through bridges, forming shapes that feel organic yet structured (see `docs/design_assets/Runes/Capture4.PNG` for the primary visual reference).
 
 The symbols should feel like they belong to the table itself — etched into its geometry, not overlaid on top of it.
 

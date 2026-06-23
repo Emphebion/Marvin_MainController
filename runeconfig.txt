@@ -1,7 +1,7 @@
 ; runeconfig.txt — 48 candidate rune definitions (6 per button)
 ;
 ; All runes use COMPLETE segments so shapes are large (22–40 LEDs each),
-; matching the reference designs in Runes/Rune Example 1-3.png.
+; matching the reference designs in docs/design_assets/Runes/Rune Example 1-3.png.
 ;
 ; Six shape templates, each using 2–4 full segments:
 ;

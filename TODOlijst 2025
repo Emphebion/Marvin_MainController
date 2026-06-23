@@ -1,5 +1,0 @@
-#Los alle TODO in code op
-#Voeg een state toe voor het ontkoppelen van één item                [done]
-#    Checkt op skill of de klasse zichtbaar is voor setActivePlayer
-#    Checkt item ID of dit Item aangesloten is
-#    Zo ja: start disconnect spel (5 min)

@@ -78,7 +78,6 @@ ctx = GameContext()
 # Sleep variables (system-level, not round-level)
 systemTimeout  = parser.getint('common', 'systemTimeout')
 systemWakeTime = time.time()
-handlerTime    = time.time()
 
 
 def bedTime():

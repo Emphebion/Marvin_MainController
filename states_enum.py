@@ -141,6 +141,11 @@ class StatesEnum():
         return State13_states
     
     #Sx Quit
+    # TODO (2026-06-23): no Sx_Quit state class exists and MARVIN.py calls
+    # quit() directly when state == Sx_Quit.value, so this helper and the
+    # orphan [StateX] section in marvinconfig.txt are never read. Either
+    # wire up a real Sx_Quit state (shutdown screen, MQTT goodbye, etc.)
+    # or remove this method together with the [StateX] config block.
     def get_states_sx(self):
         class Statex_states(Enum):
             Sx = self.all_states.Sx_Quit.value

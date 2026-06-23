@@ -19,10 +19,7 @@ class S1_Reset():
         # Spark / idle timing (used by Broken status)
         self.idleMaxTimeout = float(glbs.parser.getint('State1', 'idletimeout'))
         self.idleStartTime = 0
-        self.sparkStartTime = 0
         self.idleTimeout = glbs.random.uniform(1, self.idleMaxTimeout)
-
-        self._heartbeat_interval = 30
 
     # ------------------------------------------------------------------ #
     # Main entry point                                                     #
@@ -302,9 +299,6 @@ class S1_Reset():
         if glbs.table.status == "Disabled":
             glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
             glbs.devices.transmitLED(glbs.table.getLEDData())
-
-        elif glbs.table.status == "Broken":
-            glbs.table._ensure_sparklist()
 
         elif glbs.table.status == "Overload":
             pass  # placeholder: heavy flickering (Phase 2)

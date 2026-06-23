@@ -1,8 +1,9 @@
 # Phase 2 — Architecture & Improvement
 
-**Overview:** [overhaul_plan.md](overhaul_plan.md)
-**Depends on:** [Phase 1](phase1_documentation.md)
-**Followed by:** [Phase 3](phase3_runegame.md)
+**Created:** 2026-04-11
+**Overview:** [overhaul_plan.md](260407_overhaul_plan.md)
+**Depends on:** [Phase 1](260411_phase1_documentation.md)
+**Followed by:** [Phase 3](260411_phase3_runegame.md)
 **Status: DONE**
 
 ---
@@ -13,10 +14,10 @@ Refactor towards a cleaner, testable architecture without changing external beha
 
 ## Relevant Context
 
-- **State machine:** see [overview — State Machine](overhaul_plan.md#state-machine). Each state is a class; `run()` returns the next state value. Transitions are defined in `states_enum.py`.
+- **State machine:** see [overview — State Machine](260407_overhaul_plan.md#state-machine). Each state is a class; `run()` returns the next state value. Transitions are defined in `states_enum.py`.
 - **`glbs.py`:** currently the single shared state bag — holds all subsystem objects AND mutable round variables. Phase 2 separates these: subsystem objects stay in `glbs.py`; mutable per-round variables move to `GameContext`.
-- **Config files:** see [overview — Config Files](overhaul_plan.md#config-files). Phase 2 passes per-module config sections to constructors instead of sharing a single global `parser` instance.
-- **Timing notes:** see [overview — Timing Notes](overhaul_plan.md#timing-notes) before touching any sleep or loop timeout values.
+- **Config files:** see [overview — Config Files](260407_overhaul_plan.md#config-files). Phase 2 passes per-module config sections to constructors instead of sharing a single global `parser` instance.
+- **Timing notes:** see [overview — Timing Notes](260407_overhaul_plan.md#timing-notes) before touching any sleep or loop timeout values.
 
 ---
 
@@ -47,7 +48,7 @@ level3 = runes    ; or multiline (Phase 5)
 ### Improve `_Devices.py`
 
 - Add device reconnection on serial failure (fix `TODO:34`).
-- Remove `time.sleep(.000001)` in `Device.read()` — confirmed vestigial. See [Timing Notes](overhaul_plan.md#timing-notes). **Do not touch** `pygame.time.wait(1)` in `_InputHandler.event_handler()`.
+- Remove `time.sleep(.000001)` in `Device.read()` — confirmed vestigial. See [Timing Notes](260407_overhaul_plan.md#timing-notes). **Do not touch** `pygame.time.wait(1)` in `_InputHandler.event_handler()`.
 
 ### Improve `_Display.py` (desktop simulation)
 
@@ -147,6 +148,6 @@ UP           →  exit, return to S1 idle
 
 **Phase 2b tests:** DONE for unit tests; `test_state_transitions.py` and `test_game_simulation.py` added.
 
-**Architecture doc:** updated to Phase 3 state — see [architecture.md](architecture.md).
+**Architecture doc:** updated to Phase 3 state — see [architecture.md](../architecture.md).
 
 <!-- MAINTENANCE: After Phase 4, update architecture.md for MQTT module. After Phase 5, add MultiLineGame entry to Game Mode Architecture section. -->

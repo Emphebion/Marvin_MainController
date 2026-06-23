@@ -1,5 +1,7 @@
 # Rune Reveal BFS Fix — Diagnostic & Implementation Spec
 
+**Created:** 2026-04-06
+
 ## Symptoms
 
 Two visual artifacts reported during rune reveal animation testing:

@@ -346,10 +346,6 @@ class _Items(object):
 
         self.setCurrentItemToLowestActiveItem()
 
-    # Future: function to add new items during run-time
-    def generate_item(self):
-        i = 1
-
 
 class Item(object):
     def __init__(self, name, function, ID, level, activationSkill, load=1, connected=False, display_name=None):
@@ -362,12 +358,6 @@ class Item(object):
         self.load = load
         self.connected = connected
         print(f"Item created: {self.name}, ID: {self.ID}, connected: {self.connected}, activationSkill: {self.activationSkill}")
-
-    def toggle_connected(self):
-        self.connected = not self.connected
-        
-    def setConnected(self, value):
-        self.connected = value
 
     def connectItem(self):
         self.connected = True

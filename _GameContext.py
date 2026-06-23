@@ -11,7 +11,14 @@ context without touching hardware or display objects.
 Attributes:
     gameStartTime      -- time.time() when the current round started
     gameTimeout        -- duration (seconds) allowed for the round
-    currentInput       -- last raw input string (currently unused)
+    currentInput       -- single-slot mirror of the most recent raw input
+                          event (button name or RFID hex). Intended use:
+                          debug/HUD echo of the latest input while a round
+                          is in progress, and a hand-off slot between the
+                          input handler and any non-line game mode that
+                          wants the last token without scanning
+                          currentRoundInputs. Currently unwritten — wire it
+                          up from S11 / future game modes when needed.
     currentGameRoute   -- list of _Segment objects for the active line
     currentRoundInputs -- button inputs recorded in the current round
     gameSuccess        -- True if the round was completed successfully

@@ -10,7 +10,7 @@ import sys
 import types
 import pytest
 from unittest.mock import MagicMock
-from _Table import _Table, _Segment, _Button, Spark
+from _Table import _Table, _Segment, _Button
 import _Table as _Table_module
 
 
@@ -119,18 +119,11 @@ class TestSegment:
         seg.setLEDValue(99, [255, 0, 0])  # should not raise
         assert len(seg.getLEDvalues()) == 3
 
-    def test_flow_direction(self):
-        seg = _Segment('s0', 3, ['s1'], ['s2'], [0, 0, 0])
-        seg.addSegmentFlow(1)
-        assert seg.getLastSegmentFlow() == 1
-
     def test_clear_segment(self):
         seg = _Segment('s0', 3, ['s1'], ['s2'], [0, 0, 0])
         seg.setLEDValue(0, [100, 100, 100])
-        seg.addSegmentFlow(1)
         seg.clearSegment([0, 0, 0])
         assert all(v == [0, 0, 0] for v in seg.getLEDvalues())
-        assert seg.flow == []
 
 
 # ---------------------------------------------------------------------------
@@ -781,166 +774,6 @@ class TestFadeToBlack:
             f"fade_to_black drifted: elapsed={elapsed:.3f}s, "
             "expected ~0.30 s ± ~10%"
         )
-
-
-# ---------------------------------------------------------------------------
-# Spark.resetSpark
-# ---------------------------------------------------------------------------
-
-class TestSparkReset:
-    def test_reset_clears_user_tags_from_previous_run(self, table_config_file):
-        """A re-run of the same Spark must not see stale 'Done' tags
-        left over from its previous animation cycle."""
-        table = make_table(table_config_file)
-        seg = table.getSegment('segm0')
-        spark = Spark('spark0', [seg])
-        # Simulate leftover state from a previous run.
-        seg.setUser(0, 'spark0')
-        seg.setUser(2, 'Done')
-
-        spark.resetSpark()
-
-        assert all(u == 'Unused' for u in seg.getLEDUsers())
-
-    def test_reset_clears_segments_done_list(self, table_config_file):
-        """resetSpark must clear segmentsDone so a re-run starts cleanly."""
-        table = make_table(table_config_file)
-        seg = table.getSegment('segm0')
-        spark = Spark('spark0', [seg])
-        spark.segmentsDone = [seg]
-        spark.segmentDoneDirection = [1]
-
-        spark.resetSpark()
-
-        assert spark.segmentsDone == []
-        assert spark.segmentDoneDirection == []
-        assert spark.lengthCounter == 0
-        assert spark.segmentsActive == [seg]
-
-    def test_reset_no_segments_is_noop(self):
-        """An empty-segments Spark must return silently rather than
-        spin-loop (the dead-code bug fixed in S3)."""
-        spark = Spark.__new__(Spark)
-        spark.segments = []
-        spark.segmentsActive = []
-        spark.segmentActiveDirection = []
-        spark.segmentsDone = []
-        spark.segmentDoneDirection = []
-        spark.lengthCounter = 0
-        # Must return immediately without raising or hanging.
-        spark.resetSpark()
-
-
-# ---------------------------------------------------------------------------
-# _Table.run_chaos_sparks
-# ---------------------------------------------------------------------------
-
-class TestRunChaosSparks:
-    """Multi-spark chaos engine. Tests stub glbs.time/glbs.devices so the
-    suite stays fast and deterministic."""
-
-    def _install_glbs_stub(self, monkeypatch, frames_to_run):
-        """Stub glbs.time so .time() returns synthetic timestamps that
-        cap the chaos loop at a known number of frames.
-
-        Each frame consumes two time() reads (loop guard + frame_start).
-        Plus one read at start (last_time) and one at top before the loop.
-        We emit a long tail of 'past end_time' values to guarantee exit.
-        """
-        captured_frames = []
-
-        def capture(data):
-            captured_frames.append([list(rgb) for rgb in data])
-
-        # Pre-build a time sequence: enough sub-end_time values to run
-        # frames_to_run, then jump well past end_time.
-        # Each iteration of the while loop calls time.time() at the guard
-        # AND at frame_start; we want both to read 'now < end_time' during
-        # the frame, and the guard to read 'now >= end_time' to exit.
-        # Use a simple monotonic float counter advanced by sleep().
-        clock = [0.0]
-
-        def fake_time():
-            return clock[0]
-
-        def fake_sleep(seconds):
-            if seconds and seconds > 0:
-                clock[0] += seconds
-
-        stub_time = types.SimpleNamespace(time=fake_time, sleep=fake_sleep)
-        stub = types.SimpleNamespace(
-            time=stub_time,
-            devices=types.SimpleNamespace(transmitLED=capture),
-        )
-        monkeypatch.setitem(sys.modules, 'glbs', stub)
-        return captured_frames, clock
-
-    def test_paces_with_target_fps(self, table_config_file, monkeypatch):
-        """Sleep is called per frame to honour target_fps."""
-        captured, clock = self._install_glbs_stub(monkeypatch, frames_to_run=5)
-        table = make_table(table_config_file)
-        # 0.5 s @ 10 fps → 5 frames + 1 trailing final-black transmit.
-        table.run_chaos_sparks(0.5, target_fps=10, concurrent=2, spawn_rate=10.0)
-        # Loop runs until clock advances past end_time; with sleep=1/10 per
-        # frame, expect ~5 frames in-loop + 1 final transmit at the end.
-        assert len(captured) == 6
-        # Final frame is all-black (final clear-and-transmit).
-        assert all(rgb == [0, 0, 0] for rgb in captured[-1])
-
-    def test_caps_concurrent_sparks(self, table_config_file, monkeypatch):
-        """Active spark count never exceeds the `concurrent` cap."""
-        captured, clock = self._install_glbs_stub(monkeypatch, frames_to_run=10)
-        table = make_table(table_config_file)
-        # Sample the active list by patching random.choice to count calls.
-        original_choice = _Table_module.random.choice
-        spawn_log = []
-
-        def logging_choice(seq):
-            picked = original_choice(seq)
-            spawn_log.append(picked)
-            return picked
-
-        monkeypatch.setattr(_Table_module.random, 'choice', logging_choice)
-        # High spawn_rate, low cap: the cap must hold the line.
-        table.run_chaos_sparks(0.5, target_fps=10, concurrent=3,
-                                spawn_rate=100.0)
-        # We can't observe `active` directly post-hoc, but the captured
-        # frames let us bound it: each frame lights at most one LED per
-        # active spark (head step). Total lit LEDs per frame ≤ concurrent.
-        for frame in captured[:-1]:  # skip trailing all-black
-            lit = sum(1 for rgb in frame if rgb != [0, 0, 0])
-            assert lit <= 3
-
-    def test_finished_sparks_are_retired(self, table_config_file, monkeypatch):
-        """Sparks whose segments are fully consumed leave the active list."""
-        captured, clock = self._install_glbs_stub(monkeypatch, frames_to_run=200)
-        table = make_table(table_config_file)
-        # Force a single short-lived spark, spawn once, no further spawns.
-        table.run_chaos_sparks(5.0, target_fps=10, concurrent=1,
-                                spawn_rate=0.2)
-        # With spawn_rate 0.2 and 5 s runtime, at most ~1 spark spawns.
-        # All frames after the spark dies must be all-black (no active sparks).
-        # The final transmit is always all-black; check that a tail of
-        # consecutive all-black frames exists before the final one.
-        all_black = lambda frame: all(rgb == [0, 0, 0] for rgb in frame)
-        # Find a black tail of at least 5 frames (≥ 0.5 s of quiet).
-        tail_black = 0
-        for frame in reversed(captured):
-            if all_black(frame):
-                tail_black += 1
-            else:
-                break
-        assert tail_black >= 5
-
-    def test_emits_at_least_one_frame(self, table_config_file, monkeypatch):
-        """Even a zero-ish duration must transmit the final-black frame."""
-        captured, clock = self._install_glbs_stub(monkeypatch, frames_to_run=0)
-        table = make_table(table_config_file)
-        table.run_chaos_sparks(0.0, target_fps=10, concurrent=2,
-                                spawn_rate=10.0)
-        # One trailing all-black transmit.
-        assert len(captured) >= 1
-        assert all(rgb == [0, 0, 0] for rgb in captured[-1])
 
 
 # ---------------------------------------------------------------------------

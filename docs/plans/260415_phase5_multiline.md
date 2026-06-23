@@ -1,7 +1,8 @@
 # Phase 5 — MultiLineGame Mode
 
-**Overview:** [overhaul_plan.md](overhaul_plan.md)
-**Depends on:** [Phase 4](phase4_mqtt.md) — requires `BaseGame` interface, `_LineGame.py` extraction, and `[LineGame] lineColor` config key
+**Created:** 2026-04-15
+**Overview:** [overhaul_plan.md](260407_overhaul_plan.md)
+**Depends on:** [Phase 4](260411_phase4_mqtt.md) — requires `BaseGame` interface, `_LineGame.py` extraction, and `[LineGame] lineColor` config key
 **Note:** Design question (exact line counts, input scoring rules) must be resolved before implementation starts.
 **Status: NOT STARTED** — `MultiLineGame` does not exist.
 
@@ -15,7 +16,7 @@ Implement `MultiLineGame` as a subclass of `LineGame` — a harder variant of th
 
 - **BaseGame interface** (Phase 2): `start()`, `update()`, `is_complete()`, `clear()`. `MultiLineGame` extends `LineGame` — no new states required.
 - **`LineGame` route generation:** `_build_route(goal)` generates a route for a given goal button. `MultiLineGame` calls this multiple times with different goal buttons to produce parallel routes.
-- **Colour system:** see [overview — Colour System](overhaul_plan.md#colour-system). `lineColor` is defined in `marvinconfig.txt [LineGame]` (added in Phase 4). `falseLineColor` is a new key in `[MultiLineGame]`. Both are named colour entries in `tableconfig.txt`.
+- **Colour system:** see [overview — Colour System](260407_overhaul_plan.md#colour-system). `lineColor` is defined in `marvinconfig.txt [LineGame]` (added in Phase 4). `falseLineColor` is a new key in `[MultiLineGame]`. Both are named colour entries in `tableconfig.txt`.
 - **Game mode selection:** `[GameModes]` in `marvinconfig.txt` selects game type per level. S9/S10/S11 use the `BaseGame` interface for all modes.
 
 ---
@@ -149,7 +150,7 @@ When the table overloads, a spark animation plays for a random duration (5–15 
 | File | Bug | Fix | Status |
 |---|---|---|---|
 | `S7_Connect_Item.py` line 69 | `time.sleep(3)` in the insufficient-skill branch, but `time` is never imported — crashes with `NameError` if a player without the required skill scans an item | Changed to `glbs.time.sleep(3)` | **Fixed** |
-| `S7_Connect_Item.py` line 59 | `currentItemName != newItem.name` guard blocks game start when the scanned item matches `currentItemName`. After startup this is the last item in the config list; after a failed game it's the played item — both block legitimate scans/retries. | **Arduino side fixed** — stale RFID reads are now handled by dedup on the Arduino (see [arduino_rfid_improvement.md](arduino_rfid_improvement.md)). Python side: guard removed from S7 and S4, `_Items.__init__` fixed. | **Fixed** |
+| `S7_Connect_Item.py` line 59 | `currentItemName != newItem.name` guard blocks game start when the scanned item matches `currentItemName`. After startup this is the last item in the config list; after a failed game it's the played item — both block legitimate scans/retries. | **Arduino side fixed** — stale RFID reads are now handled by dedup on the Arduino (see [arduino_rfid_improvement.md](260418_arduino_rfid_improvement.md)). Python side: guard removed from S7 and S4, `_Items.__init__` fixed. | **Fixed** |
 | `_Items.py` line 54 | `__init__` sets `currentItemName` to the last loaded item instead of clearing it. | Set `self.currentItemName = ""` after the loading loop. | **Fixed** |
 
 ---

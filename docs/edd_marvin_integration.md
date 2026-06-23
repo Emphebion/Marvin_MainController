@@ -2,7 +2,7 @@
 
 **Audience:** EDD development team (C# / .NET, Claude-assisted)
 **Prerequisites:** Familiarity with the EDD codebase (Hermes, Void, Sphinx, Alexandria)
-**MARVIN spec:** [phase4_mqtt.md](phase4_mqtt.md) — full protocol reference
+**MARVIN spec:** [phase4_mqtt.md](plans/260411_phase4_mqtt.md) — full protocol reference
 **empnode spec:** `empnode/docs/mqtt-topics.md` — existing protocol for comparison
 
 ---

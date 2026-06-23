@@ -1,11 +1,12 @@
 # Phase 4 — MQTT Connection
 
-**Overview:** [overhaul_plan.md](overhaul_plan.md)
-**Depends on:** [Phase 3](phase3_runegame.md) — requires `_RuneGame` and `_LineGame` in place
-**Followed by:** [Phase 5](phase5_multiline.md)
+**Created:** 2026-04-11
+**Overview:** [overhaul_plan.md](260407_overhaul_plan.md)
+**Depends on:** [Phase 3](260411_phase3_runegame.md) — requires `_RuneGame` and `_LineGame` in place
+**Followed by:** [Phase 5](260415_phase5_multiline.md)
 **Note:** Review empnode docs before implementation starts.
 **Status: DONE** — `_MQTT.py` implemented; `requirements.txt` updated; all state-file integration points wired.
-**Extension:** [Phase 4b — EDD Alignment](phase4b_edd_alignment.md) — rename players→characters, RFID 8→10 char, skill mapping docs
+**Extension:** [Phase 4b — EDD Alignment](260415_phase4b_edd_alignment.md) — rename players→characters, RFID 8→10 char, skill mapping docs
 
 ### Completion Notes
 - RFID hex conversion completed before MQTT start: all IDs now 8-char uppercase hex strings in configs and in-memory
@@ -40,10 +41,10 @@ Connect MARVIN to the empnode MQTT broker and publish game state events so EDD/G
 
 ## Relevant Context
 
-- **Config files and write pattern:** see [overview — Config Files](overhaul_plan.md#config-files). All writes use `configparser.write()` consistently. The `[items] source` parameter is the well capacity; `[State6] source` in `marvinconfig.txt` is dead config and should be removed (Phase 3b).
-- **Colour system:** see [overview — Colour System](overhaul_plan.md#colour-system). All game/idle colours are named entries in `tableconfig.txt`; MQTT colour commands update the RGB of the named colour entry, not a separate field.
-- **Table status:** see [overview — Table Status](overhaul_plan.md#table-status). Phase 4 adds the `Disabled` status (EDD-commanded dark/unresponsive state).
-- **Skill tokens:** see [overview — Skill Tokens](overhaul_plan.md#skill-tokens). The MQTT player register payload `skills` list maps directly to these tokens.
+- **Config files and write pattern:** see [overview — Config Files](260407_overhaul_plan.md#config-files). All writes use `configparser.write()` consistently. The `[items] source` parameter is the well capacity; `[State6] source` in `marvinconfig.txt` is dead config and should be removed (Phase 3b).
+- **Colour system:** see [overview — Colour System](260407_overhaul_plan.md#colour-system). All game/idle colours are named entries in `tableconfig.txt`; MQTT colour commands update the RGB of the named colour entry, not a separate field.
+- **Table status:** see [overview — Table Status](260407_overhaul_plan.md#table-status). Phase 4 adds the `Disabled` status (EDD-commanded dark/unresponsive state).
+- **Skill tokens:** see [overview — Skill Tokens](260407_overhaul_plan.md#skill-tokens). The MQTT player register payload `skills` list maps directly to these tokens.
 - **RFID contexts:** player RFID scans happen in `S1_Reset._checkInput()`; item RFID scans happen in `S7_Connect_Item._setState()`. There is one physical scanner.
 - **Hot-reload:** `_Players.reload()` and `_Items.reload()` (Phase 2) rebuild in-memory dicts from config files. Call after every config write.
 
@@ -402,7 +403,7 @@ No MQTT logic lives inside individual state files. Each state calls `glbs.mqtt.p
 
 **Reviewed against empnode `tools/` patterns** (2026-04-12). **Simulation verified against real EDD codebase and empnode firmware** (2026-04-13): protocol alignment confirmed, no discrepancies found. Key architectural constraint: MARVIN and empnode never communicate directly — they share a broker but use separate topic namespaces (`marvin/` vs `empnode/`). EDD is the only system that bridges both.
 
-**EDD integration guide:** [edd_marvin_integration.md](edd_marvin_integration.md) — step-by-step implementation plan for the EDD team adding MARVIN support, including all use/misuse scenarios, test plan, and simulation environment setup.
+**EDD integration guide:** [edd_marvin_integration.md](../edd_marvin_integration.md) — step-by-step implementation plan for the EDD team adding MARVIN support, including all use/misuse scenarios, test plan, and simulation environment setup.
 
 - **S4.1 — MARVIN simulation mode + MQTT:** MARVIN already runs without hardware (pygame simulation). With `[MQTT] enabled = true` in `marvinconfig.txt` and a broker running, the full MQTT stack operates live. No separate MockMARVIN is needed — the simulation IS the mock. Verify: start broker, start MARVIN in sim mode, subscribe to `marvin/#`, use mouse clicks to trigger RFID scans and game events.
 - **S4.2 — EDD stub script (`tools/edd_stub.py`): DONE.** Standalone Python script (not part of empnode). Subscribes to `marvin/<id>/state/#`; prints received messages with timestamps. Accepts CLI commands: `register-character`, `register-item`, `set-well`, `set-status`, `set-color`, `define-color`, `sync-offer`. Supports `--broker`, `--port`, `--node-id` CLI arguments. Usage: `py -3 tools/edd_stub.py [--broker HOST] [--port PORT] [--node-id ID]`.

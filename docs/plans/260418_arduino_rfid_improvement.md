@@ -1,6 +1,7 @@
 # Arduino IOBoardMega — RFID & Serial Improvement Plan
 
-**Relates to:** [Phase 5 MultiLineGame](phase5_multiline.md) — Bug 2 (`currentItemName` guard / stale RFID reads)
+**Created:** 2026-04-18
+**Relates to:** [Phase 5 MultiLineGame](260415_phase5_multiline.md) — Bug 2 (`currentItemName` guard / stale RFID reads)
 **Source:** `D:\Personal Documents\Creatief\Emphebion\Techniek\MARVIN\IOBoardMega`
 **Status: COMPLETE** — Arduino dedup implemented, Python-side guard removed, `_Items.__init__` fixed. All 262 tests pass.
 

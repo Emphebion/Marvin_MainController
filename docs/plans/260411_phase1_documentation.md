@@ -1,8 +1,9 @@
 # Phase 1 — Documentation
 
-**Overview:** [overhaul_plan.md](overhaul_plan.md)
+**Created:** 2026-04-11
+**Overview:** [overhaul_plan.md](260407_overhaul_plan.md)
 **Depends on:** nothing (first phase)
-**Followed by:** [Phase 2](phase2_architecture.md)
+**Followed by:** [Phase 2](260411_phase2_architecture.md)
 **Status: DONE** — all deliverables implemented and verified.
 
 ---
@@ -13,9 +14,9 @@ Create clear, professional, to-the-point documentation for the existing codebase
 
 ## Relevant Context
 
-- Config files and their purpose: see [overview — Config Files](overhaul_plan.md#config-files).
-- State machine structure: see [overview — State Machine](overhaul_plan.md#state-machine).
-- Skill tokens: see [overview — Skill Tokens](overhaul_plan.md#skill-tokens).
+- Config files and their purpose: see [overview — Config Files](260407_overhaul_plan.md#config-files).
+- State machine structure: see [overview — State Machine](260407_overhaul_plan.md#state-machine).
+- Skill tokens: see [overview — Skill Tokens](260407_overhaul_plan.md#skill-tokens).
 
 ---
 
@@ -50,7 +51,7 @@ All TODOs reviewed and either fixed immediately, deferred with phase reference, 
 | `S10_IdleGame.py:34` | Change successes for time + max failures | Already implemented; remove TODO |
 | `S13_FinishGame.py:22` | Change to S7 / add S4 | Fix in Phase 2 |
 | `_Devices.py:34` | Re-detect devices later | Fix in Phase 2 |
-| `_Devices.py:118` | Remove 1µs sleep | Safe to remove — `Device.read()` not called in game states. See [Timing Notes](overhaul_plan.md#timing-notes) |
+| `_Devices.py:118` | Remove 1µs sleep | Safe to remove — `Device.read()` not called in game states. See [Timing Notes](260407_overhaul_plan.md#timing-notes) |
 | `_Players.py:26` | Append to list if ID=0 | Evaluate in Phase 2 |
 | `_Table.py:66-70` | Prevent crossings, create game class | Phase 2 |
 | `states_enum.py:136-139` | Remove dead state transitions | Fix now |
@@ -100,8 +101,8 @@ Add a "soft glowing energy flow" idle animation for the `Active` table status, d
 
 ## Relevant Context
 
-- **Table status:** `Active` currently shows no LED animation in S1_Reset; `Broken` uses the Spark effect. Both statuses are handled in `S1_Reset._setIdleLightBehaviour()` and the main `run()` loop. See [overview — Table Status](overhaul_plan.md#table-status).
-- **Colour system:** The flow colour is referenced by name from `marvinconfig.txt [State1] energyFlowColor`, resolved at runtime from `colorsLED`. See [overview — Colour System](overhaul_plan.md#colour-system).
+- **Table status:** `Active` currently shows no LED animation in S1_Reset; `Broken` uses the Spark effect. Both statuses are handled in `S1_Reset._setIdleLightBehaviour()` and the main `run()` loop. See [overview — Table Status](260407_overhaul_plan.md#table-status).
+- **Colour system:** The flow colour is referenced by name from `marvinconfig.txt [State1] energyFlowColor`, resolved at runtime from `colorsLED`. See [overview — Colour System](260407_overhaul_plan.md#colour-system).
 - **Segment graph:** Flows traverse the segment graph using `flowSegments`/`counterSegments` connections defined in `tableconfig.txt`.
 
 ---

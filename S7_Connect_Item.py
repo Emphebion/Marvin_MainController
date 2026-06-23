@@ -23,11 +23,6 @@ class S7_Connect_Item():
         else:
             self._skipThisState()
 
-        'TODO: get item ID and set current item in globals'
-
-        'Why is this here?'
-        #glbs.display.display(self.folder,self.name,self.location)
-
         glbs.ambient_flow.set_mode('menu')
         while(self.state == self.states.S7):
             glbs.ambient_flow.tick(glbs.time.time())
