@@ -21,7 +21,12 @@ class S13_FinishGame():
             glbs.table.setAllTableLEDs(glbs.table.scale_intensity(
                 glbs.table.colorsLED["emerald"], FEEDBACK_INTENSITY))
             glbs.devices.transmitLED(glbs.table.getLEDData())
-            if glbs.ctx.returnState.value is self.states.S8.value or glbs.ctx.returnState.value is self.states.S7.value:
+            # Guard against returnState being None — e.g. when a state machine
+            # bug routes into S13 without a state having set ctx.returnState.
+            # Skip item-side effects; success feedback already played above.
+            if glbs.ctx.returnState is None:
+                print("S13: gameSuccess but returnState is None — skipping item effects")
+            elif glbs.ctx.returnState.value is self.states.S8.value or glbs.ctx.returnState.value is self.states.S7.value:
                 item_before = glbs.items.items.get(glbs.items.currentItemName)
                 overloaded = glbs.items.connectItem()
                 if overloaded:

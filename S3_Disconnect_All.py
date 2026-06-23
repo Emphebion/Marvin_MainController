@@ -49,7 +49,7 @@ class S3_Disconnect_All(object):
                         else:
                             glbs.ctx.gameTimeout = self.gameTime  # Set game timeout (in seconds) to the value in the config
                         glbs.ctx.returnState = self.states.S3
-                    self.state = self.states.S9
+                        self.state = self.states.S9
                 elif new_input["data"] == "left":
                     glbs.ctx.prevStateName = self.state.name
                     self.state = self.states.S7

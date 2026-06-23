@@ -1,7 +1,7 @@
 [common]
 devices = GSM,RFID_LED
 menu = main,wellsize,disconnectall,disconnect1item,connect,achtergrond
-systemtimeout = 240
+systemtimeout = 30
 overloadsparkmin = 5
 overloadsparkmax = 15
 
@@ -168,5 +168,5 @@ palette = amethist,purple,runeL2
 cycleperiod = 3.0
 pulsephasescale = 1.5
 introseconds = 15.0
-framerate = 30
+framerate = 15
 

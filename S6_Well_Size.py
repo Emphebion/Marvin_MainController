@@ -41,8 +41,12 @@ class S6_Well_Size(object):
         self._cycle_period      = glbs.parser.getfloat('WellSize', 'cyclePeriod',     fallback=3.0)
         self._pulse_phase_scale = glbs.parser.getfloat('WellSize', 'pulsePhaseScale', fallback=1.5)
         self._intro_seconds     = glbs.parser.getfloat('WellSize', 'introSeconds',    fallback=15.0)
-        frame_rate              = glbs.parser.getfloat('WellSize', 'frameRate',       fallback=30.0)
-        self._frame_interval    = 1.0 / frame_rate if frame_rate > 0 else 1.0 / 30.0
+        # Cap at 15 Hz: above ~20 Hz the 500-kbaud link to the IOBoardMega stays
+        # saturated and the Mega can't clock the WS2812 strip — see fade_to_black
+        # in _Table.py. Per-frame palette interpolation here makes that visible
+        # as occasional LED flashes.
+        frame_rate              = min(glbs.parser.getfloat('WellSize', 'frameRate', fallback=15.0), 15.0)
+        self._frame_interval    = 1.0 / frame_rate if frame_rate > 0 else 1.0 / 15.0
 
         # Apply ring radii to the shared table (override its defaults from config)
         if glbs.parser.has_option('WellSize', 'rOuter'):
