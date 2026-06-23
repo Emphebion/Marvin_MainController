@@ -63,7 +63,7 @@ skills = wellsize
 
 [PC1]
 name = Mira
-id = 0000DDB4EF
+id = 0000DCBF1D
 skills = wellsize,connect1,disconnectall
 
 [PC2]

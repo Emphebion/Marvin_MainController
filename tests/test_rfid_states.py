@@ -147,6 +147,7 @@ def _build_glbs(monkeypatch, *, status="Active", active_player=None):
             run_spark_animation=MagicMock(),
             run_chaos_sparks=MagicMock(),
             run_lightning_sparks=MagicMock(),
+            feedback_orange_flash=MagicMock(),
         ),
         display=types.SimpleNamespace(
             screenOff=MagicMock(),

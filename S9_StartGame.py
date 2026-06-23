@@ -13,9 +13,12 @@ class S9_StartGame(object):
     def run(self):
         self.state = self.states.S9
         print("current state is {}".format(self.state))
-        
+
         while(self.state == self.states.S9):
             self._setState()
+        # Clear the playing field of any residual menu/feedback LEDs before
+        # S10 starts building the first round.
+        glbs.table.fade_to_black(1.0)
         return self.state.value
 
     def _setState(self):

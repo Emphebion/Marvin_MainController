@@ -35,7 +35,7 @@ function = Repareert met X punten per Y tijd
 id = 0000DE1ECC
 level = 2
 load = 21
-connected = 0
+connected = 1
 
 [item5]
 name = Zegel van Intentie
@@ -115,7 +115,7 @@ function = Onbekend in de pilaar
 id = 0000DD48D0
 level = 1
 load = 7
-connected = 0
+connected = 1
 
 [item15]
 name = Boek der Rituelen

@@ -20,8 +20,10 @@ class S3_Disconnect_All(object):
         else:
             self._skipThisState()
             return self.state.value
-            
+
+        glbs.ambient_flow.set_mode('menu')
         while(self.state == self.states.S3):
+            glbs.ambient_flow.tick(glbs.time.time())
             self._setState()
         return self.state.value
 

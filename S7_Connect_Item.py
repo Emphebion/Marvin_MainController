@@ -28,7 +28,9 @@ class S7_Connect_Item():
         'Why is this here?'
         #glbs.display.display(self.folder,self.name,self.location)
 
+        glbs.ambient_flow.set_mode('menu')
         while(self.state == self.states.S7):
+            glbs.ambient_flow.tick(glbs.time.time())
             self._setState()
         return self.state.value
 
@@ -69,9 +71,7 @@ class S7_Connect_Item():
                         glbs.ctx.returnState = self.states.S7
                         self.state = self.states.S9
                     elif not characterCanActivate:
-                        glbs.table.setAllTableLEDs(glbs.table.colorsLED["orange"])
-                        glbs.time.sleep(3)
-                        glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
+                        glbs.table.feedback_orange_flash()
                         self.state = self.states.S7
                     else:
                         self.state = self.states.S7

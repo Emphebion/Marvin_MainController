@@ -1,105 +1,105 @@
 [common]
-devices=GSM,RFID_LED
-menu=main,wellsize,disconnectall,disconnect1item,connect,achtergrond
-systemTimeout=240
-overloadSparkMin=5
-overloadSparkMax=15
+devices = GSM,RFID_LED
+menu = main,wellsize,disconnectall,disconnect1item,connect,achtergrond
+systemtimeout = 240
+overloadsparkmin = 5
+overloadsparkmax = 15
 
 [GSM]
 devid = 1234:5678
 baudrate = 9600
-startByte = \n
-stopByte = \r
+startbyte = \n
+stopbyte = \r
 
 [RFID_LED]
 devid = 2A03:0042
 baudrate = 500000
-startByte = \r
-stopByte = \n
+startbyte = \r
+stopbyte = \n
 
 [screen]
 size = 480,320
 
 [State1]
-name=reset
-folder=menu
-location=0,0
-idletimeout=10
-energyFlowCount=3
-energyFlowSpeed=80
-energyFlowLength=30
-energyFlowColor=amethist
+name = reset
+folder = menu
+location = 0,0
+idletimeout = 10
+energyflowcount = 3
+energyflowspeed = 80
+energyflowlength = 30
+energyflowcolor = amethist
 
 [State2]
-name=welcome
-folder=menu
-location=0,0
+name = welcome
+folder = menu
+location = 0,0
 
 [State3]
-name=disconnectall
-folder=menu
-location=0,0
-skills=disconnectall
-gameTime=600
+name = disconnectall
+folder = menu
+location = 0,0
+skills = disconnectall
+gametime = 600
 
 [State4]
-name=disconnect1item
-folder=menu
-location=0,0
-skills=disconnect1item
-gameTime=300
+name = disconnect1item
+folder = menu
+location = 0,0
+skills = disconnect1item
+gametime = 300
 
 [State5]
-name=wellsize
-folder=menu
-location=0,0
-skills=wellsize
+name = wellsize
+folder = menu
+location = 0,0
+skills = wellsize
 
 [State6]
-name=achtergrond
-folder=menu
-location=0,0
+name = achtergrond
+folder = menu
+location = 0,0
 
 [State7]
-name=connect
-folder=menu
-location=0,0
-skills=connect1,connect2,connect3
-gameTime=300
+name = connect
+folder = menu
+location = 0,0
+skills = connect1,connect2,connect3
+gametime = 300
 
 [State8]
-name=achtergrond
-folder=menu
-ifolder=items
-location=0,0
-item_location=120,80
-gameTime=300
+name = achtergrond
+folder = menu
+ifolder = items
+location = 0,0
+item_location = 120,80
+gametime = 300
 
 [State9]
 
 [State10]
-failuresPerLevel=4,3,2
+failuresperlevel = 4,3,2
 
 [State11]
-looptimeout=80
-lineLength=28
+looptimeout = 80
+linelength = 28
 
 [State12]
 
 [State13]
-successTimeout=3
+successtimeout = 3
 
 [StateT1]
-name=TableDisabled
+name = TableDisabled
 
 [StateT2]
-name=TableActive
+name = TableActive
 
 [StateT3]
-name=TableBroken
+name = TableBroken
 
 [StateT4]
-name=TableOverload
+name = TableOverload
 
 [GameModes]
 level1 = multiline
@@ -107,52 +107,66 @@ level2 = multiline
 level3 = multiline
 
 [RuneGame]
-revealSpeedL1 = 150
-revealSpeedL2 = 100
-revealSpeedL3 = 60
-holdTimeL1 = 1500
-holdTimeL2 = 1000
-holdTimeL3 = 600
-pauseBetween = 500
-responseTimeout = 3000
-runesPerLevelL1 = 1
-runesPerLevelL2 = 3
-runesPerLevelL3 = 5
-runeColorL1 = runeL1
-runeColorL2 = runeL2
-runeColorL3 = runeL3
+revealspeedl1 = 150
+revealspeedl2 = 100
+revealspeedl3 = 60
+holdtimel1 = 1500
+holdtimel2 = 1000
+holdtimel3 = 600
+pausebetween = 500
+responsetimeout = 3000
+runesperlevell1 = 1
+runesperlevell2 = 3
+runesperlevell3 = 5
+runecolorl1 = runeL1
+runecolorl2 = runeL2
+runecolorl3 = runeL3
 
 [StateX]
-name=Quit
-folder=menu
-location=0,0
+name = Quit
+folder = menu
+location = 0,0
 
 [MQTT]
-enabled  = true
-broker   = localhost
-port     = 1883
-node_id  = marvin-001
+enabled = true
+broker = localhost
+port = 1883
+node_id = marvin-001
 
 [LineGame]
-lineColor = turquoise
+linecolor = turquoise
 
 [MultiLineGame]
-multiLineCountL1 = 1
-multiLineCountL2 = 2
-multiLineCountL3 = 3
-falseLineColor = red
+multilinecountl1 = 1
+multilinecountl2 = 2
+multilinecountl3 = 3
+falselinecolor = red
+mode = default
+
+[Rules]
+decouplemode = lenient
+
+[MenuEffect]
+palette = amethist,purple,runeL2,turquoise,teal,runeL1,emerald,bluewhite
+stepms = 170
+cyclesec = 25.0
+maxintensity = 0.4
+maxgapsec = 1.0
+framerate = 30
+crossfadeseconds = 1.5
 
 [WellSize]
-mode                  = pathflow
-rOuter                = 30.0
-rMiddle               = 20.8
-rInner                = 14.0
-boundaryFadeWidth     = 1.0
-boundaryFadeWidthPath = 0.02
-boundaryMinBright     = 0.0
-color                 = amethist
-palette               = amethist,purple,runeL2
-cyclePeriod           = 3.0
-pulsePhaseScale       = 1.5
-introSeconds          = 15.0
-frameRate             = 30
+mode = pathflow
+router = 30.0
+rmiddle = 20.8
+rinner = 14.0
+boundaryfadewidth = 1.0
+boundaryfadewidthpath = 0.02
+boundaryminbright = 0.0
+color = amethist
+palette = amethist,purple,runeL2
+cycleperiod = 3.0
+pulsephasescale = 1.5
+introseconds = 15.0
+framerate = 30
+

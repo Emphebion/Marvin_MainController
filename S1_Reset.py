@@ -1,7 +1,6 @@
 """S1_Reset — Idle/reset state with table-status-dependent LED animations."""
 
 from states_enum import StatesEnum
-from _Table import EnergyFlow
 import glbs
 
 class S1_Reset():
@@ -23,14 +22,6 @@ class S1_Reset():
         self.sparkStartTime = 0
         self.idleTimeout = glbs.random.uniform(1, self.idleMaxTimeout)
 
-        # Energy flow config (used by Active status)
-        self._flowCount  = glbs.parser.getint('State1', 'energyFlowCount')
-        self._flowSpeed  = glbs.parser.getint('State1', 'energyFlowSpeed') / 1000.0  # ms → s
-        self._flowLength = glbs.parser.getint('State1', 'energyFlowLength')
-        self._flowColorName = glbs.parser.get('State1', 'energyFlowColor').strip()
-        self._flowStepTime = 0.0   # timestamp of last animation step
-
-        self._flows = []
         self._heartbeat_interval = 30
 
     # ------------------------------------------------------------------ #
@@ -40,6 +31,7 @@ class S1_Reset():
         self.state = self.states.S1
         print("current state is {}".format(self.state))
         glbs.display.screenOff()
+        glbs.ambient_flow.set_mode('idle')
 
         device_names = [device.name for device in glbs.devices.connectedDevices]
         print("Connected devices: {}".format(device_names))
@@ -48,15 +40,12 @@ class S1_Reset():
 
         self._setIdleLightBehaviour()
         self.idleStartTime = glbs.time.time()
-        self._flowStepTime = glbs.time.time()
 
         while self.state == self.states.S1:
             now = glbs.time.time()
 
             if glbs.table.status == "Active":
-                if (now - self._flowStepTime) >= self._flowSpeed:
-                    self._stepEnergyFlows()
-                    self._flowStepTime = now
+                glbs.ambient_flow.tick(now)
 
             elif glbs.table.status == "Broken":
                 if (now - self.idleStartTime) >= self.idleTimeout:
@@ -67,9 +56,6 @@ class S1_Reset():
             glbs.mqtt.tick_heartbeat()
             self._setState()
 
-        # Fade the idle animation out before handing off to the next state.
-        # Harmless if Disabled/Overload left the table already dark.
-        glbs.table.fade_to_black(2.0)
         return self.state.value
 
     # ------------------------------------------------------------------ #
@@ -124,7 +110,8 @@ class S1_Reset():
         updated_by_section = {}
         updated = {}
 
-        glbs.display.draw_gm_assign(entries, sel_idx, updated)
+        glbs.display.draw_gm_assign(entries, sel_idx, updated,
+                                    status=self._gm_status())
 
         while True:
             input_list = glbs.handler.event_handler()
@@ -137,6 +124,10 @@ class S1_Reset():
                         sel_idx = (sel_idx - 1) % len(entries)
                     elif ev["data"] == "right":
                         sel_idx = (sel_idx + 1) % len(entries)
+                    elif ev["data"] == "north":
+                        self._cycle_linegame_mode()
+                    elif ev["data"] == "south":
+                        self._toggle_decouple_mode()
                 elif ev["event"] == "rfid":
                     new_id = ev["data"]
                     entry = entries[sel_idx]
@@ -160,10 +151,64 @@ class S1_Reset():
                         sel_idx,
                     )
                     print(f"GM assign: {entry['label']} → {new_id}")
-                glbs.display.draw_gm_assign(entries, sel_idx, updated)
+                glbs.display.draw_gm_assign(entries, sel_idx, updated,
+                                            status=self._gm_status())
 
         # Restore idle display
         glbs.display.screenOff()
+
+    # ------------------------------------------------------------------ #
+    # GM rules toggles (linegame mode / decouple mode)                    #
+    # ------------------------------------------------------------------ #
+    _LINEGAME_MODE_ORDER = ('default', 'nofaults', 'uniform')
+
+    # Player-facing label for each decouple mode (shown on the GM screen).
+    # Lenient = only the menu-access skill (`disconnect1item`) is checked, so
+    # the player effectively needs 1 skill. Strict = additionally requires
+    # `disconnect{item.level}`, so the full skill kit spans 3 disconnects.
+    _DECOUPLE_LABEL = {
+        'lenient': 'disconnect: 1 skill',
+        'strict':  'disconnect: 3 skills',
+    }
+
+    def _gm_status(self):
+        """One-line summary of the current rules toggles for the GM screen."""
+        line = glbs.parser.get('MultiLineGame', 'mode', fallback='default')
+        deco = glbs.parser.get(
+            'Rules', 'decoupleMode', fallback='lenient').strip().lower()
+        deco_label = self._DECOUPLE_LABEL.get(deco, f"disconnect: {deco}")
+        return f"linegame: {line}    {deco_label}"
+
+    def _cycle_linegame_mode(self):
+        """North button: cycle [MultiLineGame] mode and persist to config."""
+        cur = glbs.parser.get(
+            'MultiLineGame', 'mode', fallback='default').strip().lower()
+        order = self._LINEGAME_MODE_ORDER
+        if cur in order:
+            nxt = order[(order.index(cur) + 1) % len(order)]
+        else:
+            nxt = order[0]
+        if not glbs.parser.has_section('MultiLineGame'):
+            glbs.parser.add_section('MultiLineGame')
+        glbs.parser.set('MultiLineGame', 'mode', nxt)
+        self._write_config()
+        print(f"GM rules: linegame mode → {nxt}")
+
+    def _toggle_decouple_mode(self):
+        """South button: toggle [Rules] decoupleMode and persist to config."""
+        if not glbs.parser.has_section('Rules'):
+            glbs.parser.add_section('Rules')
+        cur = glbs.parser.get(
+            'Rules', 'decoupleMode', fallback='lenient').strip().lower()
+        nxt = 'strict' if cur == 'lenient' else 'lenient'
+        glbs.parser.set('Rules', 'decoupleMode', nxt)
+        self._write_config()
+        print(f"GM rules: decouple mode → {nxt}")
+
+    def _write_config(self):
+        """Write the in-memory parser back to marvinconfig.txt."""
+        with open(glbs.config_file, 'w') as f:
+            glbs.parser.write(f)
 
     def _build_gm_entries(self):
         """Return a flat ordered list of assignable character and item entries.
@@ -258,41 +303,11 @@ class S1_Reset():
             glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
             glbs.devices.transmitLED(glbs.table.getLEDData())
 
-        elif glbs.table.status == "Active":
-            self._flows = []
-            base_color = glbs.table.resolve_color(self._flowColorName)
-            # Spread flows across evenly spaced segments for a balanced start
-            step = max(1, len(glbs.table.segmentList) // self._flowCount)
-            for i in range(self._flowCount):
-                seg = glbs.table.segmentList[(i * step) % len(glbs.table.segmentList)]
-                # Alternate direction so flows move in both directions
-                direction = 1 if i % 2 == 0 else -1
-                self._flows.append(
-                    EnergyFlow(
-                        name=f"flow{i}",
-                        base_color=base_color,
-                        length=self._flowLength,
-                        start_segment=seg,
-                        direction=direction,
-                    )
-                )
-
         elif glbs.table.status == "Broken":
             glbs.table._ensure_sparklist()
 
         elif glbs.table.status == "Overload":
             pass  # placeholder: heavy flickering (Phase 2)
-
-    # ------------------------------------------------------------------ #
-    # Energy flow animation (Active)                                       #
-    # ------------------------------------------------------------------ #
-    def _stepEnergyFlows(self):
-        """Advance all energy flows by one LED step and transmit the result."""
-        glbs.table.setAllTableLEDs(glbs.table.colorsLED["black"])
-        for flow in self._flows:
-            flow.step(glbs.table)
-            flow.apply()
-        glbs.devices.transmitLED(glbs.table.getLEDData())
 
     # ------------------------------------------------------------------ #
     # Spark animation (Broken)                                             #

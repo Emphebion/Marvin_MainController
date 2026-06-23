@@ -30,7 +30,7 @@ from _Display import _Display
 from _InputHandler import _InputHandler
 from _Items import _Items
 from _Devices import _Devices
-from _Table import _Table
+from _Table import _Table, AmbientFlow
 from _Characters import _Characters
 from _LineGame import LineGame, MultiLineGame
 from _RuneGame import RuneGame
@@ -66,6 +66,11 @@ multiline_game = MultiLineGame(table, parser)             # multiline game insta
 rune_game      = RuneGame(table, config_file, rune_config_file)  # rune game instance
 game           = line_game                               # active game mode (switched by S9)
 mqtt       = _MQTT(config_file)                # MQTT client (no-op if disabled)
+
+# Shared idle/menu drift engine ticked from S1 (idle) and S2–S7 (menu).
+# Parameters come from [State1] (shared structure + idle) and [MenuEffect]
+# (menu palette / cadence / crossfade).
+ambient_flow = AmbientFlow(table, parser)
 
 # Round state — all mutable per-round variables live here
 ctx = GameContext()

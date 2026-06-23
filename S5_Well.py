@@ -19,7 +19,9 @@ class S5_Well(object):
         else:
             self._skipThisState()
 
+        glbs.ambient_flow.set_mode('menu')
         while(self.state == self.states.S5):
+            glbs.ambient_flow.tick(glbs.time.time())
             self._setState()
         return self.state.value
 

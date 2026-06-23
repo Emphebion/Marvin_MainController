@@ -22,8 +22,10 @@ class S4_Disconnect_Item(object):
             glbs.display.display(self.folder,self.name,self.location)
         else:
             self._skipThisState()
-        
+
+        glbs.ambient_flow.set_mode('menu')
         while(self.state == self.states.S4):
+            glbs.ambient_flow.tick(glbs.time.time())
             self._setState()
         return self.state.value
 
@@ -39,6 +41,17 @@ class S4_Disconnect_Item(object):
                 newItem = glbs.items.getItemByID(rfid_hex)
                 characterIsGM = glbs.characters.activeCharacter.isGM
                 if newItem:
+                    # decoupleMode = 'lenient' (default) preserves the old
+                    # behaviour: menu access (disconnect1item) is enough.
+                    # 'strict' additionally requires disconnect{item.level}.
+                    mode = glbs.parser.get(
+                        'Rules', 'decoupleMode', fallback='lenient'
+                    ).strip().lower()
+                    canDecouple = (
+                        mode != 'strict'
+                        or glbs.characters.activeCharacter.hasSkill(
+                            f"disconnect{newItem.level}")
+                    )
                     if characterIsGM and newItem.connected:
                         item_before = newItem
                         glbs.items.currentItemName = newItem.name
@@ -46,7 +59,7 @@ class S4_Disconnect_Item(object):
                         glbs.mqtt.publish_item_disconnected(item_before)
                         glbs.items.currentItemName = ""
                         self.state = self.states.S1
-                    elif newItem.connected:
+                    elif newItem.connected and canDecouple:
                         glbs.items.currentItemName = newItem.name
                         if glbs.display._sim:
                             glbs.ctx.gameTimeout = 60  # shorter timeout for testing
@@ -54,6 +67,9 @@ class S4_Disconnect_Item(object):
                             glbs.ctx.gameTimeout = self.gameTime  # Set game timeout (in seconds) to the value in the config
                         glbs.ctx.returnState = self.states.S4
                         self.state = self.states.S9
+                    elif newItem.connected and not canDecouple:
+                        glbs.table.feedback_orange_flash()
+                        self.state = self.states.S4
                     else:
                         self.state = self.states.S4
             

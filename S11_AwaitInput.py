@@ -1,6 +1,8 @@
 from states_enum import StatesEnum
 import glbs
 
+LINE_INTENSITY = 0.8  # render all animated lines at 80% of their raw colour
+
 class S11_AwaitInput():
     def __init__(self):
         states_enum = StatesEnum()
@@ -82,7 +84,8 @@ class S11_AwaitInput():
             self._setMultiLineLEDOutput()
             return
         # Line mode: advance line animation by one LED using index tracking
-        color = glbs.table.resolve_color(self._line_color_name)
+        color = glbs.table.scale_intensity(
+            glbs.table.resolve_color(self._line_color_name), LINE_INTENSITY)
         black = glbs.table.colorsLED["black"]
         # Head: colour one LED at head_idx in the current head segment
         if glbs.ctx.currentGameRoute:
@@ -118,7 +121,8 @@ class S11_AwaitInput():
         """Advance all multiline routes by one LED each using index tracking."""
         glbs.ctx.lineCounter += 1
         for r in glbs.game.routes:
-            color = glbs.table.resolve_color(r['color'])
+            color = glbs.table.scale_intensity(
+                glbs.table.resolve_color(r['color']), LINE_INTENSITY)
             black = glbs.table.colorsLED["black"]
             # Head: colour one LED at head_idx in the current head segment
             if r['route']:

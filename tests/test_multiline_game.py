@@ -393,3 +393,92 @@ class TestMultiLineClear:
         while game.routes[0]['route']:
             game.routes[0]['route'].pop()
         assert not game.is_complete()
+
+
+# ---------------------------------------------------------------------------
+# Linegame mode selector ([MultiLineGame] mode key)
+# ---------------------------------------------------------------------------
+
+class TestMultiLineModeSelection:
+    """The mode key in [MultiLineGame] selects between three configurations:
+
+        default  -- per-level real counts + one false line (legacy behaviour)
+        nofaults -- per-level real counts, NO false line
+        uniform  -- forced to 1 real + 1 false on every level
+    """
+
+    def _parser_with_mode(self, multiline_marvin_config, mode):
+        parser = make_parser(multiline_marvin_config)
+        if not parser.has_section('MultiLineGame'):
+            parser.add_section('MultiLineGame')
+        parser.set('MultiLineGame', 'mode', mode)
+        return parser
+
+    @pytest.mark.parametrize("level,expected_real", [(1, 1), (2, 2), (3, 3)])
+    def test_default_mode_keeps_legacy_counts_and_false_line(
+            self, multiline_table_config_file, multiline_marvin_config,
+            monkeypatch, level, expected_real):
+        table = make_table(multiline_table_config_file)
+        parser = self._parser_with_mode(multiline_marvin_config, 'default')
+        game = MultiLineGame(table, parser)
+        ctx = make_ctx()
+        monkeypatch.setitem(sys.modules, 'glbs',
+                            make_glbs_stub(ctx, items_level=level))
+
+        game.start(None)
+        real_routes = [r for r in game.routes if not r['is_false']]
+        false_routes = [r for r in game.routes if r['is_false']]
+        # Real count is capped by number of buttons (3) but we expect the
+        # configured count for level 1 and 2, and one false line always.
+        if level <= 2:
+            assert len(real_routes) == expected_real
+        assert len(false_routes) == 1
+
+    @pytest.mark.parametrize("level,expected_real", [(1, 1), (2, 2), (3, 3)])
+    def test_nofaults_mode_drops_the_false_line(
+            self, multiline_table_config_file, multiline_marvin_config,
+            monkeypatch, level, expected_real):
+        table = make_table(multiline_table_config_file)
+        parser = self._parser_with_mode(multiline_marvin_config, 'nofaults')
+        game = MultiLineGame(table, parser)
+        ctx = make_ctx()
+        monkeypatch.setitem(sys.modules, 'glbs',
+                            make_glbs_stub(ctx, items_level=level))
+
+        game.start(None)
+        assert all(not r['is_false'] for r in game.routes)
+        # No false line means the total equals the level's real count
+        # (still capped by the button count, here 3).
+        assert len(game.routes) == min(expected_real, 3)
+
+    @pytest.mark.parametrize("level", [1, 2, 3])
+    def test_uniform_mode_forces_one_real_plus_false_at_every_level(
+            self, multiline_table_config_file, multiline_marvin_config,
+            monkeypatch, level):
+        table = make_table(multiline_table_config_file)
+        parser = self._parser_with_mode(multiline_marvin_config, 'uniform')
+        game = MultiLineGame(table, parser)
+        ctx = make_ctx()
+        monkeypatch.setitem(sys.modules, 'glbs',
+                            make_glbs_stub(ctx, items_level=level))
+
+        game.start(None)
+        real_routes = [r for r in game.routes if not r['is_false']]
+        false_routes = [r for r in game.routes if r['is_false']]
+        assert len(real_routes) == 1
+        assert len(false_routes) == 1
+
+    def test_unknown_mode_falls_back_to_default(
+            self, multiline_table_config_file, multiline_marvin_config,
+            monkeypatch):
+        table = make_table(multiline_table_config_file)
+        parser = self._parser_with_mode(multiline_marvin_config, 'banana')
+        game = MultiLineGame(table, parser)
+        ctx = make_ctx()
+        monkeypatch.setitem(sys.modules, 'glbs',
+                            make_glbs_stub(ctx, items_level=2))
+
+        game.start(None)
+        # Same as default at level 2: 2 real + 1 false.
+        assert sum(1 for r in game.routes if r['is_false']) == 1
+        assert sum(1 for r in game.routes if not r['is_false']) == 2

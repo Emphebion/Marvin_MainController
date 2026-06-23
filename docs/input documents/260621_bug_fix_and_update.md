@@ -1,4 +1,6 @@
 # Things to fix or update
+Create a plan for the features listed below. Ask questions untill every thing is clear.
+
 ## System fade delay
 There seems to be a delay making the fade to black 4 seconds instead of 2. Either make it 1 second or check if there is a undetermined delay
 

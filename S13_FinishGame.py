@@ -1,6 +1,8 @@
 from states_enum import StatesEnum
 import glbs
 
+FEEDBACK_INTENSITY = 0.6  # dim the full-table success/failure flash to 60%
+
 class S13_FinishGame():
     def __init__(self):
         states_enum = StatesEnum()
@@ -16,7 +18,8 @@ class S13_FinishGame():
         if glbs.ctx.gameSuccess:
             print("Game finished successfully")
             glbs.mqtt.publish_game_success(elapsed_s)
-            glbs.table.setAllTableLEDs(glbs.table.colorsLED["emerald"])
+            glbs.table.setAllTableLEDs(glbs.table.scale_intensity(
+                glbs.table.colorsLED["emerald"], FEEDBACK_INTENSITY))
             glbs.devices.transmitLED(glbs.table.getLEDData())
             if glbs.ctx.returnState.value is self.states.S8.value or glbs.ctx.returnState.value is self.states.S7.value:
                 item_before = glbs.items.items.get(glbs.items.currentItemName)
@@ -39,7 +42,8 @@ class S13_FinishGame():
                 glbs.mqtt.publish_items_cleared()
         else:
             print("Game failed")
-            glbs.table.setAllTableLEDs(glbs.table.colorsLED["red"])
+            glbs.table.setAllTableLEDs(glbs.table.scale_intensity(
+                glbs.table.colorsLED["red"], FEEDBACK_INTENSITY))
             glbs.devices.transmitLED(glbs.table.getLEDData())
 
         #start the finish timer

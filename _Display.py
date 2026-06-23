@@ -651,7 +651,7 @@ class _Display(object):
     # ------------------------------------------------------------------ #
     # GM tag assignment display                                            #
     # ------------------------------------------------------------------ #
-    def draw_gm_assign(self, entries, sel_idx, updated):
+    def draw_gm_assign(self, entries, sel_idx, updated, status=None):
         """Draw the GM tag assignment screen.
 
         Hardware mode: full-screen text overlay with scrollable entry list.
@@ -661,13 +661,15 @@ class _Display(object):
             entries  -- list of entry dicts from S1_Reset._build_gm_entries()
             sel_idx  -- index of the currently highlighted entry
             updated  -- dict of {index: new_id} for entries changed this session
+            status   -- optional status string rendered above the footer
+                        (e.g. "linegame: default    decouple: lenient")
         """
         if self._sim:
-            self._draw_gm_panel(entries, sel_idx, updated)
+            self._draw_gm_panel(entries, sel_idx, updated, status)
         else:
-            self._draw_gm_screen(entries, sel_idx, updated)
+            self._draw_gm_screen(entries, sel_idx, updated, status)
 
-    def _draw_gm_screen(self, entries, sel_idx, updated):
+    def _draw_gm_screen(self, entries, sel_idx, updated, status=None):
         """Hardware: full-screen GM assign overlay (480×320)."""
         self.screen.fill((0, 0, 20))
         w = self.size[0]
@@ -711,14 +713,22 @@ class _Display(object):
             self.screen.blit(id_surf, (w - id_surf.get_width() - 6, y))
             y += row_h
 
+        # Optional status line above footer (linegame / decouple modes)
+        if status:
+            stat_surf = self._font_sm.render(status, True, (180, 180, 110))
+            self.screen.blit(stat_surf,
+                             (w // 2 - stat_surf.get_width() // 2,
+                              self.size[1] - 30))
+
         # Footer instructions
         instr = self._font_sm.render(
-            "L/R: navigate   RFID: assign   UP: exit", True, (70, 70, 70))
+            "L/R: navigate   RFID: assign   UP: exit   N/S: rules",
+            True, (70, 70, 70))
         self.screen.blit(instr, (w // 2 - instr.get_width() // 2,
                                  self.size[1] - 14))
         glbs.pygame.display.flip()
 
-    def _draw_gm_panel(self, entries, sel_idx, updated):
+    def _draw_gm_panel(self, entries, sel_idx, updated, status=None):
         """Simulation: GM assign state in the right RFID panel."""
         px = self._PANEL_X
         pw = self._SIM_W - px
@@ -769,5 +779,11 @@ class _Display(object):
             y += 20
             if y > self._SIM_H - 20:
                 break
+
+        # Optional status line pinned to the bottom of the panel
+        if status:
+            stat_surf = self._font_sm.render(status, True, (180, 180, 110))
+            self.screen.blit(stat_surf,
+                             (px + 4, self._SIM_H - 14))
 
         glbs.pygame.display.flip()

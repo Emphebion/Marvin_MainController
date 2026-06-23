@@ -276,6 +276,17 @@ class MultiLineGame(LineGame):
         self.routes = []        # list of route dicts (see start())
         self.goal_buttons = []  # real goal button names for input scoring
 
+    def _real_count_for_level(self, level):
+        """Per-level real-line count from [MultiLineGame] config."""
+        if level >= 3:
+            return self._parser.getint(
+                'MultiLineGame', 'multiLineCountL3', fallback=3)
+        if level == 2:
+            return self._parser.getint(
+                'MultiLineGame', 'multiLineCountL2', fallback=2)
+        return self._parser.getint(
+            'MultiLineGame', 'multiLineCountL1', fallback=1)
+
     # BUG: Game not starting for a new item (item99) I've just added manually. I have exited the game and restarted it, so that is not the issue. I thought it might 
     # be the level (the new item is level 3), but changing the level of an existing item to 3 does not cause the issue, so that is not it either. 
     # If I click the item in the simulation menu before anything else, the last input shows the correct code, so there is something else wrong.
@@ -296,21 +307,31 @@ class MultiLineGame(LineGame):
         line_color = self._parser.get('LineGame', 'lineColor', fallback='turquoise')
         false_color = self._parser.get('MultiLineGame', 'falseLineColor', fallback='red')
 
-        # Each level gets its own real-line count; every level gets one red
-        # false line whose goal button must NOT be pressed for a win.
-        if level >= 3:
-            real_count = self._parser.getint('MultiLineGame', 'multiLineCountL3', fallback=3)
-        elif level == 2:
-            real_count = self._parser.getint('MultiLineGame', 'multiLineCountL2', fallback=2)
-        else:
-            real_count = self._parser.getint('MultiLineGame', 'multiLineCountL1', fallback=1)
-        has_false = True
+        # 'default'  — per-level real counts + one false line (original behaviour)
+        # 'nofaults' — per-level real counts + NO false line
+        # 'uniform'  — every level forced to 1 real + 1 false
+        mode = self._parser.get(
+            'MultiLineGame', 'mode', fallback='default').strip().lower()
+        if mode == 'uniform':
+            real_count = 1
+            has_false = True
+        elif mode == 'nofaults':
+            real_count = self._real_count_for_level(level)
+            has_false = False
+        else:  # 'default' and any unknown value
+            real_count = self._real_count_for_level(level)
+            has_false = True
 
         # Pick unique goal buttons for each line
         available = list(self._table.gameButtons)
         random.shuffle(available)
         total = real_count + (1 if has_false else 0)
         goals = available[:min(total, len(available))]
+
+        # Leave the LED nearest each goal button dark so the player can see
+        # where each line stops. Only meaningful at L2/L3 (multiple lines
+        # reaching distinct buttons); skipped in 'uniform' mode and at L1.
+        needs_gap = level >= 2 and mode != 'uniform'
 
         self.routes = []
         self.goal_buttons = []
@@ -327,7 +348,7 @@ class MultiLineGame(LineGame):
                 'counter': 0,
                 'head_idx': 0,
                 'tail_idx': 0,
-                'gap_at_end': True,
+                'gap_at_end': needs_gap,
             })
             if not is_false:
                 self.goal_buttons.append(g)

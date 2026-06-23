@@ -746,6 +746,42 @@ class TestFadeToBlack:
         for frame in captured:
             assert all(rgb == [0, 0, 0] for rgb in frame)
 
+    def test_fade_to_black_duration_bounds(self, table_config_file, monkeypatch):
+        """Deadline-clocked loop: per-frame work must be absorbed by sleep,
+        so total wall time tracks ``seconds`` even with a slow transmit.
+
+        Regression for the 4-s-instead-of-2-s drift caused by the old
+        constant-sleep loop.
+        """
+        import time as _time
+        # Real sleep; stubbed transmit that takes a measurable slice of the
+        # frame interval. With frame_rate=30 the interval is ~33 ms and the
+        # transmit eats ~15 ms — pre-fix this stretched 0.3 s out past 0.5 s.
+        sleeps = []
+        real_sleep = _time.sleep
+
+        def slow_transmit(_data):
+            real_sleep(0.015)
+
+        stub = types.SimpleNamespace(
+            devices=types.SimpleNamespace(transmitLED=slow_transmit)
+        )
+        monkeypatch.setitem(sys.modules, 'glbs', stub)
+
+        table = make_table(table_config_file)
+        table.setAllTableLEDs([200, 100, 50])
+
+        start = _time.time()
+        table.fade_to_black(0.3, frame_rate=30)
+        elapsed = _time.time() - start
+
+        # Lower bound: must not finish early (would prove no pacing).
+        # Upper bound: must not drift more than ~20% over target.
+        assert 0.27 <= elapsed <= 0.36, (
+            f"fade_to_black drifted: elapsed={elapsed:.3f}s, "
+            "expected ~0.30 s ± ~10%"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Spark.resetSpark

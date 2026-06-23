@@ -53,6 +53,19 @@ class _Table(object):
         for color in colors:
             self.colorsLED[color] = [int(x.strip()) for x in parser.get(color, 'rgb').split(',')]
 
+        # Catch the "defined a [colorname] section but forgot to add it to
+        # common.colors=" footgun. Without this, the section is silently
+        # ignored and any colorsLED["name"] lookup later raises KeyError —
+        # which propagates out of run() and kills the process (the pygame
+        # window then sits on screen as an unresponsive orphan, which looks
+        # like a freeze rather than a crash).
+        registered = set(colors)
+        for section in parser.sections():
+            if section not in registered and parser.has_option(section, 'rgb'):
+                print(f"WARN: tableconfig has [{section}] with rgb= but it's "
+                      f"missing from common.colors= — it will NOT be loaded. "
+                      f"Add it to colors= to use it.")
+
         self.status = parser.get('common', 'status')                # Off, Active, Broken, Overload
         
         #debug
@@ -121,14 +134,25 @@ class _Table(object):
             for i,prevColor in enumerate(segment.LEDvalues):
                 segment.setLEDValue(i,color)
 
-    def fade_to_black(self, seconds, frame_rate=30):
-        """Smoothly fade every LED to black over ``seconds`` seconds.
+    def fade_to_black(self, seconds, frame_rate=15):
+        """Smoothly fade every LED uniformly to black over ``seconds``.
 
-        Snapshots the current per-LED RGB values, then scales them down by
-        a linearly decreasing factor each frame until fully black. Blocks
-        the caller for the fade duration.
+        Snapshots the current per-LED RGB values, then scales every triple
+        down by a linearly decreasing factor each frame until fully black.
+        Blocks the caller for the fade duration.
 
         seconds <= 0 → instant blank (single transmit).
+
+        Frame-rate cap: 15 Hz is intentional. At 500 kbaud one ~1490-byte
+        LED frame takes ~30 ms on the wire, leaving the IOBoardMega only
+        ~3 ms of idle per 33 ms slot at 30 Hz — not enough to clock 494
+        WS2812 LEDs (~15–20 ms with interrupts disabled). Above ~20 Hz the
+        wire stays saturated, the Mega never gets to push a frame to the
+        strip, and the fade visually reads as "stays bright, jumps to
+        black at the end". Every other animation on this table is paced
+        by an outer state loop whose incidental work (event_handler etc.)
+        naturally drops the effective rate to ~20 Hz; this one is the only
+        tight-inner-loop animator, so it has to cap itself explicitly.
         """
         import glbs
         if seconds <= 0:
@@ -138,6 +162,8 @@ class _Table(object):
         snapshot = [list(seg.getLEDvalues()) for seg in self.segmentList]
         n_frames = max(1, int(seconds * frame_rate))
         frame_interval = 1.0 / frame_rate
+
+        deadline = time.time()
         for k in range(1, n_frames + 1):
             factor = 1.0 - (k / n_frames)
             for seg_idx, seg in enumerate(self.segmentList):
@@ -146,9 +172,74 @@ class _Table(object):
                                         int(rgb[1] * factor),
                                         int(rgb[2] * factor)])
             glbs.devices.transmitLED(self.getLEDData())
-            time.sleep(frame_interval)
+            deadline += frame_interval
+            remainder = deadline - time.time()
+            if remainder > 0:
+                time.sleep(remainder)
         self.setAllTableLEDs(self.colorsLED["black"])
         glbs.devices.transmitLED(self.getLEDData())
+
+    def _fade_segments(self, segments, start_color, end_color, seconds, frame_rate=15):
+        """Linearly fade ``segments`` from start_color to end_color over ``seconds``.
+
+        Other segments are left untouched. Blocks for the duration. Frame rate
+        is capped to match ``fade_to_black`` (see that docstring for the
+        IOBoardMega bandwidth reasoning).
+        """
+        import glbs
+        if seconds <= 0:
+            for seg in segments:
+                for i in range(seg.nrLEDs):
+                    seg.setLEDValue(i, list(end_color))
+            glbs.devices.transmitLED(self.getLEDData())
+            return
+        n_frames = max(1, int(seconds * frame_rate))
+        frame_interval = 1.0 / frame_rate
+        dr = end_color[0] - start_color[0]
+        dg = end_color[1] - start_color[1]
+        db = end_color[2] - start_color[2]
+        deadline = time.time()
+        for k in range(1, n_frames + 1):
+            t = k / n_frames
+            color = [int(start_color[0] + dr * t),
+                     int(start_color[1] + dg * t),
+                     int(start_color[2] + db * t)]
+            for seg in segments:
+                for i in range(seg.nrLEDs):
+                    seg.setLEDValue(i, color)
+            glbs.devices.transmitLED(self.getLEDData())
+            deadline += frame_interval
+            remainder = deadline - time.time()
+            if remainder > 0:
+                time.sleep(remainder)
+
+    def feedback_orange_flash(self, pre_fade=1.0, fade_in=1.0, hold=2.0,
+                              fade_out=1.0, frame_rate=15):
+        """Orange "insufficient skill" feedback on the inner ring.
+
+        Sequence (blocks for pre_fade + fade_in + hold + fade_out seconds):
+          1. Fade whatever is currently on the LEDs to black.
+          2. Inner ring fades black -> orange.
+          3. Hold orange on the inner ring.
+          4. Inner ring fades orange -> black.
+
+        Callers resume normally afterwards; on the next ambient_flow tick the
+        menu palette paints back over the now-dark table.
+        """
+        orange = self.colorsLED["orange"]
+        black  = self.colorsLED["black"]
+        self.fade_to_black(pre_fade, frame_rate=frame_rate)
+        inner = [seg for seg in self.segmentList
+                 if self._segment_tier(seg.name) == 'inner_ring']
+        self._fade_segments(inner, black, orange, fade_in, frame_rate)
+        if hold > 0:
+            time.sleep(hold)
+        self._fade_segments(inner, orange, black, fade_out, frame_rate)
+
+    @staticmethod
+    def scale_intensity(color, factor):
+        """Scale an RGB triple by a brightness factor, clamped to [0, 255]."""
+        return [max(0, min(255, int(c * factor))) for c in color]
 
     def resolve_color(self, value):
         """Resolve a colour parameter value to [R,G,B].
@@ -1060,6 +1151,233 @@ class EnergyFlow(object):
             t = i / max(1, self.length - 1)
             factor = 0.5 * (1.0 + math.cos(math.pi * t))
             seg.setLEDValue(led_idx, self._scale_color(self.base_color, factor))
+
+
+class AmbientFlow(object):
+    """Shared idle/menu ambient drift engine.
+
+    One instance owns the EnergyFlow body and ticks across both S1 (idle)
+    and S2-S7 (menu). On a mode change the body keeps drifting on the same
+    physical LEDs; only base colour and step cadence crossfade.
+
+    Phase 1: only idle is wired. set_mode('menu') is accepted but treated
+    as a no-op so the visible behaviour during S1 stays bit-for-bit
+    identical to the pre-refactor inline implementation.
+    """
+
+    def __init__(self, table, parser):
+        self._table = table
+        self._parser = parser
+
+        # Shared structure (count, length) lives in [State1] per the plan.
+        self._count = parser.getint('State1', 'energyFlowCount', fallback=3)
+        self._length = parser.getint('State1', 'energyFlowLength', fallback=30)
+
+        # Idle parameters.
+        idle_step_ms = parser.getint('State1', 'energyFlowSpeed', fallback=80)
+        self._idle_step = max(0.001, idle_step_ms / 1000.0)
+        idle_color_name = parser.get('State1', 'energyFlowColor',
+                                     fallback='amethist').strip()
+        self._idle_color = table.resolve_color(idle_color_name)
+        self._idle_intensity = 1.0
+
+        # Menu parameters (read defensively so phase 1 cannot crash on odd
+        # values). These are unused while menu is a no-op but are stored so
+        # phase 2 just flips the gate without re-plumbing.
+        try:
+            palette_raw = parser.get('MenuEffect', 'palette',
+                                     fallback='amethist,purple,runeL2,turquoise')
+            palette = [c.strip() for c in palette_raw.split(',') if c.strip()]
+            self._menu_palette_rgb = [table.resolve_color(c) for c in palette] \
+                if palette else [table.resolve_color('amethist')]
+        except Exception:
+            self._menu_palette_rgb = [table.resolve_color('amethist')]
+        self._menu_step = max(
+            0.001,
+            parser.getint('MenuEffect', 'stepMs', fallback=200) / 1000.0)
+        self._menu_intensity = max(
+            0.0, min(1.0,
+                     parser.getfloat('MenuEffect', 'maxIntensity', fallback=0.4)))
+        self._menu_cycle_period = max(
+            0.5, parser.getfloat('MenuEffect', 'cycleSec', fallback=25.0))
+        self._crossfade_seconds = max(
+            0.05,
+            parser.getfloat('MenuEffect', 'crossfadeSeconds', fallback=1.5))
+        frame_rate = parser.getint('MenuEffect', 'frameRate', fallback=30)
+        self._frame_interval = 1.0 / frame_rate if frame_rate > 0 else 1.0 / 30.0
+        self._max_gap_seconds = max(
+            0.05,
+            parser.getfloat('MenuEffect', 'maxGapSec', fallback=1.0))
+
+        self._menu_enabled = True
+
+        self._flows = []
+        self._mode = 'idle'
+        self._prev_mode = None
+        self._mode_change_time = 0.0
+        self._start_wall = None
+        self._last_step_time = None
+        self._next_step = None
+        self._last_frame = 0.0
+
+    @property
+    def flows(self):
+        """Read-only view of the underlying EnergyFlow objects (tests/debug)."""
+        return self._flows
+
+    def set_mode(self, mode):
+        """Switch idle <-> menu, starting a crossfade if different.
+
+        Phase 1: menu transitions are silently ignored so callers can be
+        wired now without changing visible behaviour.
+        """
+        if not self._menu_enabled and mode != 'idle':
+            return
+        if mode == self._mode and self._prev_mode is None:
+            return
+        if mode == self._mode and self._prev_mode is not None:
+            return
+        self._prev_mode = self._mode
+        self._mode = mode
+        self._mode_change_time = time.time()
+
+    def reset(self):
+        """Drop flows so the next tick lazily recreates them."""
+        self._flows = []
+        self._start_wall = None
+        self._last_step_time = None
+        self._next_step = None
+        self._last_frame = 0.0
+
+    def _ensure_flows(self):
+        if self._flows or not self._table.segmentList:
+            return
+        n_segs = len(self._table.segmentList)
+        step = max(1, n_segs // self._count)
+        for i in range(self._count):
+            seg = self._table.segmentList[(i * step) % n_segs]
+            direction = 1 if i % 2 == 0 else -1
+            self._flows.append(EnergyFlow(
+                name=f"ambient{i}",
+                base_color=self._idle_color,
+                length=self._length,
+                start_segment=seg,
+                direction=direction,
+            ))
+
+    def _mode_color_intensity(self, mode, now):
+        if mode == 'idle':
+            return (self._idle_color, self._idle_intensity)
+        elapsed = now - (self._start_wall if self._start_wall is not None else now)
+        phase = (elapsed / self._menu_cycle_period) % 1.0
+        rgb = self._table._palette_color(self._menu_palette_rgb, phase)
+        return (rgb, self._menu_intensity)
+
+    def _mode_step_interval(self, mode):
+        return self._idle_step if mode == 'idle' else self._menu_step
+
+    @staticmethod
+    def _clamp01(t):
+        if t <= 0.0:
+            return 0.0
+        if t >= 1.0:
+            return 1.0
+        return t
+
+    def _crossfade_t(self, now):
+        if self._prev_mode is None:
+            return 1.0
+        return self._clamp01(
+            (now - self._mode_change_time) / self._crossfade_seconds)
+
+    @staticmethod
+    def _lerp_rgb(a, b, t):
+        return [a[0] + (b[0] - a[0]) * t,
+                a[1] + (b[1] - a[1]) * t,
+                a[2] + (b[2] - a[2]) * t]
+
+    def _effective_color_intensity(self, now):
+        target = self._mode_color_intensity(self._mode, now)
+        if self._prev_mode is None:
+            return target
+        prior = self._mode_color_intensity(self._prev_mode, now)
+        t = self._crossfade_t(now)
+        return (self._lerp_rgb(prior[0], target[0], t),
+                prior[1] + (target[1] - prior[1]) * t)
+
+    def _effective_step_interval(self, now):
+        target = self._mode_step_interval(self._mode)
+        if self._prev_mode is None:
+            return target
+        prior = self._mode_step_interval(self._prev_mode)
+        t = self._crossfade_t(now)
+        return prior + (target - prior) * t
+
+    @staticmethod
+    def _scale_color(color, factor):
+        return [max(0, min(255, int(c * factor))) for c in color]
+
+    def tick(self, now):
+        """Advance drift / render / transmit if due."""
+        # 1. Bootstrap.
+        if self._start_wall is None:
+            self._start_wall = now
+            self._last_step_time = now
+            self._next_step = now + self._effective_step_interval(now)
+            self._last_frame = 0.0
+
+        # 2. Long-gap auto-reset (returning from game / sleep).
+        if (self._last_step_time is not None
+                and (now - self._last_step_time) > self._max_gap_seconds):
+            self.reset()
+            self._start_wall = now
+            self._last_step_time = now
+            self._next_step = now + self._effective_step_interval(now)
+
+        self._ensure_flows()
+
+        # 3. Catch up on missed drift steps. step_taken records whether at
+        #    least one step ran this tick -- drives the "render on step"
+        #    branch of the policy below.
+        step_taken = False
+        while self._next_step is not None and now >= self._next_step:
+            step_at = self._next_step
+            for f in self._flows:
+                f.step(self._table)
+            self._last_step_time = step_at
+            self._next_step = step_at + self._effective_step_interval(step_at)
+            step_taken = True
+
+        # 4. Render policy.
+        #    - Steady state (idle or menu, no crossfade): render only on
+        #      step. One transmit per step keeps the LED serial bus well
+        #      under its bandwidth ceiling (~30 ms / frame). The palette
+        #      colour walk between steps is small enough that step-cadence
+        #      rendering still looks like a smooth drift.
+        #    - During a crossfade: render at frame_rate so the colour /
+        #      intensity / cadence ramp is smooth. The crossfade is short
+        #      (~1-2 s) so the higher transmit rate is tolerable.
+        must_render = step_taken
+        if self._prev_mode is not None:
+            if (now - self._last_frame) >= self._frame_interval:
+                must_render = True
+        if not must_render:
+            return
+
+        base_color, intensity = self._effective_color_intensity(now)
+        effective = self._scale_color(base_color, intensity)
+        self._table.setAllTableLEDs(self._table.colorsLED['black'])
+        for f in self._flows:
+            f.base_color = effective
+            f.apply()
+        import glbs
+        glbs.devices.transmitLED(self._table.getLEDData())
+        self._last_frame = now
+
+        # 5. Retire finished crossfade.
+        if (self._prev_mode is not None
+                and (now - self._mode_change_time) >= self._crossfade_seconds):
+            self._prev_mode = None
 
 
 class _LightningSpark(object):
