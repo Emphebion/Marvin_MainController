@@ -110,6 +110,38 @@ class _Display(object):
             self.screen = glbs.pygame.display.set_mode(self.size, glbs.pygame.NOFRAME)
             self.max_rad = int(min(self.size) / 2 - 75)
 
+        # Saved so _flip() can rebuild the surface after a VC4/V3D driver
+        # hiccup that leaves pygame's display subsystem 'not initialized'.
+        self._mode_args = (self.size,) if self._sim else (self.size, glbs.pygame.NOFRAME)
+
+    def _flip(self):
+        """pygame.display.flip with one-shot recovery on backend loss.
+
+        A driver hiccup (the deep-dive's surviving fragment of case D) can
+        leave pygame's display subsystem in 'not initialized' state, so
+        every subsequent flip raises. Try once to quit + re-init the
+        display and rebuild the surface; if the retry also fails, let the
+        exception propagate. PR B's signature-repeat guard in MARVIN.py
+        will then escalate the second identical failure to service mode.
+        """
+        try:
+            glbs.pygame.display.flip()
+            return
+        except glbs.pygame.error as e:
+            if 'video system not initialized' not in str(e):
+                raise
+            print(f"_Display: display subsystem lost ({e}), re-initialising")
+            try:
+                glbs.pygame.display.quit()
+            except Exception:
+                pass
+            glbs.pygame.display.init()
+            self.screen = glbs.pygame.display.set_mode(*self._mode_args)
+            if self._sim:
+                glbs.pygame.display.set_caption("MARVIN Simulation")
+            # Re-attempt. If this raises, propagate untouched.
+            glbs.pygame.display.flip()
+
     # ------------------------------------------------------------------ #
     # Hardware-mode methods (unchanged public API)                         #
     # ------------------------------------------------------------------ #
@@ -133,7 +165,7 @@ class _Display(object):
                     self._image_cache[key] = glbs.pygame.image.load(
                         folder + "/" + fileName + ".jpg").convert()
                 self.screen.blit(self._image_cache[key], location)
-            glbs.pygame.display.flip()
+            self._flip()
         else:
             if fileName:
                 key = (folder, fileName)
@@ -178,7 +210,7 @@ class _Display(object):
             a = random.randrange(0, 255, 10)
             glbs.pygame.draw.circle(self.screen, (r, g, b, a),
                                     (240, 160), self.max_rad, width)
-            glbs.pygame.display.flip()
+            self._flip()
         else:
             self.update_leds()
 
@@ -189,7 +221,7 @@ class _Display(object):
             self.update_leds()
         else:
             self.screen.fill((0, 0, 0))
-            glbs.pygame.display.flip()
+            self._flip()
 
     # ------------------------------------------------------------------ #
     # Simulation: click handling                                           #
@@ -272,7 +304,7 @@ class _Display(object):
         # RFID panel
         self._draw_rfid_panel()
 
-        glbs.pygame.display.flip()
+        self._flip()
 
     # ------------------------------------------------------------------ #
     # Simulation: internal helpers                                         #
@@ -368,7 +400,7 @@ class _Display(object):
         cx, cy = self._RING_CX, self._RING_CY
         for r in (self._R_INNER, self._R_MIDDLE, self._R_OUTER):
             glbs.pygame.draw.circle(self.screen, (40, 40, 40), (cx, cy), r, 1)
-        glbs.pygame.display.flip()
+        self._flip()
 
     def _rfid_panel_snapshot(self):
         """Return a hashable snapshot of all state shown in the RFID panel.
@@ -646,7 +678,7 @@ class _Display(object):
         self.screen.blit(instr, (px + pw // 2 - instr.get_width() // 2,
                                  self._SIM_H - 14))
 
-        glbs.pygame.display.flip()
+        self._flip()
 
     # ------------------------------------------------------------------ #
     # GM tag assignment display                                            #
@@ -726,7 +758,7 @@ class _Display(object):
             True, (70, 70, 70))
         self.screen.blit(instr, (w // 2 - instr.get_width() // 2,
                                  self.size[1] - 14))
-        glbs.pygame.display.flip()
+        self._flip()
 
     def _draw_gm_panel(self, entries, sel_idx, updated, status=None):
         """Simulation: GM assign state in the right RFID panel."""
@@ -786,4 +818,4 @@ class _Display(object):
             self.screen.blit(stat_surf,
                              (px + 4, self._SIM_H - 14))
 
-        glbs.pygame.display.flip()
+        self._flip()
