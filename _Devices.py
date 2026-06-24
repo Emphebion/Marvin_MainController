@@ -110,8 +110,7 @@ class _Devices(object):
                 port = self.port_by_id(dev.devID)
                 if port:
                     try:
-                        dev.ser.port = port
-                        dev.connect()
+                        dev.reopen(port)
                         dev.offline = False
                         print(f"_Devices: reconnected {dev.name} on {port}")
                     except Exception as e:
@@ -180,6 +179,12 @@ class Device(object):
         self.name = name
         self.devID = devID
         self.offline = False
+        # Re-entrancy lock guarding self.ser and self._rx_buf. Taken by both
+        # the main thread (send/read) and the reconnect watcher (reopen).
+        # Without it, a USB re-enumeration could swap self.ser mid-read,
+        # producing OSError / TypeError that previously escaped the narrow
+        # SerialException catch and crashed the loop.
+        self._lock = threading.RLock()
         self.ser = serial.Serial()
         self.ser.port = port
         self.ser.baudrate = baudrate
@@ -192,24 +197,54 @@ class Device(object):
         self.connect()
 
     def connect(self, timeout=0.1):
-        self.ser.timeout = timeout
-        self.open()
+        with self._lock:
+            self.ser.timeout = timeout
+            self.open()
+        # 2 s Arduino bootloader settle — deliberately outside the lock so
+        # the main thread isn't blocked waiting for it during a reconnect.
         time.sleep(2)
 
     def open(self):
-        if not self.ser.is_open:
+        with self._lock:
+            if not self.ser.is_open:
+                try:
+                    self.ser.open()
+                except serial.SerialException as e:
+                    print(e)
+
+    def reopen(self, new_port):
+        """Atomically swap to ``new_port`` and re-open. Used by the reconnect
+        watcher so the main thread cannot observe a half-swapped self.ser.
+
+        Also flushes the RX buffer: a partial frame held over from before
+        the disconnect could otherwise re-decode as a phantom 'B' frame
+        with arbitrary bits set after resync (deep-dive case B → A path).
+        """
+        with self._lock:
             try:
-                self.ser.open()
-            except serial.SerialException as e:
-                print(e)
+                if self.ser.is_open:
+                    self.ser.close()
+            except Exception:
+                pass
+            self.ser.port = new_port
+            self._rx_buf.clear()
+            self.ser.timeout = 0.1
+            self.ser.open()
+        time.sleep(2)
 
     def send(self, data):
-        self.open()
-        if self.ser.is_open:
+        with self._lock:
+            self.open()
+            if not self.ser.is_open:
+                return
             try:
                 msg = self.format_msg(data)
                 self.ser.write(msg)
-            except serial.SerialException as e:
+            except (serial.SerialException, OSError, TypeError) as e:
+                # Broader than SerialException: on Linux, a cdc_acm reset can
+                # surface as OSError from a closed fd, and a race with the
+                # reconnect watcher can land a None/wrong-type self.ser
+                # briefly. All three mean the device is gone — same response.
                 print(f"Device {self.name}: send failed ({e}), marking offline")
                 self.offline = True
                 try:
@@ -246,47 +281,50 @@ class Device(object):
             CRC-valid frame in the buffer.  None if no complete frame is
             ready yet.
         """
-        self.open()
-        if not self.ser.is_open:
-            return None
-        try:
-            n = self.ser.in_waiting
-            if n:
-                self._rx_buf.extend(self.ser.read(n))
-        except serial.SerialException as e:
-            print(f"Device {self.name}: read failed ({e}), marking offline")
-            self.offline = True
-            try:
-                self.ser.close()
-            except Exception:
-                pass
-            return None
-
-        while True:
-            idx = self._rx_buf.find(b'\x00')
-            if idx < 0:
+        with self._lock:
+            self.open()
+            if not self.ser.is_open:
                 return None
-            frame = bytes(self._rx_buf[:idx])
-            del self._rx_buf[:idx + 1]
-            if not frame:
-                continue                       # spurious 0x00, resync
             try:
-                decoded = self._cobs_decode(frame)
-            except ValueError:
-                print(f"RX drop: COBS decode failed (encoded={len(frame)}B)")
-                continue
-            if len(decoded) < 2:
-                print(f"RX drop: frame too short (decoded={len(decoded)}B)")
-                continue
-            crc_expected = self._crc8(decoded[:-1])
-            crc_actual = decoded[-1]
-            if crc_expected != crc_actual:
-                type_hex = f"0x{decoded[0]:02X}"
-                print(f"RX drop: CRC mismatch (type={type_hex} "
-                      f"len={len(decoded)} got=0x{crc_actual:02X} "
-                      f"want=0x{crc_expected:02X})")
-                continue
-            return decoded[:-1]                # type + body, CRC removed
+                n = self.ser.in_waiting
+                if n:
+                    self._rx_buf.extend(self.ser.read(n))
+            except (serial.SerialException, OSError, TypeError) as e:
+                # See Device.send for why this except is broader than
+                # SerialException alone.
+                print(f"Device {self.name}: read failed ({e}), marking offline")
+                self.offline = True
+                try:
+                    self.ser.close()
+                except Exception:
+                    pass
+                return None
+
+            while True:
+                idx = self._rx_buf.find(b'\x00')
+                if idx < 0:
+                    return None
+                frame = bytes(self._rx_buf[:idx])
+                del self._rx_buf[:idx + 1]
+                if not frame:
+                    continue                       # spurious 0x00, resync
+                try:
+                    decoded = self._cobs_decode(frame)
+                except ValueError:
+                    print(f"RX drop: COBS decode failed (encoded={len(frame)}B)")
+                    continue
+                if len(decoded) < 2:
+                    print(f"RX drop: frame too short (decoded={len(decoded)}B)")
+                    continue
+                crc_expected = self._crc8(decoded[:-1])
+                crc_actual = decoded[-1]
+                if crc_expected != crc_actual:
+                    type_hex = f"0x{decoded[0]:02X}"
+                    print(f"RX drop: CRC mismatch (type={type_hex} "
+                          f"len={len(decoded)} got=0x{crc_actual:02X} "
+                          f"want=0x{crc_expected:02X})")
+                    continue
+                return decoded[:-1]                # type + body, CRC removed
 
     # ------------------------------------------------------------------ #
     # COBS + CRC-8 helpers                                                 #

@@ -9,11 +9,14 @@ Hardware note: serial devices are detected at import time via glbs.py.
 Run without hardware to enter keyboard/simulation mode automatically.
 """
 
+import collections
+import errno
 import os
 import sys
 import time
 import traceback
 
+from _CrashTracer import _ConsoleBuffer, _CrashTracer
 from states_enum import StatesEnum
 import S1_Reset
 import S2_Welcome
@@ -32,25 +35,72 @@ import glbs
 
 CRASH_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'crash.log')
 
+# Recovery rate limit — even a successful retry cannot fire faster than this.
+# Belt-and-braces against the dedup tracer: if dedup ever fails, this caps the
+# loop at ~1 entry/second instead of the 100+/sec seen overnight.
+_MIN_RECOVERY_INTERVAL_S = 1.0
 
-def _log_crash(state_value, exc):
-    """Append a timestamped traceback to crash.log so post-mortem is possible.
+# Number of recent crash signatures the classifier remembers. A signature
+# reappearing here = the same bug is firing on every loop iteration; service
+# mode is the only sane response. 5 lets a couple of unrelated transient bugs
+# co-exist without one evicting another and missing a true cascade.
+_RECENT_SIGS_LEN = 5
 
-    Stderr is not captured by the table service runner, so without this the
-    only evidence a crash happened is the game stopping. Writing to a file
-    next to the script gives us a durable record across restarts.
+
+def _classify(exc, sig, recent_sigs):
+    """Return one of 'retry' | 'service_mode' | 'propagate' for ``exc``.
+
+    Decision table (see docs/plans/260624_crash_trace_and_recovery.md §2.1):
+        SystemExit / KeyboardInterrupt -> 'propagate'   (handled upstream)
+        MemoryError, OSError ENOSPC    -> 'service_mode'
+        signature seen recently        -> 'service_mode'   (cascade guard)
+        anything else                  -> 'retry'
+
+    The "subsystem dead, recoverable" path (re-init pygame, mark device
+    offline) is deliberately not yet wired in — those repairs need their own
+    review and live in a follow-up PR. Without them, a non-recoverable
+    pygame or serial failure falls through to the cascade-guard branch
+    instead: it retries once, recurs at the same signature, and escalates
+    to service mode on the second occurrence. That bounds the damage even
+    without active repair.
     """
+    if isinstance(exc, (SystemExit, KeyboardInterrupt)):
+        return 'propagate'
+    if isinstance(exc, MemoryError):
+        return 'service_mode'
+    if isinstance(exc, OSError) and getattr(exc, 'errno', None) == errno.ENOSPC:
+        return 'service_mode'
+    if sig in recent_sigs:
+        return 'service_mode'
+    return 'retry'
+
+
+def _enter_service_mode(exc, sig):
+    """Halt the state machine. Stay alive so MQTT/SSH inspection still works.
+
+    Publishes a retained 'state/service_mode' message so EDD/GMControl can
+    surface the table as bricked rather than just silent. Sleeps in 30 s
+    intervals — long enough not to hammer the broker, short enough that a
+    broker reconnect republishes within a sensible window.
+    """
+    cls, fname, lineno = sig
+    reason = f"{cls} at {os.path.basename(fname)}:{lineno}"
+    print(f"MARVIN: entering service mode ({reason})", file=sys.__stderr__)
     try:
-        with open(CRASH_LOG, 'a', encoding='utf-8') as f:
-            f.write("=" * 60 + "\n")
-            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}  state={state_value}\n")
-            traceback.print_exc(file=f)
-            f.write("\n")
+        traceback.print_exception(type(exc), exc, exc.__traceback__, file=sys.__stderr__)
     except Exception:
         pass
-    # Also print to stderr in case something is watching it.
-    print(f"MARVIN: unhandled exception in state {state_value}", file=sys.stderr)
-    traceback.print_exc()
+    while True:
+        try:
+            import glbs as _g
+            _g.mqtt.publish("state/service_mode", {
+                "reason": reason,
+                "type": cls,
+                "origin": f"{os.path.basename(fname)}:{lineno}",
+            }, retain=True)
+        except Exception:
+            pass
+        time.sleep(30)
 
 #############################################
 # Main function
@@ -68,6 +118,15 @@ def main():
     calling the current state's run() and transitioning to the returned state.
     Exits when Sx_Quit (value 100) is reached.
     """
+
+    # Tee stdout to a 500-line ring buffer so the lines printed *before* a
+    # crash (FRAME B / FRAME T / device messages) end up in the crash log.
+    # Install before any state runs so we capture the run-up to the failure.
+    console = _ConsoleBuffer(sys.stdout)
+    sys.stdout = console
+    tracer = _CrashTracer(CRASH_LOG, console_buffer=console)
+    recent_sigs = collections.deque(maxlen=_RECENT_SIGS_LEN)
+    last_recovery_t = 0.0
 
     states_enum = StatesEnum()
     all_states = states_enum.all_states
@@ -123,10 +182,34 @@ def main():
         except KeyboardInterrupt:
             raise
         except Exception as exc:
-            # Last-ditch handler: log the traceback to crash.log and recover
-            # to S1 so a single corrupt-state bug does not kill the table
-            # mid-event. Round context is reset so the next state starts clean.
-            _log_crash(state, exc)
+            # Last-ditch handler. Three layers of defence keep us out of the
+            # overnight-cascade trap:
+            #   1. Tracer dedups identical failures so the log stays small.
+            #   2. Classifier escalates to service mode when the same
+            #      signature reappears within recent_sigs — exactly the
+            #      shape the 7 GB cascade had.
+            #   3. Rate limit caps recovery transitions at ~1/sec even if
+            #      both dedup and escalation somehow miss.
+            sig = _CrashTracer.signature(exc)
+            tracer.record(state, exc)
+            print(f"MARVIN: unhandled exception in state {state}", file=sys.__stderr__)
+            traceback.print_exc(file=sys.__stderr__)
+
+            action = _classify(exc, sig, recent_sigs)
+            if action == 'propagate':
+                raise
+            if action == 'service_mode':
+                _enter_service_mode(exc, sig)
+                # _enter_service_mode never returns.
+
+            recent_sigs.append(sig)
+
+            now = time.time()
+            wait = _MIN_RECOVERY_INTERVAL_S - (now - last_recovery_t)
+            if wait > 0:
+                time.sleep(wait)
+            last_recovery_t = time.time()
+
             try:
                 glbs.ctx.reset()
             except Exception:

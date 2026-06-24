@@ -19,6 +19,8 @@ The 1 ms pygame.time.wait(1) at the end of event_handler() is intentional:
 it rate-limits the polling loop to prevent missed or double button triggers.
 """
 
+import sys
+
 import glbs
 
 class _InputHandler(object):
@@ -28,8 +30,9 @@ class _InputHandler(object):
         self.init = 1
         self.SERIAL = glbs.pygame.USEREVENT + 1
         self.elist = []
+        self._shutdown_streak = 0
         self.allowed_events = [glbs.pygame.KEYDOWN, glbs.pygame.MOUSEBUTTONDOWN,
-                               glbs.pygame.USEREVENT, self.SERIAL]
+                               glbs.pygame.QUIT, glbs.pygame.USEREVENT, self.SERIAL]
         glbs.pygame.event.set_allowed(self.allowed_events)
 
     # ------------------------------------------------------------------ #
@@ -45,6 +48,14 @@ class _InputHandler(object):
     # F1+C1+F2-lite land.                                                 #
     # ------------------------------------------------------------------ #
     _BUTTON_DEBOUNCE_S = 0.10
+
+    # Shutdown-bit debounce. The screen-byte bit 0 = shutdown is the only
+    # single-bit event that can take down pygame, so a one-frame noise flip
+    # (USB re-enumerate, EMC, partial-frame resync after an SD-card stall)
+    # was enough to crash the table overnight. Require the bit to be set in
+    # N consecutive 'B' frames before honouring — at the default ~10 Hz B
+    # cadence that's ~500 ms of held press, well below user perception.
+    _SHUTDOWN_STREAK_REQUIRED = 5
 
     def event_handler(self):
         """Poll for input and return the events produced by *this* call.
@@ -119,6 +130,19 @@ class _InputHandler(object):
             scrn = data[1] if len(data) > 1 else 0
             game = data[2] if len(data) > 2 else 0
             print(f"FRAME B scrn=0x{scrn:02X} game=0x{game:02X}")
+
+            # Debounced shutdown (bit 0 of the screen byte). A phantom bit
+            # from EMC / a USB resync / SD-stall partial frame must not be
+            # able to tear down pygame on its own — that was the suspected
+            # 2026-06-24 overnight cascade trigger.
+            if scrn & 0x01:
+                self._shutdown_streak += 1
+                if self._shutdown_streak >= self._SHUTDOWN_STREAK_REQUIRED:
+                    glbs.pygame.quit()
+                    sys.exit(0)
+            else:
+                self._shutdown_streak = 0
+
             if scrn != 0:
                 bits = [(scrn >> bit) & 1 for bit in range(8 - 1, -1, -1)]
                 for index, bit in enumerate(bits):
@@ -133,8 +157,8 @@ class _InputHandler(object):
                         self.elist.append({"event": "keydown", "data": "down"})
                     elif button == "top":
                         self.elist.append({"event": "keydown", "data": "up"})
-                    elif button == "shutdown":
-                        glbs.pygame.quit()
+                    # "shutdown" is handled separately above with a streak
+                    # debounce; do not fire on the raw single-frame bit.
             if game != 0:
                 bits = [(game >> bit) & 1 for bit in range(8 - 1, -1, -1)]
                 for index, bit in enumerate(bits):
@@ -181,6 +205,13 @@ class _InputHandler(object):
         for event in glbs.pygame.event.get():
             glbs.systemWakeTime = glbs.time.time()
 
+            # Window-close in sim mode — a workstation user closing the
+            # pygame window must shut down cleanly rather than leave a
+            # zombie state loop on a dead pygame.
+            if event.type == glbs.pygame.QUIT:
+                glbs.pygame.quit()
+                sys.exit(0)
+
             if event.type == glbs.pygame.KEYDOWN:
                 if event.key == glbs.pygame.K_LEFT:
                     self.elist.append({"event": "keydown", "data": "left"})
@@ -196,6 +227,7 @@ class _InputHandler(object):
 
                 elif event.key == glbs.pygame.K_ESCAPE:
                     glbs.pygame.quit()
+                    sys.exit(0)
 
                 elif event.key == glbs.pygame.K_h:
                     self.elist.append({"event": "keydown", "data": "east"})
