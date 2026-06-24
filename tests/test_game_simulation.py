@@ -31,7 +31,7 @@ from _GameContext import GameContext
 def make_ctx():
     """Return a freshly initialised GameContext."""
     ctx = GameContext()
-    ctx.gameStartTime = time.time()
+    ctx.gameStartTime = time.monotonic()
     ctx.gameTimeout = 30.0
     return ctx
 

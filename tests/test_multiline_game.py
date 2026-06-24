@@ -35,7 +35,7 @@ def make_glbs_stub(ctx, items_level=2):
 def make_ctx():
     from _GameContext import GameContext
     ctx = GameContext()
-    ctx.gameStartTime = time.time()
+    ctx.gameStartTime = time.monotonic()
     ctx.gameTimeout = 30.0
     return ctx
 

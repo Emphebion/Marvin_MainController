@@ -97,7 +97,7 @@ class _InputHandler(object):
         if len(data) < 3 or data[0] != ord('B'):
             return False
         mask = (data[1], data[2])
-        now = glbs.time.time()
+        now = glbs.time.monotonic()
         last_mask = getattr(dev, '_last_button_mask', None)
         last_time = getattr(dev, '_last_button_time', 0.0)
         if mask == last_mask and (now - last_time) < self._BUTTON_DEBOUNCE_S:
@@ -203,7 +203,7 @@ class _InputHandler(object):
         clicking a player or item button in the simulation injects an rfid event.
         """
         for event in glbs.pygame.event.get():
-            glbs.systemWakeTime = glbs.time.time()
+            glbs.systemWakeTime = glbs.time.monotonic()
 
             # Window-close in sim mode — a workstation user closing the
             # pygame window must shut down cleanly rather than leave a

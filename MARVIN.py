@@ -204,11 +204,11 @@ def main():
 
             recent_sigs.append(sig)
 
-            now = time.time()
+            now = time.monotonic()
             wait = _MIN_RECOVERY_INTERVAL_S - (now - last_recovery_t)
             if wait > 0:
                 time.sleep(wait)
-            last_recovery_t = time.time()
+            last_recovery_t = time.monotonic()
 
             try:
                 glbs.ctx.reset()

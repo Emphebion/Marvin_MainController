@@ -25,14 +25,14 @@ class S4_Disconnect_Item(object):
 
         glbs.ambient_flow.set_mode('menu')
         while(self.state == self.states.S4):
-            glbs.ambient_flow.tick(glbs.time.time())
+            glbs.ambient_flow.tick(glbs.time.monotonic())
             self._setState()
         return self.state.value
 
     def _setState(self):
         input_list = glbs.handler.event_handler()
         if input_list:
-            glbs.systemWakeTime = glbs.time.time()  # Reset system wake time
+            glbs.systemWakeTime = glbs.time.monotonic()  # Reset system wake time
             new_input = input_list.pop()
 
             # CHECK if an RFID tag has been presented

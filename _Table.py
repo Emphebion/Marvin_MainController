@@ -148,7 +148,7 @@ class _Table(object):
         n_frames = max(1, int(seconds * frame_rate))
         frame_interval = 1.0 / frame_rate
 
-        deadline = time.time()
+        deadline = time.monotonic()
         for k in range(1, n_frames + 1):
             factor = 1.0 - (k / n_frames)
             for seg_idx, seg in enumerate(self.segmentList):
@@ -158,7 +158,7 @@ class _Table(object):
                                         int(rgb[2] * factor)])
             glbs.devices.transmitLED(self.getLEDData())
             deadline += frame_interval
-            remainder = deadline - time.time()
+            remainder = deadline - time.monotonic()
             if remainder > 0:
                 time.sleep(remainder)
         self.setAllTableLEDs(self.colorsLED["black"])
@@ -183,7 +183,7 @@ class _Table(object):
         dr = end_color[0] - start_color[0]
         dg = end_color[1] - start_color[1]
         db = end_color[2] - start_color[2]
-        deadline = time.time()
+        deadline = time.monotonic()
         for k in range(1, n_frames + 1):
             t = k / n_frames
             color = [int(start_color[0] + dr * t),
@@ -194,7 +194,7 @@ class _Table(object):
                     seg.setLEDValue(i, color)
             glbs.devices.transmitLED(self.getLEDData())
             deadline += frame_interval
-            remainder = deadline - time.time()
+            remainder = deadline - time.monotonic()
             if remainder > 0:
                 time.sleep(remainder)
 
@@ -651,11 +651,11 @@ class _Table(object):
         active = []
         spawn_accum = 0.0
         frame_interval = 1.0 / target_fps
-        end_time = glbs.time.time() + duration
-        last_time = glbs.time.time()
+        end_time = glbs.time.monotonic() + duration
+        last_time = glbs.time.monotonic()
 
-        while glbs.time.time() < end_time:
-            frame_start = glbs.time.time()
+        while glbs.time.monotonic() < end_time:
+            frame_start = glbs.time.monotonic()
             dt = frame_start - last_time
             last_time = frame_start
 
@@ -682,7 +682,7 @@ class _Table(object):
             self._buffer_to_segments(buf, offsets)
             glbs.devices.transmitLED(self.getLEDData())
 
-            elapsed = glbs.time.time() - frame_start
+            elapsed = glbs.time.monotonic() - frame_start
             sleep_for = frame_interval - elapsed
             if sleep_for > 0:
                 glbs.time.sleep(sleep_for)
@@ -934,7 +934,7 @@ class AmbientFlow(object):
             return
         self._prev_mode = self._mode
         self._mode = mode
-        self._mode_change_time = time.time()
+        self._mode_change_time = time.monotonic()
 
     def reset(self):
         """Drop flows so the next tick lazily recreates them."""

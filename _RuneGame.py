@@ -195,7 +195,7 @@ class RuneGame(BaseGame):
         """Advance animation by one step.  Called by S11 each loop iteration."""
         self._collect_input()
 
-        now = time.time()
+        now = time.monotonic()
         elapsed_ms = (now - self._phase_time) * 1000
 
         if self._phase == self._REVEAL:
@@ -254,7 +254,7 @@ class RuneGame(BaseGame):
         self._reveal_order = [led for layer in self._reveal_layers for led in layer]
         self._reveal_step = 0
         self._phase = self._REVEAL
-        self._phase_time = time.time()
+        self._phase_time = time.monotonic()
 
     def _step_reveal(self):
         """Light up all LEDs in the current BFS layer simultaneously."""
@@ -267,7 +267,7 @@ class RuneGame(BaseGame):
 
         if self._reveal_step >= len(self._reveal_layers):
             self._phase = self._HOLD
-            self._phase_time = time.time()
+            self._phase_time = time.monotonic()
 
     # Number of brightness steps for the simultaneous fade-out
     _FADE_STEPS = 8
@@ -276,7 +276,7 @@ class RuneGame(BaseGame):
         """Begin simultaneous fade of all rune LEDs to black."""
         self._fade_step = self._FADE_STEPS
         self._phase = self._FADE
-        self._phase_time = time.time()
+        self._phase_time = time.monotonic()
 
     def _step_fade(self):
         """Dim all rune LEDs by one brightness step simultaneously.
@@ -295,7 +295,7 @@ class RuneGame(BaseGame):
                 if seg:
                     seg.setLEDValue(led_idx, list(black))
             self._phase = self._PAUSE
-            self._phase_time = time.time()
+            self._phase_time = time.monotonic()
         else:
             dimmed = [max(0, int(c * factor)) for c in self._color]
             for seg_name, led_idx in self._reveal_order:
@@ -310,7 +310,7 @@ class RuneGame(BaseGame):
     def _start_await_input(self):
         """All runes revealed — start the response timer."""
         self._phase = self._AWAIT_INPUT
-        self._phase_time = time.time()
+        self._phase_time = time.monotonic()
 
     def _collect_input(self):
         """Buffer button presses from currentRoundInputs (early input allowed)."""
@@ -342,7 +342,7 @@ class RuneGame(BaseGame):
             return
 
         # Timeout?
-        elapsed_ms = (time.time() - self._phase_time) * 1000
+        elapsed_ms = (time.monotonic() - self._phase_time) * 1000
         timeout_ms = self._response_timeout * len(expected)
         if elapsed_ms >= timeout_ms:
             glbs.ctx.gameFailures += 1
@@ -551,7 +551,7 @@ class RuneGame(BaseGame):
         per_rune_ms = reveal_ms + hold_ms + fade_ms + self._pause_between
 
         total_ms = count * per_rune_ms + count * self._response_timeout
-        remaining_s = glbs.ctx.gameTimeout - (time.time() - glbs.ctx.gameStartTime)
+        remaining_s = glbs.ctx.gameTimeout - (time.monotonic() - glbs.ctx.gameStartTime)
         return remaining_s * 1000 >= total_ms
 
     def _pick_runes(self, count):

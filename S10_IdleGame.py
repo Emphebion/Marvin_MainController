@@ -26,7 +26,7 @@ class S10_IdleGame():        #S10_GameMaster
 
         # Wait between rounds (line and multiline)
         if self.state == self.states.S10 and glbs.game.mode in ('line', 'multiline'):
-            self.idleTime = glbs.random.randint(3,5) + glbs.time.time()
+            self.idleTime = glbs.random.randint(3,5) + glbs.time.monotonic()
         self.state = self.states.S10
         print("current state is {}".format(self.state))
 
@@ -82,10 +82,10 @@ class S10_IdleGame():        #S10_GameMaster
                 else:
                     self.state = self.states.S11
             # Line mode: wait between rounds
-            elif glbs.game.mode == 'line' and (self.idleTime - glbs.time.time() > 0):
+            elif glbs.game.mode == 'line' and (self.idleTime - glbs.time.monotonic() > 0):
                 self.state = self.states.S10
             # Multiline mode: wait between rounds (same as line)
-            elif glbs.game.mode == 'multiline' and (self.idleTime - glbs.time.time() > 0):
+            elif glbs.game.mode == 'multiline' and (self.idleTime - glbs.time.monotonic() > 0):
                 self.state = self.states.S10
             # Start next round/sequence
             else:
@@ -107,7 +107,7 @@ class S10_IdleGame():        #S10_GameMaster
     def checkForFailures(self):
         inputs = list(set(glbs.ctx.currentRoundInputs))
         if inputs:
-            glbs.systemWakeTime = glbs.time.time()
+            glbs.systemWakeTime = glbs.time.monotonic()
         if not((self.currentGoal in inputs) and (len(inputs) == 1)):
             glbs.ctx.gameFailures = glbs.ctx.gameFailures + 1
             glbs.mqtt.publish_game_failure(glbs.ctx.gameFailures, self._max_failures)
@@ -116,7 +116,7 @@ class S10_IdleGame():        #S10_GameMaster
         """Check multiline round inputs: all real goals must be pressed, no false goal."""
         inputs = list(set(glbs.ctx.currentRoundInputs))
         if inputs:
-            glbs.systemWakeTime = glbs.time.time()
+            glbs.systemWakeTime = glbs.time.monotonic()
         if not inputs:
             glbs.ctx.gameFailures += 1
             glbs.mqtt.publish_game_failure(glbs.ctx.gameFailures, self._max_failures)
@@ -136,9 +136,9 @@ class S10_IdleGame():        #S10_GameMaster
 
     def checkGameTime(self):
         gameComplete = False
-        timmy = glbs.ctx.gameTimeout - (glbs.time.time() - glbs.ctx.gameStartTime)
+        timmy = glbs.ctx.gameTimeout - (glbs.time.monotonic() - glbs.ctx.gameStartTime)
         print("Current time before finished = " + str(timmy))
-        if (glbs.time.time() - glbs.ctx.gameStartTime) > glbs.ctx.gameTimeout:
+        if (glbs.time.monotonic() - glbs.ctx.gameStartTime) > glbs.ctx.gameTimeout:
             gameComplete = True
             # game is finished
         return gameComplete

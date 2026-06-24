@@ -21,14 +21,14 @@ class S5_Well(object):
 
         glbs.ambient_flow.set_mode('menu')
         while(self.state == self.states.S5):
-            glbs.ambient_flow.tick(glbs.time.time())
+            glbs.ambient_flow.tick(glbs.time.monotonic())
             self._setState()
         return self.state.value
 
     def _setState(self):
         input_list = glbs.handler.event_handler()
         if input_list:
-            glbs.systemWakeTime = glbs.time.time()
+            glbs.systemWakeTime = glbs.time.monotonic()
             new_input = input_list.pop()
             if new_input["event"] == "keydown":
                 if new_input["data"] == "right":

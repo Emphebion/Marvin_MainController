@@ -28,7 +28,7 @@ class S11_AwaitInput():
 
     def _setState(self):
         # Statement used to determine game speed:
-        if (self.loopTimeout > (glbs.time.time()-self.loopStartTime)):
+        if (self.loopTimeout > (glbs.time.monotonic()-self.loopStartTime)):
             self.state = self.states.S11
         else:
             if glbs.game.mode == 'runes':
@@ -36,21 +36,21 @@ class S11_AwaitInput():
                 if glbs.game.is_complete():
                     self.state = self.states.S10
                 else:
-                    self.loopStartTime = glbs.time.time()
+                    self.loopStartTime = glbs.time.monotonic()
                     self.state = self.states.S12
             elif glbs.game.mode == 'multiline':
                 # Multiline mode: check if all routes are done
                 if glbs.game.is_complete() and all(not r['done'] for r in glbs.game.routes):
                     self.state = self.states.S10
                 else:
-                    self.loopStartTime = glbs.time.time()
+                    self.loopStartTime = glbs.time.monotonic()
                     self.state = self.states.S12
             else:
                 # Line mode: check if the line is done
                 if(not self.routeDone) & (not glbs.ctx.currentGameRoute):
                     self.state = self.states.S10
                 else:
-                    self.loopStartTime = glbs.time.time()
+                    self.loopStartTime = glbs.time.monotonic()
                     self.state = self.states.S12
 
         #reset state machine if no input has been provided for 15 minutes   CAN BE MOVED TO OTHER STATES NOW THAT FAILURES ARE HANDLED

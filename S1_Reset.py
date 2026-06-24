@@ -36,10 +36,13 @@ class S1_Reset():
         glbs.characters.setActiveCharacter(None)
 
         self._setIdleLightBehaviour()
-        self.idleStartTime = glbs.time.time()
+        # Duration anchors below use monotonic() — they pair with the `now`
+        # inside the while loop (also monotonic) and feed AmbientFlow.tick.
+        # See glbs.systemWakeTime comment for why.
+        self.idleStartTime = glbs.time.monotonic()
 
         while self.state == self.states.S1:
-            now = glbs.time.time()
+            now = glbs.time.monotonic()
 
             if glbs.table.status == "Active":
                 glbs.ambient_flow.tick(now)

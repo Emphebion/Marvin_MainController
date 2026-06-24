@@ -65,11 +65,11 @@ class S6_Well_Size(object):
         glbs.display.display(self.folder, self.name, self.location)
         glbs.display.draw_source(glbs.items.source, glbs.items.calculateNodeUse())
 
-        self._enter_time = glbs.time.time()
+        self._enter_time = glbs.time.monotonic()
         last_frame_time = 0.0
 
         while self.state == self.states.S6:
-            now = glbs.time.time()
+            now = glbs.time.monotonic()
             if (now - last_frame_time) >= self._frame_interval:
                 self._draw_well_leds(now - self._enter_time)
                 last_frame_time = now
@@ -126,13 +126,13 @@ class S6_Well_Size(object):
         self._mode = _MODES[(idx + 1) % len(_MODES)]
         print(f"S6 well-size mode → {self._mode}")
         # Restart elapsed time so the new mode gets its intro ramp.
-        self._enter_time = glbs.time.time()
+        self._enter_time = glbs.time.monotonic()
         self._draw_well_leds(0.0)
 
     def _setState(self):
         input_list = glbs.handler.event_handler()
         if input_list:
-            glbs.systemWakeTime = glbs.time.time()
+            glbs.systemWakeTime = glbs.time.monotonic()
             new_input = input_list.pop()
             if new_input["event"] == "keydown":
                 if new_input["data"] == "up":

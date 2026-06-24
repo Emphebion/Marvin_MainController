@@ -14,14 +14,14 @@ class S2_Welcome(object):
         print("current state is {}".format(self.state))
         print("Welcome to the game, {}!".format(glbs.characters.activeCharacter.name))
         glbs.display.display(self.folder, self.name, self.location)
-        glbs.systemWakeTime = glbs.time.time()  # Reset system wake time
+        glbs.systemWakeTime = glbs.time.monotonic()  # Reset system wake time
         glbs.ambient_flow.set_mode('menu')
 
         # No explicit reset/clear — AmbientFlow keeps its trail continuous
         # across menu→menu transitions (sub-millisecond gaps) and
         # auto-resets on its own after a long gap (game / sleep).
         while(self.state == self.states.S2):
-            glbs.ambient_flow.tick(glbs.time.time())
+            glbs.ambient_flow.tick(glbs.time.monotonic())
             self._setState()
         return self.state.value
 
@@ -29,7 +29,7 @@ class S2_Welcome(object):
         new_state = self.states.S2
         input_list = glbs.handler.event_handler()
         if input_list:
-            glbs.systemWakeTime = glbs.time.time()  # Reset system wake time
+            glbs.systemWakeTime = glbs.time.monotonic()  # Reset system wake time
             new_input = input_list.pop()
             new_state = self.states.S3
 

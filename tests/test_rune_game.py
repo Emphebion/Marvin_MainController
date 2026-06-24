@@ -84,7 +84,7 @@ def make_game(table_config_file, marvin_config_file, rune_config_file, monkeypat
             gameFailures=0,
             gameSuccess=False,
             gameTimeout=600.0,
-            gameStartTime=time.time(),
+            gameStartTime=time.monotonic(),
         ),
         items=types.SimpleNamespace(
             currentItemName='widget',
@@ -234,7 +234,7 @@ class TestSmartTimeout:
                                      rune_config_file, monkeypatch)
         # Set game time to nearly expired
         glbs_stub.ctx.gameTimeout = 0.001
-        glbs_stub.ctx.gameStartTime = time.time() - 10
+        glbs_stub.ctx.gameStartTime = time.monotonic() - 10
         game.start(None)
         assert game.is_complete()
         assert glbs_stub.ctx.gameSuccess is True
@@ -255,7 +255,7 @@ class TestInputScoring:
         ]
         game._expected_buttons = list(buttons)
         game._phase = game._AWAIT_INPUT
-        game._phase_time = time.time()
+        game._phase_time = time.monotonic()
         game._inputs = []
 
     def test_correct_input_completes(self, table_config_file, marvin_config_file,
@@ -291,7 +291,7 @@ class TestInputScoring:
         self._setup_sequence(game, glbs_stub, ['east'])
 
         # Set phase_time far in the past to trigger timeout
-        game._phase_time = time.time() - 100
+        game._phase_time = time.monotonic() - 100
 
         game.update()
         assert game.is_complete()
@@ -350,7 +350,7 @@ class TestAnimationPhases:
 
         # Force into REVEAL phase and step through
         game._phase = game._REVEAL
-        game._phase_time = time.time() - 1  # elapsed > revealSpeed
+        game._phase_time = time.monotonic() - 1  # elapsed > revealSpeed
 
         initial_step = game._reveal_step
         game.update()
@@ -365,7 +365,7 @@ class TestAnimationPhases:
         # Advance reveal to completion (one tick per layer)
         game._phase = game._REVEAL
         for _ in range(len(game._reveal_layers) + 5):
-            game._phase_time = time.time() - 1
+            game._phase_time = time.monotonic() - 1
             game.update()
             if game._phase != game._REVEAL:
                 break
@@ -379,7 +379,7 @@ class TestAnimationPhases:
         game.start(None)
 
         game._phase = game._HOLD
-        game._phase_time = time.time() - 1  # elapsed > holdTime
+        game._phase_time = time.monotonic() - 1  # elapsed > holdTime
 
         game.update()
         assert game._phase == game._FADE
@@ -392,7 +392,7 @@ class TestAnimationPhases:
 
         game._phase = game._FADE
         game._fade_step = 1  # one step left before factor hits 0
-        game._phase_time = time.time() - 1
+        game._phase_time = time.monotonic() - 1
 
         game.update()
         # After the final brightness step, should be in PAUSE

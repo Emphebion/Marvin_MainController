@@ -31,7 +31,12 @@ def handler(monkeypatch):
     )
     glbs_stub = types.SimpleNamespace(
         pygame=pygame_stub,
-        time=types.SimpleNamespace(time=lambda: time_state['now']),
+        # Stub both .time() and .monotonic() — production uses monotonic
+        # for duration math; both return the same controllable value here.
+        time=types.SimpleNamespace(
+            time=lambda: time_state['now'],
+            monotonic=lambda: time_state['now'],
+        ),
     )
     monkeypatch.setitem(sys.modules, 'glbs', glbs_stub)
 

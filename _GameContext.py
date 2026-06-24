@@ -9,7 +9,9 @@ makes the round lifecycle explicit and allows tests to inject a fresh
 context without touching hardware or display objects.
 
 Attributes:
-    gameStartTime      -- time.time() when the current round started
+    gameStartTime      -- time.monotonic() when the current round started
+                          (monotonic clock — pairs with monotonic reads in
+                          S10/S13/_RuneGame; immune to NTP wall-clock jumps)
     gameTimeout        -- duration (seconds) allowed for the round
     currentInput       -- single-slot mirror of the most recent raw input
                           event (button name or RFID hex). Intended use:

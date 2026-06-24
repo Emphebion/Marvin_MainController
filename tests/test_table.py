@@ -799,7 +799,7 @@ class TestRunLightningSparks:
             if seconds and seconds > 0:
                 clock[0] += seconds
 
-        stub_time = types.SimpleNamespace(time=fake_time, sleep=fake_sleep)
+        stub_time = types.SimpleNamespace(time=fake_time, monotonic=fake_time, sleep=fake_sleep)
         stub = types.SimpleNamespace(
             time=stub_time,
             devices=types.SimpleNamespace(transmitLED=capture),

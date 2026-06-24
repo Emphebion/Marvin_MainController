@@ -14,7 +14,7 @@ class S13_FinishGame():
         print("current state is {}".format(self.state))
 
         #Handle the consequences of the game
-        elapsed_s = glbs.time.time() - glbs.ctx.gameStartTime
+        elapsed_s = glbs.time.monotonic() - glbs.ctx.gameStartTime
         if glbs.ctx.gameSuccess:
             print("Game finished successfully")
             glbs.mqtt.publish_game_success(elapsed_s)
@@ -52,8 +52,8 @@ class S13_FinishGame():
             glbs.devices.transmitLED(glbs.table.getLEDData())
 
         #start the finish timer
-        stopTime = self.successTimeout + glbs.time.time()
-        while (stopTime - glbs.time.time() > 0):
+        stopTime = self.successTimeout + glbs.time.monotonic()
+        while (stopTime - glbs.time.monotonic() > 0):
             delay = 1
 
         glbs.ctx.reset()  # Reset all round variables for the next game
@@ -62,8 +62,8 @@ class S13_FinishGame():
         glbs.table.fade_to_black(2.0)
         
         #start the finish timer again
-        stopTime = self.successTimeout + glbs.time.time()
-        while (stopTime - glbs.time.time() > 0):
+        stopTime = self.successTimeout + glbs.time.monotonic()
+        while (stopTime - glbs.time.monotonic() > 0):
             delay = 1
 
         while(self.state == self.states.S13):

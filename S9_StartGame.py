@@ -22,8 +22,8 @@ class S9_StartGame(object):
         return self.state.value
 
     def _setState(self):
-        glbs.systemWakeTime = glbs.time.time()
-        glbs.ctx.gameStartTime = glbs.time.time()
+        glbs.systemWakeTime = glbs.time.monotonic()
+        glbs.ctx.gameStartTime = glbs.time.monotonic()
 
         # Select game mode based on item level.
         # Single .get() rather than `in`+index: the items file-watcher thread

@@ -79,9 +79,14 @@ ambient_flow = AmbientFlow(table, parser)
 # Round state — all mutable per-round variables live here
 ctx = GameContext()
 
-# Sleep variables (system-level, not round-level)
+# Sleep variables (system-level, not round-level).
+# systemWakeTime is a *duration anchor*, not a wall-clock timestamp: it
+# pairs with time.monotonic() reads in bedTime(). Using monotonic here
+# means an NTP sync during a session (the Pi has no battery-backed RTC
+# and boots with whatever fake-hwclock restored) cannot make bedTime
+# fire spuriously when the wall clock jumps forward by hours.
 systemTimeout  = parser.getint('common', 'systemTimeout')
-systemWakeTime = time.time()
+systemWakeTime = time.monotonic()
 
 
 def bedTime():
@@ -91,7 +96,7 @@ def bedTime():
     RFID scan starts a fresh session.
     """
     sleep = False
-    if (time.time() - systemWakeTime) > systemTimeout:
+    if (time.monotonic() - systemWakeTime) > systemTimeout:
         characters.resetActiveCharacter()
         sleep = True
     return sleep
