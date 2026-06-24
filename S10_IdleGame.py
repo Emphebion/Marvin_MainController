@@ -13,10 +13,14 @@ class S10_IdleGame():        #S10_GameMaster
 
 
     def run(self):
-        # Resolve failure limit for the current item's level
+        # Resolve failure limit for the current item's level.
+        # Single .get() rather than `in`+index: the items file-watcher thread
+        # could swap glbs.items.items between the two operations.
         level = 1
-        if glbs.items.currentItemName and glbs.items.currentItemName in glbs.items.items:
-            level = glbs.items.items[glbs.items.currentItemName].level
+        if glbs.items.currentItemName:
+            item = glbs.items.items.get(glbs.items.currentItemName)
+            if item is not None:
+                level = item.level
         level_idx = min(level - 1, len(self.failuresPerLevel) - 1)
         self._max_failures = self.failuresPerLevel[level_idx]
 

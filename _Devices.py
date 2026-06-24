@@ -41,6 +41,14 @@ import time
 import threading
 
 
+# When in_waiting exceeds this on a single read(), assume the main loop was
+# blocked long enough that the kernel RX buffer holds a fragmented mess of
+# overlapping frames. 256 bytes is ~35 frames at the normal 'B' cadence —
+# well above any single-tick legitimate accumulation, well below the
+# typical 4 KB kernel buffer that would otherwise overflow silently.
+_RX_OVERRUN_THRESHOLD = 256
+
+
 class _Devices(object):
     """Container for all configured serial devices. Detects and connects devices at init.
 
@@ -287,6 +295,16 @@ class Device(object):
                 return None
             try:
                 n = self.ser.in_waiting
+                if n > _RX_OVERRUN_THRESHOLD:
+                    # The main thread was blocked long enough (SD stall, GC
+                    # pause, etc.) for the kernel buffer to accumulate many
+                    # frames worth of bytes. Trying to COBS-decode that
+                    # backlog risks partial-frame mis-decodes — drop it and
+                    # resync on the next clean frame instead.
+                    print(f"Device {self.name}: RX overrun in_waiting={n}, flushing")
+                    self.ser.read(n)
+                    self._rx_buf.clear()
+                    return None
                 if n:
                     self._rx_buf.extend(self.ser.read(n))
             except (serial.SerialException, OSError, TypeError) as e:

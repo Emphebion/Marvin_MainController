@@ -25,10 +25,14 @@ class S9_StartGame(object):
         glbs.systemWakeTime = glbs.time.time()
         glbs.ctx.gameStartTime = glbs.time.time()
 
-        # Select game mode based on item level
+        # Select game mode based on item level.
+        # Single .get() rather than `in`+index: the items file-watcher thread
+        # could swap glbs.items.items between the two operations.
         level = 1
-        if glbs.items.currentItemName and glbs.items.currentItemName in glbs.items.items:
-            level = glbs.items.items[glbs.items.currentItemName].level
+        if glbs.items.currentItemName:
+            item = glbs.items.items.get(glbs.items.currentItemName)
+            if item is not None:
+                level = item.level
         try:
             mode = glbs.parser.get('GameModes', f'level{level}')
         except Exception:

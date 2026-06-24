@@ -47,6 +47,10 @@ table_file = 'tableconfig.txt'
 character_file = 'characterconfig.txt'
 
 pygame.init()
+# Surface the resolved SDL backend so a silent fall-back to 'dummy' (e.g.
+# missing /dev/dri/card0, user not in 'video' group) shows up in logs
+# instead of waiting for the first display call to raise mid-game.
+print(f"SDL_VIDEODRIVER={pygame.display.get_driver()!r}")
 
 # parser is kept for state modules that read their config sections
 # (State1…State13, StateT1…StateT4) from marvinconfig.txt.
