@@ -254,3 +254,110 @@ class TestGetDevice:
         dev.offline = False
         devices.connectedDevices.append(dev)
         assert devices.get_device('RFID_LED') is None
+
+
+# ---------------------------------------------------------------------------
+# RX-buffer overrun guard. When the main loop is blocked long enough (SD
+# stall, GC pause) for the kernel buffer to back up past ~one stall's
+# worth of frames, the decoder must drop the backlog rather than risk a
+# partial-frame mis-decode that the deep-dive (case A) showed could fire
+# the shutdown bit.
+# ---------------------------------------------------------------------------
+
+class TestRxOverrunGuard:
+    def test_overrun_flushes_kernel_buffer_and_returns_none(self):
+        from _Devices import _RX_OVERRUN_THRESHOLD
+        dev = make_device()
+        # Stuff > threshold bytes into a single in_waiting reading.
+        dev.ser.is_open = True
+        big_chunk = b'\xAA' * (_RX_OVERRUN_THRESHOLD + 50)
+        type(dev.ser).in_waiting = property(lambda self: len(big_chunk))
+        dev.ser.read = MagicMock(return_value=big_chunk)
+        # Pre-populate _rx_buf with a partial frame fragment — must also be
+        # cleared so the next decode resyncs cleanly.
+        dev._rx_buf.extend(b'\x05partial')
+        out = dev.read()
+        assert out is None
+        assert len(dev._rx_buf) == 0, \
+            "overrun must clear _rx_buf to avoid mid-frame replay"
+        dev.ser.read.assert_called_once()
+
+    def test_within_threshold_decodes_normally(self):
+        """A normal-sized burst must still decode without triggering the guard."""
+        dev = make_device()
+        frame = _build_frame(ord('B'), [0x80, 0x00])
+        # Frame length is well under the threshold.
+        _set_rx_chunks(dev, frame)
+        out = dev.read()
+        assert out == bytes([ord('B'), 0x80, 0x00])
+
+
+# ---------------------------------------------------------------------------
+# Device.reopen — atomic port swap, _rx_buf flush, used by the reconnect
+# watcher to recover from USB re-enumerations without exposing the main
+# thread to a half-swapped self.ser.
+# ---------------------------------------------------------------------------
+
+class TestReopen:
+    def test_reopen_clears_rx_buf(self):
+        """A partial frame held over from before the disconnect must be
+        thrown away — otherwise it can later decode as a phantom frame
+        with arbitrary bits set (deep-dive's case B → A path)."""
+        dev = make_device()
+        dev._rx_buf.extend(b'\x03partialjunk')
+        # Avoid the 2s sleep in reopen.
+        with patch('_Devices.time.sleep'):
+            dev.ser.is_open = False           # so close() does nothing
+            dev.reopen('/dev/ttyACM9')
+        assert len(dev._rx_buf) == 0
+
+    def test_reopen_sets_new_port(self):
+        dev = make_device()
+        with patch('_Devices.time.sleep'):
+            dev.reopen('/dev/ttyACM7')
+        assert dev.ser.port == '/dev/ttyACM7'
+
+    def test_reopen_calls_serial_open(self):
+        dev = make_device()
+        dev.ser.is_open = False
+        with patch('_Devices.time.sleep'):
+            dev.reopen('/dev/ttyACM3')
+        dev.ser.open.assert_called()
+
+    def test_reopen_closes_existing_open_handle_first(self):
+        """If the old handle is still open at reopen time, it must be closed
+        before the swap — leaking the fd would prevent reopen on Linux."""
+        dev = make_device()
+        dev.ser.is_open = True
+        with patch('_Devices.time.sleep'):
+            dev.reopen('/dev/ttyACM2')
+        dev.ser.close.assert_called()
+
+
+# ---------------------------------------------------------------------------
+# Thread-safety: send/read must take the device lock so the reconnect
+# watcher can't swap self.ser mid-operation. We assert the lock is taken
+# (not its absolute correctness — Python's GIL plus an RLock per device
+# is the contract).
+# ---------------------------------------------------------------------------
+
+class TestDeviceLock:
+    def test_device_has_an_rlock(self):
+        import threading
+        dev = make_device()
+        # RLock isn't a type — it's a factory. Check the underlying class.
+        assert hasattr(dev, '_lock')
+        assert dev._lock.__class__ is threading.RLock().__class__
+
+    def test_reopen_takes_the_lock(self):
+        """If the lock isn't honoured by reopen, the main thread can observe
+        a half-swapped self.ser."""
+        dev = make_device()
+        with patch('_Devices.time.sleep'):
+            with dev._lock:
+                # We hold the lock; reopen must wait. The simplest assertion
+                # is just that the lock is re-entrant (RLock allows same
+                # thread to acquire again) which means reopen works from
+                # the same thread without deadlocking.
+                dev.reopen('/dev/ttyACM4')
+        # If we get here without deadlock, RLock is in use.

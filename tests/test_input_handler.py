@@ -25,7 +25,9 @@ def handler(monkeypatch):
         USEREVENT=24,
         KEYDOWN=1,
         MOUSEBUTTONDOWN=2,
+        QUIT=12,
         event=types.SimpleNamespace(set_allowed=MagicMock()),
+        quit=MagicMock(),
     )
     glbs_stub = types.SimpleNamespace(
         pygame=pygame_stub,
@@ -141,3 +143,79 @@ class TestGameButtonDecoding:
         self._install_table_stub(handler)
         h.serial_event_handler(_b_frame(0x00, 0x00))
         assert h.elist == []
+
+
+# ---------------------------------------------------------------------------
+# Shutdown-bit debounce. Cause A of the 2026-06-24 overnight cascade was a
+# single noise-flipped shutdown bit tearing down pygame; the handler must
+# now require the bit to be set for N consecutive 'B' frames before firing.
+# ---------------------------------------------------------------------------
+
+class TestShutdownDebounce:
+
+    def _install_table_stub(self, handler):
+        h, _ = handler
+        import glbs
+        glbs.table = types.SimpleNamespace(
+            screenButtons=['bottom', 'right', 'top', 'left',
+                            'null', 'null', 'tag', 'shutdown'],
+            gameButtons=['southeast', 'south', 'southwest', 'west',
+                          'northwest', 'north', 'northeast', 'east'],
+        )
+
+    def test_single_shutdown_bit_does_not_fire(self, handler):
+        """One frame with bit 0 set must not call sys.exit / pygame.quit."""
+        h, _ = handler
+        self._install_table_stub(handler)
+        # bit 0 of scrn = shutdown
+        h.serial_event_handler(_b_frame(0x01, 0x00))
+        assert h._shutdown_streak == 1
+        # pygame.quit must not have been called yet
+        import glbs
+        glbs.pygame.quit.assert_not_called()
+
+    def test_four_consecutive_does_not_fire(self, handler):
+        """N-1 frames with bit 0 set must not yet honour the shutdown."""
+        h, _ = handler
+        self._install_table_stub(handler)
+        for _ in range(h._SHUTDOWN_STREAK_REQUIRED - 1):
+            h.serial_event_handler(_b_frame(0x01, 0x00))
+        import glbs
+        glbs.pygame.quit.assert_not_called()
+
+    def test_n_consecutive_fires_shutdown(self, handler):
+        """The Nth frame with bit 0 set must honour the shutdown."""
+        h, _ = handler
+        self._install_table_stub(handler)
+        with pytest.raises(SystemExit):
+            for _ in range(h._SHUTDOWN_STREAK_REQUIRED):
+                h.serial_event_handler(_b_frame(0x01, 0x00))
+        import glbs
+        glbs.pygame.quit.assert_called_once()
+
+    def test_streak_resets_on_absent_bit(self, handler):
+        """A frame without bit 0 must reset the streak — a noise spike can't
+        accumulate across long quiet intervals to eventually trigger."""
+        h, _ = handler
+        self._install_table_stub(handler)
+        # 4 frames with bit, then a clean frame, then 4 more — none should fire
+        for _ in range(h._SHUTDOWN_STREAK_REQUIRED - 1):
+            h.serial_event_handler(_b_frame(0x01, 0x00))
+        h.serial_event_handler(_b_frame(0x00, 0x00))
+        assert h._shutdown_streak == 0
+        for _ in range(h._SHUTDOWN_STREAK_REQUIRED - 1):
+            h.serial_event_handler(_b_frame(0x01, 0x00))
+        import glbs
+        glbs.pygame.quit.assert_not_called()
+
+    def test_other_screen_bits_do_not_affect_streak(self, handler):
+        """A frame with other screen bits set but bit 0 clear must reset the
+        streak — pressing 'left' shouldn't preserve a partial shutdown streak.
+        """
+        h, _ = handler
+        self._install_table_stub(handler)
+        h.serial_event_handler(_b_frame(0x01, 0x00))
+        assert h._shutdown_streak == 1
+        # bit 0 clear, other bits set — streak resets even though scrn != 0
+        h.serial_event_handler(_b_frame(0x80, 0x00))  # bit 7 set = 'bottom'
+        assert h._shutdown_streak == 0
