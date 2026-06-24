@@ -18,6 +18,7 @@ import os
 import threading
 
 from _Characters import _normalize_id, _scrub_id_in_parser, scrub_id_from_config
+from _atomic import atomic_write_parser
 
 class _Items(object):
     """Item inventory: menu navigation, connection state, and overload protection.
@@ -126,8 +127,7 @@ class _Items(object):
         # one write) and assign new_id to the target section.
         _scrub_id_in_parser(self.parser, new_id, skip_section=item_name)
         self.parser.set(item_name, 'id', new_id)
-        with open(self.config_file, 'w') as f:
-            self.parser.write(f)
+        atomic_write_parser(self.parser, self.config_file)
 
         try:
             self._mtime = os.path.getmtime(self.config_file)
@@ -292,8 +292,7 @@ class _Items(object):
             item.disconnectItem()
             self.parser[item.name]['connected'] = '0'
 
-        with open(self.config_file,'w') as file:
-            self.parser.write(file)
+        atomic_write_parser(self.parser, self.config_file)
 
         try:
             self._mtime = os.path.getmtime(self.config_file)
@@ -312,8 +311,7 @@ class _Items(object):
         item.connectItem()
         self.parser[item.name]['connected'] = '1'
 
-        with open(self.config_file,'w') as file:
-            self.parser.write(file)
+        atomic_write_parser(self.parser, self.config_file)
 
         try:
             self._mtime = os.path.getmtime(self.config_file)
@@ -336,8 +334,7 @@ class _Items(object):
         item.disconnectItem()
         self.parser[item.name]['connected'] = '0'
 
-        with open(self.config_file,'w') as file:
-            self.parser.write(file)
+        atomic_write_parser(self.parser, self.config_file)
 
         try:
             self._mtime = os.path.getmtime(self.config_file)

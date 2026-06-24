@@ -2,6 +2,7 @@
 
 from states_enum import StatesEnum
 import glbs
+from _atomic import atomic_write_parser
 
 class S1_Reset():
     """Idle state. Wakes on RFID scan. Drives table animations based on table status:
@@ -207,8 +208,7 @@ class S1_Reset():
 
     def _write_config(self):
         """Write the in-memory parser back to marvinconfig.txt."""
-        with open(glbs.config_file, 'w') as f:
-            glbs.parser.write(f)
+        atomic_write_parser(glbs.parser, glbs.config_file)
 
     def _build_gm_entries(self):
         """Return a flat ordered list of assignable character and item entries.

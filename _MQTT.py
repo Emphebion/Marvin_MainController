@@ -22,12 +22,20 @@ the game loop. If paho-mqtt is not installed, all operations are silent no-ops.
 import json
 import configparser
 
+from _atomic import atomic_write_parser
+
 try:
     import paho.mqtt.client as _mqtt_client
     _PAHO_AVAILABLE = True
 except ImportError:
     _PAHO_AVAILABLE = False
     print("_MQTT: paho-mqtt not installed; MQTT disabled. Install with: pip install paho-mqtt")
+
+
+# Bound on outbound publishes paho will hold while the broker is unreachable.
+# At ~1 publish/sec average, 100 covers ~1.5 minutes of outage with comfortable
+# headroom; longer outages drop new messages rather than grow memory unbounded.
+_MAX_QUEUED_PUBLISHES = 100
 
 
 class _MQTT:
@@ -60,6 +68,14 @@ class _MQTT:
         self._client.on_connect    = self._on_connect
         self._client.on_disconnect = self._on_disconnect
         self._client.on_message    = self._on_message
+
+        # Cap the outbound queue so a long broker outage cannot grow it
+        # without bound (the 2026-06-24 deep-dive's case H — unbounded paho
+        # queueing was the most-plausible Python-side memory leak path).
+        # paho drops new publishes once the queue hits this cap, which is
+        # less ideal than drop-oldest but is what the library offers; the
+        # important contract is "bounded", not the eviction policy.
+        self._client.max_queued_messages_set(_MAX_QUEUED_PUBLISHES)
 
         try:
             self._client.connect_async(self._broker, self._port)
@@ -237,8 +253,7 @@ class _MQTT:
                 parser.set(existing, "skills", ",".join(skills))
                 if "gm" in payload:
                     parser.set(existing, "gm", str(payload["gm"]).lower())
-                with open(glbs.character_file, "w") as f:
-                    parser.write(f)
+                atomic_write_parser(parser, glbs.character_file)
             else:
                 skills = payload.get("skills", [])
                 _KNOWN_SKILLS = {"connect1","connect2","connect3","disconnectall",
@@ -263,8 +278,7 @@ class _MQTT:
                 function = payload.get("function", "")
                 parser.set(existing, "load", str(load))
                 parser.set(existing, "function", function)
-                with open(glbs.item_file, "w") as f:
-                    parser.write(f)
+                atomic_write_parser(parser, glbs.item_file)
             else:
                 load     = int(payload.get("load", 1))
                 function = payload.get("function", "")
@@ -292,8 +306,7 @@ class _MQTT:
         parser = configparser.ConfigParser()
         parser.read(glbs.table_file)
         parser.set("common", "status", status)
-        with open(glbs.table_file, "w") as f:
-            parser.write(f)
+        atomic_write_parser(parser, glbs.table_file)
 
         self.publish_table_status(status)
         print(f"_MQTT: table status set to {status}")
@@ -313,8 +326,7 @@ class _MQTT:
         parser = configparser.ConfigParser()
         parser.read(glbs.item_file)
         parser.set("items", "source", str(size))
-        with open(glbs.item_file, "w") as f:
-            parser.write(f)
+        atomic_write_parser(parser, glbs.item_file)
 
         self.publish_items_cleared()   # republish items state with new capacity
         self._bump_config_version()
@@ -366,8 +378,7 @@ class _MQTT:
             value = preset
 
         glbs.parser.set(section, key, value)
-        with open(self._config_file, "w") as f:
-            glbs.parser.write(f)
+        atomic_write_parser(glbs.parser, self._config_file)
         print(f"_MQTT color/set: {param} = {value}")
 
     def _cmd_color_define(self, payload):
@@ -417,8 +428,7 @@ class _MQTT:
         parser = configparser.ConfigParser()
         parser.read(glbs.item_file)
         parser.set("items", "config_version", str(version))
-        with open(glbs.item_file, "w") as f:
-            parser.write(f)
+        atomic_write_parser(parser, glbs.item_file)
 
     def _bump_config_version(self):
         version = self._get_config_version() + 1
@@ -458,8 +468,7 @@ class _MQTT:
         if not parser.has_section(color_name):
             parser.add_section(color_name)
         parser.set(color_name, "rgb", f"{rgb[0]},{rgb[1]},{rgb[2]}")
-        with open(glbs.table_file, "w") as f:
-            parser.write(f)
+        atomic_write_parser(parser, glbs.table_file)
         print(f"_MQTT: color '{color_name}' updated to {rgb}")
 
     # ------------------------------------------------------------------ #
@@ -486,8 +495,7 @@ class _MQTT:
         if is_gm:
             parser.set(section_key, "gm", "true")
 
-        with open(glbs.character_file, "w") as f:
-            parser.write(f)
+        atomic_write_parser(parser, glbs.character_file)
         print(f"_MQTT: registered character '{name}' as [{section_key}] id={rfid}")
 
     def _write_new_item(self, rfid, name, level, load, function):
@@ -510,8 +518,7 @@ class _MQTT:
         parser.set(section_key, "load", str(load))
         parser.set(section_key, "connected", "0")
 
-        with open(glbs.item_file, "w") as f:
-            parser.write(f)
+        atomic_write_parser(parser, glbs.item_file)
         print(f"_MQTT: registered item '{name}' as [{section_key}] id={rfid}")
 
     # ------------------------------------------------------------------ #
@@ -569,8 +576,7 @@ class _MQTT:
                 if is_gm:
                     parser_p.set(key, "gm", "true")
 
-        with open(glbs.character_file, "w") as f:
-            parser_p.write(f)
+        atomic_write_parser(parser_p, glbs.character_file)
 
         # Update itemconfig.txt
         parser_i = configparser.ConfigParser()
@@ -603,8 +609,7 @@ class _MQTT:
                 parser_i.set(key, "load", str(load))
                 parser_i.set(key, "connected", "0")
 
-        with open(glbs.item_file, "w") as f:
-            parser_i.write(f)
+        atomic_write_parser(parser_i, glbs.item_file)
 
         n_characters = len(char_data)
         n_items      = len(payload.get("items", []))

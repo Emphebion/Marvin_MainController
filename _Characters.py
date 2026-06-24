@@ -22,6 +22,8 @@ import os
 import threading
 import configparser as _cp
 
+from _atomic import atomic_write_parser
+
 
 SENTINEL_ID = '0000000000'
 
@@ -61,8 +63,7 @@ def scrub_id_from_config(config_file, new_id, skip_section=None):
     parser = _cp.ConfigParser()
     parser.read(config_file)
     if _scrub_id_in_parser(parser, new_id, skip_section) > 0:
-        with open(config_file, 'w') as f:
-            parser.write(f)
+        atomic_write_parser(parser, config_file)
         return True
     return False
 
@@ -168,8 +169,7 @@ class _Characters(object):
         # one write) and assign new_id to the target section.
         _scrub_id_in_parser(parser, new_id, skip_section=section)
         parser.set(section, 'id', new_id)
-        with open(self.config_file, 'w') as f:
-            parser.write(f)
+        atomic_write_parser(parser, self.config_file)
 
         try:
             self._mtime = os.path.getmtime(self.config_file)
